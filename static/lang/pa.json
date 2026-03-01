@@ -1,0 +1,70 @@
+{
+    "_meta": {
+        "name": "Punjabi",
+        "native": "ਪੰਜਾਬੀ",
+        "direction": "ltr",
+        "version": "1.0"
+    },
+    "common": {
+        "save": "ਸੇਵ",
+        "cancel": "ਰੱਦ",
+        "delete": "ਮਿਟਾਓ",
+        "edit": "ਸੋਧੋ",
+        "search": "ਖੋਜੋ...",
+        "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
+        "no_data": "ਕੋਈ ਡਾਟਾ ਨਹੀਂ",
+        "success": "ਸਫਲ",
+        "error": "ਗਲਤੀ",
+        "back": "ਪਿੱਛੇ",
+        "next": "ਅੱਗੇ",
+        "submit": "ਜਮ੍ਹਾ ਕਰੋ",
+        "close": "ਬੰਦ",
+        "yes": "ਹਾਂ",
+        "no": "ਨਹੀਂ",
+        "ok": "ਠੀਕ",
+        "all": "ਸਾਰੇ",
+        "name": "ਨਾਮ",
+        "email": "ਈਮੇਲ",
+        "phone": "ਫ਼ੋਨ",
+        "address": "ਪਤਾ",
+        "amount": "ਰਕਮ",
+        "total": "ਕੁੱਲ",
+        "date": "ਤਾਰੀਖ",
+        "time": "ਸਮਾਂ",
+        "status": "ਸਥਿਤੀ",
+        "male": "ਪੁਰਸ਼",
+        "female": "ਔਰਤ",
+        "other": "ਹੋਰ"
+    },
+    "nav": {
+        "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+        "students": "ਵਿਦਿਆਰਥੀ",
+        "teachers": "ਅਧਿਆਪਕ",
+        "classes": "ਕਲਾਸਾਂ",
+        "attendance": "ਹਾਜ਼ਰੀ",
+        "exams": "ਪ੍ਰੀਖਿਆਵਾਂ",
+        "results": "ਨਤੀਜੇ",
+        "fees": "ਫੀਸ",
+        "settings": "ਸੈਟਿੰਗਾਂ",
+        "logout": "ਲਾਗ ਆਉਟ",
+        "login": "ਲਾਗ ਇਨ"
+    },
+    "dashboard": {
+        "welcome": "ਜੀ ਆਇਆਂ ਨੂੰ",
+        "total_students": "ਕੁੱਲ ਵਿਦਿਆਰਥੀ",
+        "today_attendance": "ਅੱਜ ਦੀ ਹਾਜ਼ਰੀ",
+        "fee_collected": "ਉਗਰਾਹੀ ਫੀਸ"
+    },
+    "attendance": {
+        "mark_attendance": "ਹਾਜ਼ਰੀ ਲਗਾਓ",
+        "present": "ਹਾਜ਼ਰ",
+        "absent": "ਗੈਰਹਾਜ਼ਰ"
+    },
+    "fees": {
+        "collect_fee": "ਫੀਸ ਉਗਰਾਹੋ",
+        "paid": "ਭੁਗਤਾਨ",
+        "unpaid": "ਬਕਾਇਆ",
+        "receipt": "ਰਸੀਦ",
+        "cash": "ਨਕਦ"
+    }
+}

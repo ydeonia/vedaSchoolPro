@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+{% block page_subtitle %}Check in/out & view your attendance record{% endblock %}
+
+{% block extra_css %}
+<style>
+.checkin-hero { background:linear-gradient(135deg,#1E1B4B,#4338CA); border-radius:14px; padding:20px 24px; color:white; margin-bottom:16px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.checkin-left { flex:1; min-width:200px; }
+.checkin-left h2 { font-size:1rem; margin-bottom:2px; font-weight:800; }
+.checkin-left .time-display { font-size:2.2rem; font-weight:900; font-variant-numeric:tabular-nums; letter-spacing:-1px; }
+.checkin-left .date-display { font-size:0.78rem; opacity:0.7; }
+.checkin-right { display:flex; gap:8px; flex-wrap:wrap; }
+.ck-btn { padding:10px 24px; border-radius:10px; font-weight:700; font-size:0.82rem; border:none; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:6px; }
+.ck-btn:hover { transform:scale(1.04); }
+.ck-btn.in { background:white; color:#4338CA; } .ck-btn.out { background:rgba(255,255,255,0.15); color:white; border:1.5px solid rgba(255,255,255,0.4); }
+.ck-btn.done { background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.6); cursor:default; }
+.ck-btn.done:hover { transform:none; }
+.checkin-status { margin-top:8px; font-size:0.75rem; opacity:0.85; }
+.att-stats { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:16px; }
+.a-stat { background:white; border-radius:12px; padding:12px 10px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.a-stat-val { font-size:1.5rem; font-weight:900; line-height:1; }
+.a-stat-label { font-size:0.65rem; color:var(--text-light); margin-top:3px; text-transform:uppercase; letter-spacing:0.3px; font-weight:600; }
+.cal-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px; }
+.month-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.month-nav h3 { font-size:0.92rem; font-weight:800; }
+.month-btn { background:var(--bg-secondary); border:none; padding:6px 10px; border-radius:8px; cursor:pointer; font-size:0.78rem; font-weight:600; }
+.month-btn:hover { background:var(--primary-50); color:var(--primary); }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+.cal-hdr { font-size:0.62rem; font-weight:700; text-align:center; color:var(--text-light); padding:4px 0; text-transform:uppercase; }
+.cal-day { aspect-ratio:1; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; cursor:default; position:relative; transition:transform 0.1s; max-width:42px; margin:0 auto; }
+.cal-day:hover:not(.empty) { transform:scale(1.15); z-index:2; }
+.cal-day.present { background:#D1FAE5; color:#059669; } .cal-day.absent { background:#FEE2E2; color:#DC2626; }
+.cal-day.late { background:#FEF3C7; color:#D97706; } .cal-day.on_leave { background:#DBEAFE; color:#2563EB; }
+.cal-day.half_day { background:#F3E8FF; color:#9333EA; } .cal-day.empty { background:none; }
+.cal-day.future { color:var(--text-light); opacity:0.4; } .cal-day.sunday { color:#EF4444; opacity:0.35; }
+.cal-day.today { box-shadow:0 0 0 2px #6366F1; }
+.cal-tooltip { display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); background:#1E293B; color:white; padding:6px 10px; border-radius:8px; font-size:0.65rem; white-space:nowrap; z-index:10; pointer-events:none; font-weight:600; line-height:1.5; }
+.cal-tooltip::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:4px solid transparent; border-top-color:#1E293B; }
+.cal-day:hover .cal-tooltip { display:block; }
+.cal-legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; justify-content:center; }
+.cal-legend span { font-size:0.68rem; display:flex; align-items:center; gap:4px; color:var(--text-secondary); }
+.leg-dot { width:10px; height:10px; border-radius:4px; flex-shrink:0; }
+@media(max-width:640px) { .att-stats { grid-template-columns:repeat(3,1fr); } .checkin-hero { flex-direction:column; text-align:center; } .checkin-right { justify-content:center; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="checkin-hero">
+    <div class="checkin-left">
+        <h2>👋 Daily Check-in</h2>
+        <div class="time-display" id="liveTime">--:--</div>
+        <div class="date-display" id="liveDate"></div>
+        <div class="checkin-status" id="checkinStatus"></div>
+    </div>
+    <div class="checkin-right">
+        <button class="ck-btn in" onclick="checkIn()" id="ckInBtn"><i class="fas fa-sign-in-alt"></i> Check In</button>
+        <button class="ck-btn out" onclick="checkOut()" id="ckOutBtn" style="display:none;"><i class="fas fa-sign-out-alt"></i> Check Out</button>
+    </div>
+</div>
+<div class="att-stats" id="attStats"></div>
+<div class="cal-card">
+    <div class="month-nav">
+        <button class="month-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i> Prev</button>
+        <h3 id="monthLabel"></h3>
+        <button class="month-btn" onclick="changeMonth(1)">Next <i class="fas fa-chevron-right"></i></button>
+    </div>
+    <div class="cal-grid"><div class="cal-hdr">S</div><div class="cal-hdr">M</div><div class="cal-hdr">T</div><div class="cal-hdr">W</div><div class="cal-hdr">T</div><div class="cal-hdr">F</div><div class="cal-hdr">S</div></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-legend"><span><span class="leg-dot" style="background:#10B981;"></span>Present</span><span><span class="leg-dot" style="background:#EF4444;"></span>Absent</span><span><span class="leg-dot" style="background:#F59E0B;"></span>Late</span><span><span class="leg-dot" style="background:#3B82F6;"></span>On Leave</span><span><span class="leg-dot" style="background:#9333EA;"></span>Half Day</span></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+let currentMonth=new Date().getMonth()+1, currentYear=new Date().getFullYear();
+function updateClock(){const n=new Date();document.getElementById('liveTime').textContent=n.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});document.getElementById('liveDate').textContent=`${DAYS[n.getDay()]}, ${n.getDate()} ${MONTHS[n.getMonth()]} ${n.getFullYear()}`;}
+setInterval(updateClock,1000);updateClock();
+
+async function checkIn(){try{const r=await apiCall('/api/teacher/check-in','POST');document.getElementById('checkinStatus').innerHTML=r.already?`<i class="fas fa-check-circle"></i> Already checked in at ${r.time}`:`<i class="fas fa-check-circle"></i> Checked in at ${r.time}`;if(!r.already)showToast('success','Checked In! ✅',r.message);document.getElementById('ckInBtn').className='ck-btn done';document.getElementById('ckInBtn').innerHTML='<i class="fas fa-check"></i> Checked In';document.getElementById('ckInBtn').onclick=null;document.getElementById('ckOutBtn').style.display='inline-flex';}catch(e){showToast('error','Error',e.message);}}
+async function checkOut(){try{const r=await apiCall('/api/teacher/check-out','POST');document.getElementById('checkinStatus').innerHTML+=` → Out: ${r.time}`;document.getElementById('ckOutBtn').className='ck-btn done';document.getElementById('ckOutBtn').innerHTML='<i class="fas fa-check"></i> Done';document.getElementById('ckOutBtn').onclick=null;showToast('success','Checked Out!',r.message);}catch(e){showToast('error','Error',e.message);}}
+
+async function loadAttendance(){try{const result=await apiCall(`/api/teacher/my-attendance?month=${currentMonth}&year=${currentYear}`);document.getElementById('monthLabel').textContent=`${MONTHS[currentMonth-1]} ${currentYear}`;const s=result.summary;document.getElementById('attStats').innerHTML=`<div class="a-stat"><div class="a-stat-val" style="color:#10B981;">${s.present}</div><div class="a-stat-label">Present</div></div><div class="a-stat"><div class="a-stat-val" style="color:#EF4444;">${s.absent}</div><div class="a-stat-label">Absent</div></div><div class="a-stat"><div class="a-stat-val" style="color:#F59E0B;">${s.late}</div><div class="a-stat-label">Late</div></div><div class="a-stat"><div class="a-stat-val" style="color:#3B82F6;">${s.on_leave}</div><div class="a-stat-label">On Leave</div></div><div class="a-stat"><div class="a-stat-val" style="color:#9333EA;">${s.half_day}</div><div class="a-stat-label">Half Day</div></div>`;
+const rm={};result.records.forEach(r=>{rm[r.date]=r;});const fd=new Date(currentYear,currentMonth-1,1).getDay(),dm=new Date(currentYear,currentMonth,0).getDate(),today=new Date(),ts=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+let h='';for(let i=0;i<fd;i++)h+='<div class="cal-day empty"></div>';
+for(let d=1;d<=dm;d++){const ds=`${currentYear}-${String(currentMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`,dd=new Date(currentYear,currentMonth-1,d),isSun=dd.getDay()===0,isFut=dd>today,isToday=ds===ts,rec=rm[ds],status=rec?rec.status:'';
+let cls='cal-day';if(isToday)cls+=' today';if(isFut)cls+=' future';else if(isSun)cls+=' sunday';else if(status)cls+=` ${status}`;
+let tip=`${String(d).padStart(2,'0')}/${String(currentMonth).padStart(2,'0')}/${currentYear}`;
+if(rec){tip+=`<br><b>${status.replace('_',' ').toUpperCase()}</b>`;if(rec.check_in)tip+=`<br>🕐 In: ${rec.check_in}`;if(rec.check_out)tip+=`<br>🕐 Out: ${rec.check_out}`;}else if(isSun){tip+='<br>Sunday';}else if(!isFut){tip+='<br>No record';}
+h+=`<div class="${cls}"><span class="cal-tooltip">${tip}</span>${d}</div>`;}
+document.getElementById('calGrid').innerHTML=h;}catch(e){}}
+function changeMonth(d){currentMonth+=d;if(currentMonth>12){currentMonth=1;currentYear++;}if(currentMonth<1){currentMonth=12;currentYear--;}loadAttendance();}
+
+async function loadCheckinStatus() {
+    try {
+        const resp = await fetch('/api/teacher/checkin-status', {credentials:'same-origin'});
+        if (!resp.ok) { console.log('checkin-status failed:', resp.status); return; }
+        const r = await resp.json();
+        console.log('Checkin status:', r);
+        if (r.checked_in) {
+            document.getElementById('ckInBtn').className='ck-btn done';
+            document.getElementById('ckInBtn').innerHTML='<i class="fas fa-check"></i> Checked In';
+            document.getElementById('ckInBtn').onclick=null;
+            let statusText = `<i class="fas fa-check-circle"></i> Checked in at ${r.check_in_time}`;
+            if (r.checked_out) {
+                statusText += ` → Out: ${r.check_out_time}`;
+                document.getElementById('ckOutBtn').style.display='inline-flex';
+                document.getElementById('ckOutBtn').className='ck-btn done';
+                document.getElementById('ckOutBtn').innerHTML='<i class="fas fa-check"></i> Done';
+                document.getElementById('ckOutBtn').onclick=null;
+            } else {
+                document.getElementById('ckOutBtn').style.display='inline-flex';
+            }
+            document.getElementById('checkinStatus').innerHTML=statusText;
+        }
+    } catch(e) { console.error('loadCheckinStatus error:', e); }
+}
+
+loadCheckinStatus();
+loadAttendance();
+</script>
+{% endblock %}

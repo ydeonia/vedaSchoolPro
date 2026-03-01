@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Data & Safety{% endblock %}
+{% block page_title %}Your Data, Your Control{% endblock %}
+{% block page_subtitle %}We believe schools should own their data — always{% endblock %}
+
+{% block extra_css %}
+<style>
+    .trust-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .trust-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 24px; }
+    .trust-card h3 { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; margin-bottom: 8px; }
+    .trust-card p { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; }
+    .trust-card .icon { font-size: 1.6rem; }
+    .faq-item { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 8px; overflow: hidden; }
+    .faq-q { padding: 14px 16px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .faq-q:hover { background: var(--bg-secondary, #F8FAFC); }
+    .faq-a { padding: 0 16px 14px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; display: none; }
+    .faq-a.open { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="trust-grid">
+    <div class="trust-card" style="border-left: 4px solid var(--success);">
+        <h3><span class="icon">🔓</span> Export Anytime</h3>
+        <p>Download all your school data (students, attendance, fees, results) in CSV format at any time. No lock-in, no restrictions, no fees for data export.</p>
+        <a href="/school/data-export" class="btn btn-primary btn-sm" style="margin-top:10px;"><i class="fas fa-download"></i> Go to Data Export</a>
+    </div>
+    <div class="trust-card" style="border-left: 4px solid var(--primary);">
+        <h3><span class="icon">🛡️</span> Privacy First</h3>
+        <p>Student data is private by default. No public leaderboards, no cross-school comparisons. Only authorized staff can see student records.</p>
+    </div>
+    <div class="trust-card" style="border-left: 4px solid var(--warning);">
+        <h3><span class="icon">💾</span> Automatic Backups</h3>
+        <p>Your data is backed up automatically based on your plan. Daily/Weekly backups with configurable retention. You never lose data.</p>
+    </div>
+    <div class="trust-card" style="border-left: 4px solid #7C3AED;">
+        <h3><span class="icon">📋</span> Full Audit Trail</h3>
+        <p>Every action is logged — who did what, when. Audit logs are immutable and cannot be deleted. Full transparency for school management.</p>
+    </div>
+    <div class="trust-card" style="border-left: 4px solid var(--danger);">
+        <h3><span class="icon">📄</span> Tamper-Proof Documents</h3>
+        <p>All PDF receipts and report cards carry a watermark ("EduFlow Verified") and are generated with digital signatures. Cannot be falsified.</p>
+    </div>
+    <div class="trust-card" style="border-left: 4px solid var(--info);">
+        <h3><span class="icon">🔒</span> Secure Access</h3>
+        <p>Role-based access ensures teachers only see their classes, parents only see their children, and students only see their own data.</p>
+    </div>
+</div>
+
+<div style="margin-top:24px;">
+    <h2 style="font-size:1.1rem; margin-bottom:12px;">Frequently Asked Questions</h2>
+
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">What happens if I cancel? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">You keep full access to your data. Export everything before cancellation. We never delete data without explicit request. After cancellation, data is retained for 90 days.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">Is auto-save enabled? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">Yes — every form submission is saved immediately. For attendance, marks, and fee collection, data is saved the moment you click submit. There's no "Save" button you might forget.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">How often are backups taken? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">Depends on your plan: Free (weekly), Starter (weekly), Professional (daily), Enterprise (real-time). Backups are retained for 30-365 days based on plan.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">Can someone tamper with fee receipts? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">No. All PDF documents carry a "EduFlow Verified" watermark, are generated server-side, and linked to audit logs. Any modification attempt would be detected.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">Who can see my child's data? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">Only you (as parent), your child (as student), the school admin, and their class teacher. No other parents, students, or staff can access your child's records.</div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q" onclick="this.nextElementSibling.classList.toggle('open')">Can I recover deleted data? <i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a">Yes — most deletes are "soft deletes" (data is marked inactive, not removed). Backups provide an additional safety net. Contact support for recovery.</div>
+    </div>
+</div>
+{% endblock %}

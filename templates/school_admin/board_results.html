@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}Board Results{% endblock %}
+{% block page_title %}🏛️ Board Results{% endblock %}
+{% block page_subtitle %}Track CBSE / ICSE / State board exam results{% endblock %}
+
+{% block extra_css %}
+<style>
+.res-tabs { display:flex; gap:4px; margin-bottom:16px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.res-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
+.res-tab.active { background:var(--primary); color:white; }
+/* Summary cards */
+.res-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
+.rs-card { background:white; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.rs-val { font-size:1.6rem; font-weight:900; } .rs-lbl { font-size:0.65rem; color:var(--text-light); text-transform:uppercase; font-weight:700; margin-top:2px; }
+/* Entry form */
+.entry-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
+.entry-card h3 { font-size:0.92rem; margin-bottom:14px; }
+.e-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+.e-grp { display:flex; flex-direction:column; gap:3px; }
+.e-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.e-grp input,.e-grp select { padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; }
+.e-grp input:focus,.e-grp select:focus { border-color:var(--primary); outline:none; }
+/* Bulk table */
+.bulk-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+.bulk-table th { background:var(--bg-secondary); padding:8px 10px; text-align:left; font-size:0.68rem; text-transform:uppercase; color:var(--text-secondary); font-weight:700; }
+.bulk-table td { padding:6px 10px; border-bottom:1px solid var(--border-light); }
+.bulk-table input { width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; font-size:0.78rem; }
+.bulk-table select { padding:6px; border:1px solid var(--border); border-radius:6px; font-size:0.78rem; }
+/* Result cards */
+.topper-card { background:linear-gradient(135deg,#FEF3C7,#FFFBEB); border:1px solid #FDE68A; border-radius:14px; padding:16px; margin-bottom:12px; display:flex; align-items:center; gap:14px; }
+.topper-medal { font-size:2rem; }
+.topper-info h4 { font-size:0.92rem; font-weight:800; } .topper-info p { font-size:0.78rem; color:#92400E; }
+/* Result list */
+.result-list { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; }
+.rl-header { padding:14px 16px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
+.rl-header h3 { font-size:0.92rem; font-weight:800; }
+.rl-item { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border-light); }
+.rl-item:hover { background:var(--bg); }
+.rl-rank { width:30px; height:30px; border-radius:8px; background:var(--bg-secondary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.75rem; flex-shrink:0; }
+.rl-rank.gold { background:#FEF3C7; color:#B45309; } .rl-rank.silver { background:#F1F5F9; color:#475569; }
+.rl-rank.bronze { background:#FED7AA; color:#C2410C; }
+.rl-name { font-weight:700; font-size:0.82rem; } .rl-meta { font-size:0.72rem; color:var(--text-light); }
+.rl-pct { font-weight:900; font-size:0.92rem; }
+.rl-pct.distinction { color:#059669; } .rl-pct.first { color:#2563EB; } .rl-pct.second { color:#7C3AED; }
+.rl-pct.pass { color:var(--text-secondary); } .rl-pct.fail { color:#DC2626; }
+.rl-badge { padding:2px 8px; border-radius:6px; font-size:0.62rem; font-weight:700; }
+.rl-badge.pass { background:#D1FAE5; color:#059669; } .rl-badge.fail { background:#FEE2E2; color:#DC2626; }
+.rl-badge.comp { background:#FEF3C7; color:#D97706; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+.btn-secondary { padding:8px 16px; border-radius:8px; background:var(--bg-secondary); color:var(--text-secondary); border:none; font-weight:700; cursor:pointer; font-size:0.78rem; }
+@media(max-width:768px) { .e-row { grid-template-columns:1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="res-tabs">
+    <div class="res-tab active" onclick="switchTab('overview',this)">📊 Overview</div>
+    <div class="res-tab" onclick="switchTab('entry',this)">📝 Manual Entry</div>
+    <div class="res-tab" onclick="switchTab('import',this)">📤 Import CSV</div>
+    <div class="res-tab" onclick="switchTab('list',this)">📋 Full List</div>
+</div>
+
+<!-- Overview -->
+<div id="overviewTab">
+    <div class="res-summary" id="resSummary"></div>
+    <div id="topperSection"></div>
+    <div id="classWiseSection"></div>
+</div>
+
+<!-- Entry -->
+<div id="entryTab" style="display:none;">
+    <div class="entry-card">
+        <h3>📝 Enter Board Results</h3>
+        <div class="e-row">
+            <div class="e-grp"><label>Academic Year</label><input id="brYear" value="2025-26"></div>
+            <div class="e-grp"><label>Board</label><select id="brBoard"><option value="cbse">CBSE</option><option value="icse">ICSE</option><option value="state">State Board</option><option value="ib">IB</option></select></div>
+            <div class="e-grp"><label>Class</label><select id="brClass"><option value="10">Class 10</option><option value="12">Class 12</option></select></div>
+            <div class="e-grp"><label>&nbsp;</label><button class="btn-primary" onclick="loadStudentsForEntry()" style="width:100%;">Load Students</button></div>
+        </div>
+        <div id="entryTable"></div>
+    </div>
+</div>
+
+<!-- Full list -->
+<div id="listTab" style="display:none;">
+    <div class="result-list"><div class="rl-header"><h3>All Results</h3><div><button class="btn-secondary" onclick="exportResults()"><i class="fas fa-download"></i> Export CSV</button></div></div><div id="fullList"></div></div>
+</div>
+
+<!-- CSV Import -->
+<div id="importTab" style="display:none;">
+    <div class="entry-card">
+        <h3>📤 Import Results from CSV / Excel</h3>
+        <div class="e-row" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="e-grp"><label>Academic Year</label><input id="impYear" value="2025-26"></div>
+            <div class="e-grp"><label>Board</label><select id="impBoard"><option value="cbse">CBSE</option><option value="icse">ICSE</option><option value="state">State Board</option><option value="ib">IB</option></select></div>
+            <div class="e-grp"><label>Class</label><select id="impClass"><option value="10">Class 10</option><option value="12">Class 12</option></select></div>
+        </div>
+        <div style="border:2px dashed var(--border);border-radius:12px;padding:30px;text-align:center;cursor:pointer;margin:14px 0;transition:all 0.2s;" id="csvDropZone" onclick="document.getElementById('csvFile').click()">
+            <i class="fas fa-file-csv" style="font-size:2rem;color:var(--primary);opacity:0.4;"></i>
+            <div style="font-size:0.85rem;font-weight:700;margin-top:8px;">Drop CSV/Excel file here or click to browse</div>
+            <div style="font-size:0.72rem;color:var(--text-light);margin-top:4px;">Expected columns: Student Name, Roll Number, Total Marks, Max Marks, Grade, Status</div>
+        </div>
+        <input type="file" id="csvFile" accept=".csv,.xlsx,.xls" style="display:none" onchange="parseCSV(this)">
+        <div id="csvPreview"></div>
+        <div style="background:var(--bg);border-radius:10px;padding:14px;margin-top:12px;">
+            <h4 style="font-size:0.82rem;margin-bottom:8px;">📋 CSV Format Guide</h4>
+            <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.6;">
+                Your CSV should have these columns (header names are flexible — we'll auto-detect):<br>
+                <code style="background:white;padding:2px 6px;border-radius:4px;">Student Name, Roll Number, Total Marks, Max Marks, Grade, Result (Pass/Fail)</code><br><br>
+                <strong>Example:</strong><br>
+                <code style="background:white;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">
+                Rahul Kumar, 12345, 456, 500, A1, Pass<br>
+                Priya Singh, 12346, 389, 500, B2, Pass
+                </code><br><br>
+                <a href="#" onclick="downloadTemplate();return false;" style="color:var(--primary);font-weight:700;">⬇️ Download blank template</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let results = [];
+
+function switchTab(tab, btn) {
+    document.querySelectorAll('.res-tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    ['overview','entry','import','list'].forEach(t => document.getElementById(t+'Tab').style.display = t===tab?'block':'none');
+}
+
+// CSV Drag & Drop
+const csvDZ = document.getElementById('csvDropZone');
+csvDZ.addEventListener('dragover', e => { e.preventDefault(); csvDZ.style.borderColor='var(--primary)'; csvDZ.style.background='var(--primary-50)'; });
+csvDZ.addEventListener('dragleave', () => { csvDZ.style.borderColor='var(--border)'; csvDZ.style.background=''; });
+csvDZ.addEventListener('drop', e => { e.preventDefault(); csvDZ.style.borderColor='var(--border)'; csvDZ.style.background=''; if(e.dataTransfer.files.length) parseCSVFile(e.dataTransfer.files[0]); });
+
+function parseCSV(input) { if(input.files.length) parseCSVFile(input.files[0]); }
+
+function parseCSVFile(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+        if (lines.length < 2) { alert('CSV has no data rows'); return; }
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
+        // Auto-detect columns
+        const nameCol = headers.findIndex(h => h.includes('name') || h.includes('student'));
+        const rollCol = headers.findIndex(h => h.includes('roll') || h.includes('number') || h.includes('no'));
+        const totalCol = headers.findIndex(h => h.includes('total') || h.includes('marks') || h.includes('obtained'));
+        const maxCol = headers.findIndex(h => h.includes('max') || h.includes('out of') || h.includes('maximum'));
+        const gradeCol = headers.findIndex(h => h.includes('grade'));
+        const statusCol = headers.findIndex(h => h.includes('status') || h.includes('result') || h.includes('pass'));
+
+        if (nameCol === -1 || totalCol === -1) { alert('Could not find "Name" and "Total Marks" columns. Check your CSV headers.'); return; }
+
+        const rows = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(',').map(c => c.trim().replace(/"/g,''));
+            if (!cols[nameCol]) continue;
+            const total = parseFloat(cols[totalCol]) || 0;
+            const max = maxCol >= 0 ? (parseFloat(cols[maxCol]) || 500) : 500;
+            const pct = max > 0 ? (total/max*100).toFixed(1) : 0;
+            let status = statusCol >= 0 ? cols[statusCol].toLowerCase() : (pct >= 33 ? 'pass' : 'fail');
+            if (status.includes('pass')) status = 'pass';
+            else if (status.includes('fail')) status = 'fail';
+            else if (status.includes('comp')) status = 'compartment';
+            else status = pct >= 33 ? 'pass' : 'fail';
+
+            rows.push({name: cols[nameCol], roll: rollCol >= 0 ? cols[rollCol] : '', total, max, pct, grade: gradeCol >= 0 ? cols[gradeCol] : '', status});
+        }
+
+        // Show preview
+        document.getElementById('csvPreview').innerHTML = `
+            <div style="margin-top:14px;"><h4 style="font-size:0.85rem;margin-bottom:8px;">✅ ${rows.length} students detected</h4>
+            <div style="max-height:300px;overflow-y:auto;"><table class="bulk-table"><thead><tr><th>Name</th><th>Roll</th><th>Total</th><th>Max</th><th>%</th><th>Grade</th><th>Status</th></tr></thead><tbody>
+            ${rows.map(r => `<tr><td>${r.name}</td><td>${r.roll}</td><td>${r.total}</td><td>${r.max}</td><td><strong>${r.pct}%</strong></td><td>${r.grade}</td><td style="color:${r.status==='pass'?'#059669':'#DC2626'};font-weight:700;">${r.status.toUpperCase()}</td></tr>`).join('')}
+            </tbody></table></div>
+            <div style="margin-top:12px;text-align:right;"><button class="btn-primary" onclick='submitCSVResults(${JSON.stringify(rows)})'><i class="fas fa-save"></i> Save ${rows.length} Results</button></div></div>`;
+    };
+    reader.readAsText(file);
+}
+
+async function submitCSVResults(rows) {
+    const entries = rows.map(r => ({student_name_override: r.name, roll_override: r.roll, total_marks: r.total, max_marks: r.max, grade: r.grade, result_status: r.status}));
+    try {
+        const res = await fetch('/api/school/board-results/import', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({academic_year: document.getElementById('impYear').value, board: document.getElementById('impBoard').value, class_level: document.getElementById('impClass').value, entries})});
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        alert(`✅ ${d.count} results imported!`);
+        document.getElementById('csvPreview').innerHTML = '';
+        loadResults();
+        switchTab('overview', document.querySelectorAll('.res-tab')[0]);
+    } catch(e) { alert('Import failed'); }
+}
+
+function downloadTemplate() {
+    const csv = 'Student Name,Roll Number,Total Marks,Max Marks,Grade,Result\nRahul Kumar,12345,456,500,A1,Pass\nPriya Singh,12346,389,500,B2,Pass\n';
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'board_results_template.csv'; a.click();
+}
+
+async function loadResults() {
+    try {
+        const res = await fetch('/api/school/board-results', {credentials:'same-origin'});
+        if (!res.ok) return;
+        const d = await res.json();
+        results = d.results || [];
+        renderOverview(d);
+        renderFullList();
+    } catch(e) {}
+}
+
+function renderOverview(d) {
+    const s = d.summary || {};
+    document.getElementById('resSummary').innerHTML = `
+        <div class="rs-card"><div class="rs-val" style="color:var(--primary);">${s.total||0}</div><div class="rs-lbl">Total Students</div></div>
+        <div class="rs-card"><div class="rs-val" style="color:#059669;">${s.pass_pct||0}%</div><div class="rs-lbl">Pass Rate</div></div>
+        <div class="rs-card"><div class="rs-val" style="color:#7C3AED;">${s.distinction||0}</div><div class="rs-lbl">Distinctions (90%+)</div></div>
+        <div class="rs-card"><div class="rs-val" style="color:#2563EB;">${s.first_div||0}</div><div class="rs-lbl">First Division</div></div>
+        <div class="rs-card"><div class="rs-val" style="color:#D97706;">${s.avg_pct||0}%</div><div class="rs-lbl">School Average</div></div>
+        <div class="rs-card"><div class="rs-val" style="color:#DC2626;">${s.fail||0}</div><div class="rs-lbl">Failed</div></div>`;
+
+    // Toppers
+    const toppers = (d.results||[]).filter(r=>r.result_status==='pass').sort((a,b)=>(b.percentage||0)-(a.percentage||0)).slice(0,3);
+    const medals = ['🥇','🥈','🥉'];
+    if (toppers.length) {
+        document.getElementById('topperSection').innerHTML = '<h3 style="margin-bottom:12px;">🏆 School Toppers</h3>' + toppers.map((t,i) => `<div class="topper-card"><div class="topper-medal">${medals[i]}</div><div class="topper-info"><h4>${t.student_name}</h4><p>${t.percentage}% · ${t.grade||''} · ${t.class_level ? 'Class '+t.class_level : ''}</p></div></div>`).join('');
+    }
+}
+
+function renderFullList() {
+    const el = document.getElementById('fullList');
+    if (!results.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-light);">No board results entered yet.</div>'; return; }
+    const sorted = [...results].sort((a,b)=>(b.percentage||0)-(a.percentage||0));
+    el.innerHTML = sorted.map((r,i) => {
+        const pctCls = (r.percentage||0)>=90?'distinction':(r.percentage||0)>=75?'first':(r.percentage||0)>=60?'second':(r.percentage||0)>=33?'pass':'fail';
+        const rankCls = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+        const badge = r.result_status==='pass'?'pass':r.result_status==='fail'?'fail':'comp';
+        return `<div class="rl-item"><div class="rl-rank ${rankCls}">${i+1}</div><div style="flex:1;"><div class="rl-name">${r.student_name}</div><div class="rl-meta">Class ${r.class_level} · Roll: ${r.roll_number||'—'}</div></div><div class="rl-pct ${pctCls}">${r.percentage||0}%</div><span class="rl-badge ${badge}">${r.result_status.toUpperCase()}</span></div>`;
+    }).join('');
+}
+
+async function loadStudentsForEntry() {
+    const cls = document.getElementById('brClass').value;
+    try {
+        const res = await fetch(`/api/school/students?class_level=${cls}`, {credentials:'same-origin'});
+        const d = await res.json();
+        const students = d.students || [];
+        if (!students.length) { document.getElementById('entryTable').innerHTML = '<p style="color:var(--text-light);">No students found for this class.</p>'; return; }
+        document.getElementById('entryTable').innerHTML = `<table class="bulk-table"><thead><tr><th>Student</th><th style="width:80px;">Total</th><th style="width:80px;">Max</th><th style="width:60px;">%</th><th style="width:80px;">Grade</th><th style="width:100px;">Status</th></tr></thead><tbody>${students.map(s=>`<tr data-sid="${s.id}"><td>${s.name} <span style="color:var(--text-light);font-size:0.68rem;">(${s.roll||'—'})</span></td><td><input type="number" class="br-total" onchange="calcPct(this)"></td><td><input type="number" class="br-max" value="500" onchange="calcPct(this)"></td><td class="br-pct">—</td><td><input class="br-grade" placeholder="A1"></td><td><select class="br-status"><option value="pass">Pass</option><option value="fail">Fail</option><option value="compartment">Compartment</option><option value="absent">Absent</option></select></td></tr>`).join('')}</tbody></table><div style="margin-top:12px;text-align:right;"><button class="btn-primary" onclick="saveResults()"><i class="fas fa-save"></i> Save All Results</button></div>`;
+    } catch(e) { alert('Failed to load students'); }
+}
+
+function calcPct(el) {
+    const row = el.closest('tr');
+    const total = parseFloat(row.querySelector('.br-total').value) || 0;
+    const max = parseFloat(row.querySelector('.br-max').value) || 500;
+    const pct = max > 0 ? (total/max*100).toFixed(1) : 0;
+    row.querySelector('.br-pct').textContent = pct + '%';
+    // Auto-set status
+    if (pct < 33) row.querySelector('.br-status').value = 'fail';
+    else row.querySelector('.br-status').value = 'pass';
+}
+
+async function saveResults() {
+    const rows = document.querySelectorAll('#entryTable tbody tr');
+    const entries = [];
+    rows.forEach(row => {
+        const total = parseFloat(row.querySelector('.br-total')?.value) || 0;
+        if (total === 0) return;
+        entries.push({
+            student_id: row.dataset.sid,
+            total_marks: total,
+            max_marks: parseFloat(row.querySelector('.br-max')?.value) || 500,
+            grade: row.querySelector('.br-grade')?.value || '',
+            result_status: row.querySelector('.br-status')?.value || 'pass',
+        });
+    });
+    if (!entries.length) { alert('Enter marks first'); return; }
+    try {
+        const res = await fetch('/api/school/board-results', {
+            method: 'POST', credentials: 'same-origin',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({academic_year: document.getElementById('brYear').value, board: document.getElementById('brBoard').value, class_level: document.getElementById('brClass').value, entries})
+        });
+        if (!res.ok) throw new Error();
+        alert('✅ Results saved!');
+        loadResults();
+        switchTab('overview', document.querySelectorAll('.res-tab')[0]);
+    } catch(e) { alert('Save failed'); }
+}
+
+function exportResults() {
+    if (!results.length) return;
+    let csv = 'Name,Roll,Class,Percentage,Grade,Status\n';
+    results.forEach(r => csv += `"${r.student_name}","${r.roll_number||''}","${r.class_level}","${r.percentage}","${r.grade||''}","${r.result_status}"\n`);
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'board_results.csv'; a.click();
+}
+
+loadResults();
+</script>
+{% endblock %}

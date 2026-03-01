@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Student Attendance{% endblock %}
+{% block page_subtitle %}Mark and manage daily attendance{% endblock %}
+
+{% block extra_css %}
+<style>
+    .att-date-bar {
+        display: flex; align-items: center; gap: 12px; padding: 14px 20px;
+        background: linear-gradient(135deg, var(--primary-50), var(--info-light));
+        border-radius: var(--radius); margin-bottom: 20px;
+    }
+    .att-summary { display: flex; gap: 12px; flex-wrap: wrap; }
+    .att-pill {
+        display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+        border-radius: 20px; font-size: 0.8rem; font-weight: 700;
+    }
+    .att-pill.present { background: var(--success-light); color: var(--success); }
+    .att-pill.absent { background: var(--danger-light); color: var(--danger); }
+    .att-pill.late { background: var(--warning-light); color: var(--warning); }
+    .att-pill.total { background: var(--primary-50); color: var(--primary); }
+
+    .att-card {
+        background: var(--bg-card); border: 2.5px solid var(--success); border-radius: var(--radius);
+        padding: 14px 16px; display: flex; align-items: center; gap: 14px;
+        cursor: pointer; transition: all 0.2s ease; user-select: none;
+    }
+    .att-card.present { border-color: var(--success); background: linear-gradient(135deg, #F0FDF4, #DCFCE7); }
+    .att-card.absent { border-color: var(--danger); background: linear-gradient(135deg, #FEF2F2, #FEE2E2); }
+    .att-card.late { border-color: var(--warning); background: linear-gradient(135deg, #FFFBEB, #FEF3C7); }
+    .att-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .att-card:active { transform: scale(0.97); }
+
+    .att-thumb {
+        width: 44px; height: 44px; border-radius: 50%; display: flex;
+        align-items: center; justify-content: center; font-weight: 800; font-size: 0.95rem; flex-shrink: 0;
+    }
+    .att-card.present .att-thumb { background: var(--success); color: white; }
+    .att-card.absent .att-thumb { background: var(--danger); color: white; }
+    .att-card.late .att-thumb { background: var(--warning); color: white; }
+
+    .att-info { flex: 1; min-width: 0; }
+    .att-name { font-weight: 700; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .att-roll { font-size: 0.72rem; color: var(--text-secondary); }
+    .att-status-icon { font-size: 1.5rem; flex-shrink: 0; transition: transform 0.2s; }
+    .att-card:hover .att-status-icon { transform: scale(1.15); }
+
+    .att-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .att-actions-bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; flex-wrap: wrap; gap: 12px; }
+    .att-quick-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .att-saved-badge {
+        display: inline-flex; align-items: center; gap: 6px; padding: 6px 16px;
+        background: var(--success); color: white; border-radius: 20px;
+        font-weight: 700; font-size: 0.82rem;
+    }
+
+    @keyframes confettiFall {
+        0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+    }
+    .confetti-piece {
+        position: fixed; width: 10px; height: 10px; top: -10px;
+        z-index: 9999; border-radius: 2px; animation: confettiFall 3s ease-out forwards;
+    }
+
+    /* Attendance Report section */
+    .att-report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+    .att-report-cell {
+        padding: 10px; border-radius: var(--radius-sm); text-align: center; font-size: 0.78rem;
+    }
+    .att-report-cell.present-cell { background: var(--success-light); color: var(--success); font-weight: 700; }
+    .att-report-cell.absent-cell { background: var(--danger-light); color: var(--danger); font-weight: 700; }
+
+    @media (max-width: 640px) { .att-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Class/Section Selector -->
+<div class="card mb-3">
+    <div class="card-body" style="padding: 16px 24px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <select id="attClass" class="form-select" onchange="onClassChange(this.value)" style="padding: 10px 14px; font-weight: 600;">
+                    <option value="">Select Class</option>
+                    {% for cls in classes %}
+                    <option value="{{ cls.id }}">{{ cls.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <select id="attSection" class="form-select" style="padding: 10px 14px; font-weight: 600;">
+                    <option value="">All Sections</option>
+                </select>
+            </div>
+            <div>
+                <input type="date" id="attDate" value="{{ today }}" class="form-input" style="padding: 10px 14px; font-weight: 600;">
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="loadAttendance()">
+                    <i class="fas fa-search"></i> Load
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Attendance Content -->
+<div id="attendanceArea">
+    <div class="card">
+        <div class="card-body">
+            <div class="empty-state">
+                <i class="fas fa-clipboard-check"></i>
+                <h3>Select a Class to Begin</h3>
+                <p>Choose a class, section, and date to mark attendance. Default: all students are marked present — just tap the absent ones!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Attendance Report Section -->
+<div class="card mt-3" id="reportSection" style="display: none;">
+    <div class="card-header">
+        <h2><i class="fas fa-chart-bar" style="color: var(--info); margin-right: 8px;"></i> Today's Summary</h2>
+    </div>
+    <div class="card-body" id="reportContent"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classSections = {{ sections_json | safe }};
+let currentStudents = [];
+let attendanceData = {};
+let isSaved = false;
+
+function onClassChange(classId) {
+    const secSelect = document.getElementById('attSection');
+    secSelect.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(sec => {
+            secSelect.innerHTML += `<option value="${sec.id}">${sec.name}</option>`;
+        });
+        if (classSections[classId].length > 0) secSelect.value = classSections[classId][0].id;
+    }
+}
+
+async function loadAttendance() {
+    const classId = document.getElementById('attClass').value;
+    const sectionId = document.getElementById('attSection').value;
+    const date = document.getElementById('attDate').value;
+
+    if (!classId) { showToast('warning', 'Select Class', 'Please select a class first'); return; }
+
+    const area = document.getElementById('attendanceArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i><p class="text-muted mt-1">Loading students...</p></div></div>';
+
+    try {
+        const params = new URLSearchParams({ class_id: classId, date: date, section_id: sectionId || '' });
+        const result = await apiCall(`/api/school/attendance/load?${params}`);
+
+        // Map API response to our format
+        currentStudents = result.students.map(s => ({
+            id: s.id,
+            name: `${s.first_name} ${s.last_name}`.trim(),
+            roll: s.roll_number || '',
+            admission_no: '',
+            gender: s.gender
+        }));
+        isSaved = result.already_marked;
+        attendanceData = {};
+        currentStudents.forEach(s => {
+            attendanceData[s.id] = result.existing[s.id] || 'present';
+        });
+        renderAttendance(date);
+    } catch (e) {
+        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error</h3><p>' + e.message + '</p></div></div></div>';
+    }
+}
+
+function renderAttendance(date) {
+    const area = document.getElementById('attendanceArea');
+    const counts = getCounts();
+    const dateStr = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    let html = `
+        <div class="att-date-bar">
+            <div style="flex: 1;">
+                <div style="font-weight: 800; font-size: 1rem; color: var(--primary-dark);">
+                    <i class="fas fa-calendar-day"></i> ${dateStr}
+                </div>
+            </div>
+            <div class="att-summary" id="attSummary">
+                <div class="att-pill total"><i class="fas fa-users"></i> ${counts.total}</div>
+                <div class="att-pill present"><i class="fas fa-check-circle"></i> ${counts.present} Present</div>
+                <div class="att-pill absent"><i class="fas fa-times-circle"></i> ${counts.absent} Absent</div>
+                <div class="att-pill late"><i class="fas fa-clock"></i> ${counts.late} Late</div>
+            </div>
+        </div>
+
+        <div class="att-actions-bar">
+            <div class="att-quick-btns">
+                <button class="btn btn-success btn-sm" onclick="markAll('present')"><i class="fas fa-check-double"></i> All Present</button>
+                <button class="btn btn-danger btn-sm" onclick="markAll('absent')"><i class="fas fa-times"></i> All Absent</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                ${isSaved ? '<span class="att-saved-badge"><i class="fas fa-check-circle"></i> Saved</span>' : ''}
+                <button class="btn btn-primary" onclick="saveAttendance()" id="saveBtn">
+                    <i class="fas fa-save"></i> ${isSaved ? 'Update' : 'Save'} Attendance
+                </button>
+                <span style="font-size:0.72rem; color: var(--text-light); margin-left: 4px;">✏️ You can edit & re-save anytime today</span>
+            </div>
+        </div>
+
+        <div class="att-grid" id="attGrid">`;
+
+    if (currentStudents.length === 0) {
+        html += '<div class="card" style="grid-column: 1/-1;"><div class="card-body"><div class="empty-state"><i class="fas fa-user-graduate"></i><h3>No students</h3><p>No students in this class/section</p></div></div></div>';
+    } else {
+        currentStudents.forEach((s, i) => {
+            const status = attendanceData[s.id] || 'present';
+            const icons = { present: '✅', absent: '❌', late: '⏰' };
+            html += `
+            <div class="att-card ${status}" data-sid="${s.id}" onclick="cycleStatus('${s.id}')" style="animation: fadeIn 0.2s ease ${i * 0.015}s both;">
+                <div class="att-thumb">${s.name.charAt(0)}</div>
+                <div class="att-info">
+                    <div class="att-name">${s.name}</div>
+                    <div class="att-roll">${s.roll ? 'Roll ' + s.roll : ''}${s.admission_no ? ' • ' + s.admission_no : ''}</div>
+                </div>
+                <div class="att-status-icon">${icons[status]}</div>
+            </div>`;
+        });
+    }
+    html += '</div>';
+    area.innerHTML = html;
+}
+
+function cycleStatus(sid) {
+    const statuses = ['present', 'absent', 'late'];
+    const cur = attendanceData[sid] || 'present';
+    const next = statuses[(statuses.indexOf(cur) + 1) % statuses.length];
+    attendanceData[sid] = next;
+
+    const card = document.querySelector(`[data-sid="${sid}"]`);
+    if (card) {
+        card.className = `att-card ${next}`;
+        const icons = { present: '✅', absent: '❌', late: '⏰' };
+        card.querySelector('.att-status-icon').textContent = icons[next];
+    }
+    updateSummary();
+}
+
+function markAll(status) {
+    currentStudents.forEach(s => { attendanceData[s.id] = status; });
+    const icons = { present: '✅', absent: '❌', late: '⏰' };
+    document.querySelectorAll('.att-card').forEach(card => {
+        card.className = `att-card ${status}`;
+        card.querySelector('.att-status-icon').textContent = icons[status];
+    });
+    updateSummary();
+    showToast('info', status === 'present' ? 'All Present ✅' : 'All Absent ❌', `${currentStudents.length} students marked`);
+}
+
+function getCounts() {
+    let present = 0, absent = 0, late = 0;
+    Object.values(attendanceData).forEach(s => {
+        if (s === 'present') present++; else if (s === 'absent') absent++; else if (s === 'late') late++;
+    });
+    return { total: currentStudents.length, present, absent, late };
+}
+
+function updateSummary() {
+    const c = getCounts();
+    const el = document.getElementById('attSummary');
+    if (el) el.innerHTML = `
+        <div class="att-pill total"><i class="fas fa-users"></i> ${c.total}</div>
+        <div class="att-pill present"><i class="fas fa-check-circle"></i> ${c.present} Present</div>
+        <div class="att-pill absent"><i class="fas fa-times-circle"></i> ${c.absent} Absent</div>
+        <div class="att-pill late"><i class="fas fa-clock"></i> ${c.late} Late</div>
+    `;
+}
+
+async function saveAttendance() {
+    const classId = document.getElementById('attClass').value;
+    const sectionId = document.getElementById('attSection').value;
+    const date = document.getElementById('attDate').value;
+    if (currentStudents.length === 0) return;
+
+    const records = Object.entries(attendanceData).map(([sid, status]) => ({ student_id: sid, status }));
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        await apiCall('/api/school/attendance/save', 'POST', {
+            class_id: classId, section_id: sectionId || null, date, records
+        });
+        const c = getCounts();
+        showToast('success', 'Attendance Saved! 🎉', `${c.present} present, ${c.absent} absent, ${c.late} late`);
+        isSaved = true;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Saved!';
+        btn.className = 'btn btn-success';
+        launchConfetti();
+        setTimeout(() => { btn.innerHTML = '<i class="fas fa-save"></i> Update Attendance'; btn.className = 'btn btn-primary'; btn.disabled = false; }, 2000);
+    } catch (e) { btn.innerHTML = '<i class="fas fa-save"></i> Save Attendance'; btn.disabled = false; }
+}
+
+function launchConfetti() {
+    const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#8B5CF6'];
+    for (let i = 0; i < 40; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-piece';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        p.style.animationDelay = Math.random() * 0.8 + 's';
+        p.style.animationDuration = (2 + Math.random() * 2) + 's';
+        p.style.width = (6 + Math.random() * 8) + 'px';
+        p.style.height = (6 + Math.random() * 8) + 'px';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 4000);
+    }
+}
+</script>
+{% endblock %}

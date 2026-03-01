@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block page_title %}💬 Messages{% endblock %}
+{% block page_subtitle %}Private communication with parents, students, and staff{% endblock %}
+{% block extra_css %}
+<style>
+.msg-wrap{display:grid;grid-template-columns:340px 1fr;gap:0;height:calc(100vh - 140px);background:var(--bg-card,white);border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
+.msg-sidebar{border-right:1px solid var(--border-light,#e2e8f0);display:flex;flex-direction:column;}
+.msg-sidebar-header{padding:14px;border-bottom:1px solid var(--border-light);display:flex;gap:8px;align-items:center;}
+.msg-sidebar-header input{flex:1;padding:8px 12px;border-radius:9px;border:1.5px solid var(--border);font-size:0.78rem;background:var(--bg-card);color:var(--text);}
+.msg-tabs{display:flex;gap:0;border-bottom:1px solid var(--border-light);}
+.msg-tab{flex:1;padding:8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-light);transition:all 0.2s;}
+.msg-tab.active{color:var(--primary);border-bottom-color:var(--primary);}
+.msg-tab .badge{font-size:0.55rem;background:#EF4444;color:white;padding:1px 5px;border-radius:10px;margin-left:3px;}
+.thread-list{flex:1;overflow-y:auto;padding:4px;}
+.thread-item{padding:10px 14px;border-radius:10px;cursor:pointer;transition:background 0.15s;margin:2px 0;display:flex;gap:10px;align-items:flex-start;}
+.thread-item:hover{background:var(--bg,#f1f5f9);}
+.thread-item.active{background:var(--primary-light,#EEF2FF);}
+.thread-item.unread{font-weight:700;}
+.thread-item.unread::before{content:'';width:8px;height:8px;background:var(--primary);border-radius:50%;margin-top:6px;flex-shrink:0;}
+.thread-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.75rem;color:white;flex-shrink:0;}
+.thread-avatar.staff{background:#4F46E5;}.thread-avatar.parent{background:#059669;}.thread-avatar.teacher{background:#D97706;}.thread-avatar.student{background:#2563EB;}
+.thread-info{flex:1;min-width:0;}
+.thread-name{font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.thread-subject{font-size:0.68rem;color:var(--text-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.thread-preview{font-size:0.62rem;color:var(--text-light);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+.thread-meta{font-size:0.55rem;color:var(--text-light);text-align:right;flex-shrink:0;}
+.thread-type-badge{font-size:0.5rem;padding:1px 5px;border-radius:4px;font-weight:700;}
+.type-general{background:#D1FAE5;color:#059669;}.type-confidential{background:#DBEAFE;color:#1D4ED8;}.type-complaint{background:#FEE2E2;color:#DC2626;}
+
+.msg-main{display:flex;flex-direction:column;}
+.msg-header{padding:14px 18px;border-bottom:1px solid var(--border-light);display:flex;justify-content:space-between;align-items:center;}
+.msg-header h3{font-size:0.88rem;font-weight:900;margin:0;}
+.msg-header .type-label{font-size:0.6rem;padding:2px 8px;border-radius:5px;font-weight:700;}
+.msg-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:10px;}
+.msg-bubble{max-width:75%;padding:10px 14px;border-radius:14px;font-size:0.82rem;line-height:1.45;}
+.msg-bubble.mine{background:var(--primary);color:white;align-self:flex-end;border-bottom-right-radius:4px;}
+.msg-bubble.theirs{background:var(--bg,#f1f5f9);color:var(--text);align-self:flex-start;border-bottom-left-radius:4px;}
+.msg-bubble.system{background:#FEF3C7;color:#92400E;align-self:center;font-size:0.68rem;font-style:italic;border-radius:8px;padding:6px 12px;}
+.msg-sender{font-size:0.6rem;font-weight:700;margin-bottom:2px;}.msg-time{font-size:0.52rem;margin-top:3px;opacity:0.7;}
+.msg-compose{padding:12px 18px;border-top:1px solid var(--border-light);display:flex;gap:8px;}
+.msg-compose textarea{flex:1;padding:10px;border-radius:12px;border:1.5px solid var(--border);font-size:0.82rem;resize:none;height:40px;background:var(--bg-card);color:var(--text);}
+.msg-compose textarea:focus{border-color:var(--primary);outline:none;height:60px;}
+.msg-compose button{padding:8px 18px;border-radius:10px;border:none;background:var(--primary);color:white;font-weight:700;font-size:0.78rem;cursor:pointer;}
+.msg-compose button:hover{opacity:0.9;}
+
+.msg-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-light);}
+.msg-empty i{font-size:2.5rem;margin-bottom:12px;opacity:0.3;}
+.msg-empty p{font-size:0.82rem;}
+
+/* Compose Modal */
+.compose-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:999;display:none;align-items:center;justify-content:center;}
+.compose-overlay.show{display:flex;}
+.compose-modal{background:var(--bg-card,white);border-radius:16px;width:520px;max-height:80vh;overflow-y:auto;padding:24px;box-shadow:0 8px 30px rgba(0,0,0,0.15);}
+.compose-modal h3{font-size:1rem;font-weight:900;margin-bottom:14px;}
+.cm-field{margin-bottom:10px;}
+.cm-field label{font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:3px;}
+.cm-field input,.cm-field select,.cm-field textarea{width:100%;padding:8px 12px;border-radius:9px;border:1.5px solid var(--border);font-size:0.82rem;background:var(--bg-card);color:var(--text);box-sizing:border-box;}
+.cm-field textarea{height:80px;resize:vertical;}
+.cm-actions{display:flex;gap:8px;margin-top:14px;}
+.cm-actions button{padding:10px 20px;border-radius:10px;font-weight:700;font-size:0.82rem;cursor:pointer;border:none;}
+.cm-actions .btn-send{background:var(--primary);color:white;}.cm-actions .btn-cancel{background:var(--bg,#f1f5f9);color:var(--text);}
+.contact-item{padding:6px 10px;border-radius:8px;cursor:pointer;display:flex;gap:8px;align-items:center;font-size:0.78rem;}
+.contact-item:hover{background:var(--bg,#f1f5f9);}
+.contact-item.selected{background:var(--primary-light,#EEF2FF);border:1px solid var(--primary);}
+.contact-role{font-size:0.58rem;padding:1px 6px;border-radius:4px;font-weight:700;}
+.contact-list{max-height:180px;overflow-y:auto;border:1px solid var(--border-light);border-radius:9px;padding:4px;margin-top:4px;}
+.privacy-note{padding:8px;border-radius:8px;font-size:0.68rem;margin-top:6px;}
+.privacy-note.confidential{background:#DBEAFE;color:#1D4ED8;}.privacy-note.complaint{background:#FEE2E2;color:#DC2626;}
+.btn-compose{padding:8px 14px;border-radius:9px;border:none;background:var(--primary);color:white;font-weight:700;font-size:0.72rem;cursor:pointer;white-space:nowrap;}
+@media(max-width:768px){.msg-wrap{grid-template-columns:1fr;height:auto;}.msg-sidebar{max-height:40vh;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="msg-wrap">
+    <!-- SIDEBAR — Thread List -->
+    <div class="msg-sidebar">
+        <div class="msg-sidebar-header">
+            <input type="text" id="searchThreads" placeholder="Search messages..." oninput="filterThreads()">
+            <button class="btn-compose" onclick="openCompose()"><i class="fas fa-pen"></i> New</button>
+        </div>
+        <div class="msg-tabs">
+            <div class="msg-tab active" data-type="" onclick="switchTab(this)">All</div>
+            <div class="msg-tab" data-type="general" onclick="switchTab(this)">General</div>
+            <div class="msg-tab" data-type="confidential" onclick="switchTab(this)">🔒 Private</div>
+            <div class="msg-tab" data-type="complaint" onclick="switchTab(this)">⚠ Complaints</div>
+        </div>
+        <div class="thread-list" id="threadList">
+            <div class="msg-empty"><i class="fas fa-spinner fa-pulse"></i><p>Loading...</p></div>
+        </div>
+    </div>
+
+    <!-- MAIN — Thread View -->
+    <div class="msg-main">
+        <div id="threadView">
+            <div class="msg-empty" style="height:100%;">
+                <i class="fas fa-comments"></i>
+                <p>Select a conversation or start a new one</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- COMPOSE MODAL -->
+<div class="compose-overlay" id="composeOverlay">
+    <div class="compose-modal">
+        <h3>📝 New Message</h3>
+        <div class="cm-field">
+            <label>Message Type</label>
+            <select id="cmType" onchange="updatePrivacyNote()">
+                <option value="general">💬 General — Staff with message access can see</option>
+                <option value="confidential">🔒 Confidential — Only you and receiver</option>
+                <option value="complaint">⚠️ Complaint — Only principal and assigned person</option>
+            </select>
+            <div class="privacy-note" id="privacyNote" style="display:none;"></div>
+        </div>
+        <div class="cm-field">
+            <label>Send To</label>
+            <input id="cmSearchContact" placeholder="Search by name..." oninput="searchContacts()">
+            <div class="contact-list" id="contactList"></div>
+            <div id="selectedContact" style="display:none;margin-top:6px;"></div>
+        </div>
+        <div class="cm-field" id="cmStudentField" style="display:none;">
+            <label>Related Student (optional)</label>
+            <select id="cmStudent"><option value="">— None —</option></select>
+        </div>
+        <div class="cm-field">
+            <label>Subject</label>
+            <input id="cmSubject" placeholder="What is this about?">
+        </div>
+        <div class="cm-field">
+            <label>Message</label>
+            <textarea id="cmMessage" placeholder="Type your message..."></textarea>
+        </div>
+        <div class="cm-field" id="cmComplaintFields" style="display:none;">
+            <label>Complaint Category</label>
+            <select id="cmCategory">
+                <option value="academic">Academic</option>
+                <option value="discipline">Discipline</option>
+                <option value="facility">Facility</option>
+                <option value="fee">Fee / Finance</option>
+                <option value="staff">Staff Conduct</option>
+                <option value="other">Other</option>
+            </select>
+            <label style="margin-top:6px;">Priority</label>
+            <select id="cmPriority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">🔴 Urgent</option>
+            </select>
+        </div>
+        <div class="cm-actions">
+            <button class="btn-send" onclick="sendMessage()"><i class="fas fa-paper-plane"></i> Send</button>
+            <button class="btn-cancel" onclick="closeCompose()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let threads = [];
+let currentThread = null;
+let selectedReceiverId = null;
+let currentTab = '';
+
+// ═══════════════════════════════════════
+// LOAD THREADS
+// ═══════════════════════════════════════
+async function loadThreads(type='') {
+    currentTab = type;
+    const url = type ? `/api/messages/threads?thread_type=${type}` : '/api/messages/threads';
+    try {
+        const r = await fetch(url, {credentials:'same-origin'});
+        const d = await r.json();
+        if (d.error) { showToast('error', d.error); return; }
+        threads = d.threads || [];
+        renderThreads();
+    } catch(e) {
+        document.getElementById('threadList').innerHTML = '<div class="msg-empty"><p>Failed to load</p></div>';
+    }
+}
+
+function renderThreads() {
+    const q = (document.getElementById('searchThreads').value || '').toLowerCase();
+    const filtered = threads.filter(t =>
+        !q || t.subject.toLowerCase().includes(q) ||
+        (t.participants || []).some(p => p.name.toLowerCase().includes(q))
+    );
+    if (!filtered.length) {
+        document.getElementById('threadList').innerHTML = '<div class="msg-empty"><i class="fas fa-inbox"></i><p>No messages</p></div>';
+        return;
+    }
+    document.getElementById('threadList').innerHTML = filtered.map(t => {
+        const other = (t.participants || [])[0] || {name: 'Unknown', role: 'staff'};
+        const roleClass = other.role === 'parent' ? 'parent' : other.role === 'teacher' ? 'teacher' : other.role === 'student' ? 'student' : 'staff';
+        const initials = other.name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+        const isActive = currentThread === t.id ? 'active' : '';
+        const isUnread = t.unread ? 'unread' : '';
+        const typeClass = `type-${t.type}`;
+        const typeBadge = t.type !== 'general' ? `<span class="thread-type-badge ${typeClass}">${t.type === 'confidential' ? '🔒' : '⚠️'} ${t.type}</span>` : '';
+        return `<div class="thread-item ${isActive} ${isUnread}" onclick="openThread('${t.id}')">
+            <div class="thread-avatar ${roleClass}">${initials}</div>
+            <div class="thread-info">
+                <div class="thread-name">${other.name} ${typeBadge}</div>
+                <div class="thread-subject">${t.subject}</div>
+                <div class="thread-preview">${t.last_message}</div>
+            </div>
+            <div class="thread-meta">${t.last_message_at}</div>
+        </div>`;
+    }).join('');
+}
+
+function filterThreads() { renderThreads(); }
+
+function switchTab(el) {
+    document.querySelectorAll('.msg-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    loadThreads(el.dataset.type);
+}
+
+// ═══════════════════════════════════════
+// OPEN THREAD
+// ═══════════════════════════════════════
+async function openThread(threadId) {
+    currentThread = threadId;
+    renderThreads();
+    const r = await fetch(`/api/messages/threads/${threadId}`, {credentials:'same-origin'});
+    const d = await r.json();
+    if (d.error) { showToast('error', d.error); return; }
+
+    const thread = d.thread;
+    const msgs = d.messages || [];
+    const participants = d.participants || [];
+    const complaint = d.complaint;
+
+    const typeLabel = thread.type === 'confidential' ? '<span class="type-label" style="background:#DBEAFE;color:#1D4ED8;">🔒 Confidential</span>'
+        : thread.type === 'complaint' ? '<span class="type-label" style="background:#FEE2E2;color:#DC2626;">⚠️ Complaint</span>'
+        : '<span class="type-label" style="background:#D1FAE5;color:#059669;">General</span>';
+
+    const statusBtns = thread.status === 'active' ?
+        `<button onclick="updateThread('${threadId}','resolved')" style="font-size:0.65rem;padding:4px 10px;border-radius:6px;border:1px solid #059669;color:#059669;background:transparent;cursor:pointer;">✓ Resolve</button>
+         <button onclick="updateThread('${threadId}','closed')" style="font-size:0.65rem;padding:4px 10px;border-radius:6px;border:1px solid #DC2626;color:#DC2626;background:transparent;cursor:pointer;">✕ Close</button>` : '';
+
+    let complaintInfo = '';
+    if (complaint) {
+        complaintInfo = `<div style="padding:6px 18px;background:#FEF3C7;font-size:0.68rem;color:#92400E;">
+            ⚠️ Complaint: ${complaint.category || 'General'} | Priority: <strong>${complaint.priority}</strong> | Status: <strong>${complaint.status}</strong>
+        </div>`;
+    }
+
+    const participantNames = participants.map(p =>
+        `<span style="font-size:0.6rem;padding:1px 6px;border-radius:4px;background:var(--bg,#f1f5f9);margin-right:3px;">${p.name} (${p.role_in_thread || p.role})</span>`
+    ).join('');
+
+    document.getElementById('threadView').innerHTML = `
+        <div class="msg-header">
+            <div>
+                <h3>${thread.subject} ${typeLabel}</h3>
+                <div style="margin-top:4px;">${participantNames}</div>
+            </div>
+            <div style="display:flex;gap:6px;">${statusBtns}</div>
+        </div>
+        ${complaintInfo}
+        <div class="msg-body" id="msgBody">
+            ${msgs.map(m => {
+                if (m.is_system) return `<div class="msg-bubble system">${m.content}</div>`;
+                const cls = m.is_mine ? 'mine' : 'theirs';
+                return `<div class="msg-bubble ${cls}">
+                    ${!m.is_mine ? `<div class="msg-sender">${m.sender_name} · ${m.sender_role}</div>` : ''}
+                    ${m.content}
+                    <div class="msg-time">${m.time}</div>
+                </div>`;
+            }).join('')}
+        </div>
+        ${thread.status === 'active' ? `
+        <div class="msg-compose">
+            <textarea id="replyBox" placeholder="Type a reply..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendReply();}"></textarea>
+            <button onclick="sendReply()"><i class="fas fa-paper-plane"></i></button>
+        </div>` : '<div style="padding:12px;text-align:center;color:var(--text-light);font-size:0.72rem;">Thread is ' + thread.status + '</div>'}
+    `;
+
+    // Scroll to bottom
+    setTimeout(() => { const body = document.getElementById('msgBody'); if(body) body.scrollTop = body.scrollHeight; }, 100);
+}
+
+async function sendReply() {
+    const box = document.getElementById('replyBox');
+    const msg = (box.value || '').trim();
+    if (!msg || !currentThread) return;
+    box.disabled = true;
+    try {
+        const r = await fetch(`/api/messages/threads/${currentThread}`, {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({message: msg}), credentials: 'same-origin'
+        });
+        const d = await r.json();
+        if (d.error) { showToast('error', d.error); box.disabled = false; return; }
+        box.value = '';
+        box.disabled = false;
+        openThread(currentThread);
+        loadThreads(currentTab);
+    } catch(e) { box.disabled = false; showToast('error', 'Failed to send'); }
+}
+
+async function updateThread(threadId, status) {
+    const r = await fetch(`/api/messages/threads/${threadId}`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({status}), credentials: 'same-origin'
+    });
+    const d = await r.json();
+    if (d.success) { openThread(threadId); loadThreads(currentTab); showToast('success', `Thread ${status}`); }
+}
+
+// ═══════════════════════════════════════
+// COMPOSE
+// ═══════════════════════════════════════
+function openCompose() {
+    document.getElementById('composeOverlay').classList.add('show');
+    selectedReceiverId = null;
+    document.getElementById('cmSearchContact').value = '';
+    document.getElementById('contactList').innerHTML = '';
+    document.getElementById('selectedContact').style.display = 'none';
+    document.getElementById('cmSubject').value = '';
+    document.getElementById('cmMessage').value = '';
+    updatePrivacyNote();
+}
+function closeCompose() { document.getElementById('composeOverlay').classList.remove('show'); }
+
+function updatePrivacyNote() {
+    const type = document.getElementById('cmType').value;
+    const note = document.getElementById('privacyNote');
+    const compFields = document.getElementById('cmComplaintFields');
+    if (type === 'confidential') {
+        note.style.display = 'block';
+        note.className = 'privacy-note confidential';
+        note.innerHTML = '🔒 <strong>Only you and the receiver</strong> will see this thread. No other staff, even with admin access, can read it.';
+        compFields.style.display = 'none';
+    } else if (type === 'complaint') {
+        note.style.display = 'block';
+        note.className = 'privacy-note complaint';
+        note.innerHTML = '⚠️ <strong>Only you, the receiver, and the principal</strong> will see this. Staff with clerk access CANNOT see complaints.';
+        compFields.style.display = 'block';
+    } else {
+        note.style.display = 'none';
+        compFields.style.display = 'none';
+    }
+}
+
+async function searchContacts() {
+    const q = document.getElementById('cmSearchContact').value.trim();
+    if (q.length < 2) { document.getElementById('contactList').innerHTML = '<div style="padding:8px;font-size:0.72rem;color:var(--text-light);">Type 2+ characters...</div>'; return; }
+    const r = await fetch(`/api/messages/contacts?search=${encodeURIComponent(q)}`, {credentials:'same-origin'});
+    const d = await r.json();
+    const contacts = d.contacts || [];
+    if (!contacts.length) {
+        document.getElementById('contactList').innerHTML = '<div style="padding:8px;font-size:0.72rem;color:var(--text-light);">No contacts found</div>';
+        return;
+    }
+    document.getElementById('contactList').innerHTML = contacts.map(c => {
+        const roleColors = {parent:'#059669',teacher:'#D97706',school_admin:'#4F46E5',student:'#2563EB'};
+        const color = roleColors[c.role] || '#6B7280';
+        return `<div class="contact-item" onclick="selectContact('${c.id}','${c.name}','${c.role}')">
+            <span>${c.name}</span>
+            <span class="contact-role" style="background:${color}20;color:${color};">${c.designation || c.role}</span>
+        </div>`;
+    }).join('');
+}
+
+function selectContact(id, name, role) {
+    selectedReceiverId = id;
+    document.getElementById('selectedContact').style.display = 'block';
+    document.getElementById('selectedContact').innerHTML = `<span style="padding:4px 10px;border-radius:6px;background:var(--primary-light);font-size:0.78rem;font-weight:700;">✓ ${name} (${role})</span>
+        <span onclick="clearContact()" style="cursor:pointer;margin-left:6px;color:#DC2626;font-size:0.72rem;">✕</span>`;
+    document.getElementById('contactList').innerHTML = '';
+    document.getElementById('cmSearchContact').value = '';
+
+    // Show student field if messaging a parent
+    document.getElementById('cmStudentField').style.display = (role === 'parent') ? 'block' : 'none';
+}
+
+function clearContact() {
+    selectedReceiverId = null;
+    document.getElementById('selectedContact').style.display = 'none';
+}
+
+async function sendMessage() {
+    if (!selectedReceiverId) { showToast('error', 'Select a receiver'); return; }
+    const subject = document.getElementById('cmSubject').value.trim();
+    const message = document.getElementById('cmMessage').value.trim();
+    if (!subject || !message) { showToast('error', 'Subject and message required'); return; }
+
+    const body = {
+        receiver_id: selectedReceiverId,
+        subject,
+        message,
+        thread_type: document.getElementById('cmType').value,
+        student_id: document.getElementById('cmStudent').value || '',
+    };
+    if (body.thread_type === 'complaint') {
+        body.complaint_category = document.getElementById('cmCategory').value;
+        body.complaint_priority = document.getElementById('cmPriority').value;
+    }
+
+    try {
+        const r = await fetch('/api/messages/threads', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body), credentials: 'same-origin'
+        });
+        const d = await r.json();
+        if (d.error) { showToast('error', d.error); return; }
+        showToast('success', d.message || 'Message sent!');
+        if (d.auto_copied) showToast('success', '📋 Parent auto-copied since message is to student');
+        closeCompose();
+        loadThreads(currentTab);
+        if (d.thread_id) openThread(d.thread_id);
+    } catch(e) { showToast('error', 'Failed to send'); }
+}
+
+function showToast(type, msg) {
+    const t = document.createElement('div');
+    t.style.cssText = `position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:10px;color:white;font-weight:700;font-size:0.82rem;z-index:9999;animation:slideIn 0.3s;background:${type==='success'?'#059669':'#DC2626'}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3500);
+}
+
+// Init
+loadThreads();
+</script>
+{% endblock %}

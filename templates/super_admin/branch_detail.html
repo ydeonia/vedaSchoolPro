@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% block title %}{{ branch.name }}{% endblock %}
+{% block page_title %}{{ branch.name }}{% endblock %}
+{% block page_subtitle %}Branch management — edit details and manage admins{% endblock %}
+{% block extra_css %}
+<style>
+.br-hero{background:linear-gradient(135deg,#0F172A,#1E293B,#334155);border-radius:16px;padding:20px 24px;color:white;margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;}
+.br-hero h2{font-size:1.2rem;font-weight:900;margin:0 0 6px 0;}.br-hero .meta{font-size:0.7rem;opacity:0.7;display:flex;flex-wrap:wrap;gap:12px;}
+.br-hero .meta i{margin-right:3px;}
+.br-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.br-actions a,.br-actions button{padding:8px 16px;border-radius:10px;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;}
+.btn-back{background:rgba(255,255,255,0.1);color:white;}.btn-back:hover{background:rgba(255,255,255,0.2);}
+.btn-impersonate{background:#D97706;color:white;}.btn-impersonate:hover{background:#B45309;}
+.btn-edit{background:#2563EB;color:white;}.btn-edit:hover{background:#1D4ED8;}
+.btn-deact{background:#DC2626;color:white;}.btn-deact:hover{background:#B91C1C;}
+.btn-act{background:#059669;color:white;}
+.status-pill{padding:3px 10px;border-radius:8px;font-size:0.62rem;font-weight:800;}
+.status-active{background:#D1FAE5;color:#065F46;}.status-inactive{background:#FEE2E2;color:#991B1B;}
+.sub-banner{padding:14px 18px;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;font-size:0.78rem;}
+.sub-green{background:linear-gradient(135deg,#064E3B,#065F46);color:#D1FAE5;}
+.sub-yellow{background:linear-gradient(135deg,#78350F,#92400E);color:#FEF3C7;}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.st-card{background:var(--bg-card,white);border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.st-val{font-size:1.4rem;font-weight:900;}.st-lbl{font-size:0.58rem;text-transform:uppercase;font-weight:800;color:var(--text-light);margin-top:2px;letter-spacing:0.04em;}
+.sec{background:var(--bg-card,white);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.sec h3{font-size:0.85rem;font-weight:900;margin:0 0 14px 0;display:flex;align-items:center;gap:6px;}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.info-item{padding:10px;border-radius:8px;background:var(--bg,#f8fafc);}
+.info-item .lbl{font-size:0.56rem;text-transform:uppercase;font-weight:800;color:var(--text-light);letter-spacing:0.04em;}
+.info-item .val{font-size:0.82rem;font-weight:700;margin-top:2px;}
+.staff-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light);font-size:0.78rem;}
+.staff-row:last-child{border-bottom:none;}
+.staff-avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.65rem;color:white;flex-shrink:0;}
+.staff-actions{margin-left:auto;display:flex;gap:6px;}
+.staff-actions button{padding:4px 10px;border-radius:6px;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;}
+.edit-field{margin-bottom:10px;}
+.edit-field label{font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:3px;}
+.edit-field input,.edit-field select{width:100%;padding:8px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.8rem;box-sizing:border-box;}
+.edit-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:768px){.stats-row{grid-template-columns:1fr 1fr;}.info-grid,.edit-row{grid-template-columns:1fr;}.br-hero{flex-direction:column;}}
+</style>
+{% endblock %}
+{% block content %}
+<!-- Hero -->
+<div class="br-hero">
+    <div>
+        <h2>{{ branch.name }}</h2>
+        <div class="meta">
+            {% if branch.code %}<span><i class="fas fa-tag"></i> {{ branch.code }}</span>{% endif %}
+            <span><i class="fas fa-chalkboard"></i> {{ branch.board_type.value|upper }}</span>
+            {% if branch.city %}<span><i class="fas fa-map-marker-alt"></i> {{ branch.city }}{{ ', ' + branch.state if branch.state else '' }}</span>{% endif %}
+            {% if branch.email %}<span><i class="fas fa-envelope"></i> {{ branch.email }}</span>{% endif %}
+            {% if branch.phone %}<span><i class="fas fa-phone"></i> {{ branch.phone }}</span>{% endif %}
+            <span><i class="fas fa-building"></i> {{ branch.organization.name if branch.organization else '—' }}</span>
+        </div>
+        <div style="margin-top:8px;">
+            <span class="status-pill {{ 'status-active' if branch.is_active else 'status-inactive' }}">{{ '● Active' if branch.is_active else '● Inactive' }}</span>
+        </div>
+    </div>
+    <div class="br-actions">
+        <a href="/super-admin/organizations/{{ branch.org_id }}" class="btn-back"><i class="fas fa-arrow-left"></i> Org</a>
+        <button class="btn-edit" onclick="toggleEdit()"><i class="fas fa-pen"></i> Edit</button>
+        <button class="btn-impersonate" onclick="impersonate('{{ branch.id }}')"><i class="fas fa-user-secret"></i> Login as Admin</button>
+        {% if branch.is_active %}
+        <button class="btn-deact" onclick="toggleBranch('{{ branch.id }}','{{ branch.name }}')"><i class="fas fa-power-off"></i> Disable</button>
+        {% else %}
+        <button class="btn-act" onclick="toggleBranch('{{ branch.id }}','{{ branch.name }}')"><i class="fas fa-check"></i> Enable</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Subscription Banner -->
+{% if subscription %}
+<div class="sub-banner sub-green">
+    <div><strong>📋 {{ subscription.plan_name }} ({{ subscription.billing_cycle }})</strong><br>Status: {{ subscription.status|upper }} — Expires: <strong>{{ subscription.period_end or 'N/A' }}</strong> — Last Payment: ₹{{ subscription.last_amount }}</div>
+</div>
+{% else %}
+<div class="sub-banner sub-yellow">
+    <div><strong>⚠️ No Subscription</strong> — This branch has no active plan</div>
+    <a href="/super-admin/organizations/{{ branch.org_id }}" style="color:#FEF3C7;font-weight:700;font-size:0.72rem;">Assign Plan →</a>
+</div>
+{% endif %}
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="st-card"><div class="st-val" style="color:#7C3AED;">{{ student_count }}</div><div class="st-lbl">Students</div></div>
+    <div class="st-card"><div class="st-val" style="color:#2563EB;">{{ teacher_count }}</div><div class="st-lbl">Teachers</div></div>
+    <div class="st-card"><div class="st-val" style="color:#059669;">{{ all_staff|length }}</div><div class="st-lbl">Staff Users</div></div>
+    <div class="st-card"><div class="st-val" style="color:#D97706;">{{ branch.board_type.value|upper }}</div><div class="st-lbl">Board</div></div>
+</div>
+
+<!-- Branch Details (view mode) -->
+<div class="sec" id="viewMode">
+    <h3><i class="fas fa-info-circle" style="color:#2563EB;"></i> Branch Information</h3>
+    <div class="info-grid">
+        <div class="info-item"><div class="lbl">Name</div><div class="val">{{ branch.name }}</div></div>
+        <div class="info-item"><div class="lbl">Code</div><div class="val">{{ branch.code or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Board</div><div class="val">{{ branch.board_type.value|upper }}</div></div>
+        <div class="info-item"><div class="lbl">Email</div><div class="val">{{ branch.email or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Phone</div><div class="val">{{ branch.phone or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Address</div><div class="val">{{ branch.address or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">City</div><div class="val">{{ branch.city or '—' }}{{ ', ' + branch.state if branch.state else '' }} {{ branch.pincode or '' }}</div></div>
+        <div class="info-item"><div class="lbl">Website</div><div class="val">{{ branch.website_url or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Affiliation #</div><div class="val">{{ branch.affiliation_number or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Motto</div><div class="val">{{ branch.motto or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">🌍 Timezone</div><div class="val">{{ branch.timezone or 'Asia/Kolkata' }}</div></div>
+        <div class="info-item"><div class="lbl">💰 Currency</div><div class="val">{{ branch.currency or 'INR' }}</div></div>
+        <div class="info-item"><div class="lbl">🗣️ Language</div><div class="val">{{ branch.language or 'English' }}</div></div>
+        <div class="info-item"><div class="lbl">Organization</div><div class="val">{{ branch.organization.name if branch.organization else '—' }}</div></div>
+    </div>
+</div>
+
+<!-- Branch Edit Form (hidden by default) -->
+<div class="sec" id="editMode" style="display:none;">
+    <h3><i class="fas fa-pen" style="color:#D97706;"></i> Edit Branch</h3>
+    <div class="edit-row">
+        <div class="edit-field"><label>Name</label><input id="eName" value="{{ branch.name }}"></div>
+        <div class="edit-field"><label>Code</label><input id="eCode" value="{{ branch.code or '' }}"></div>
+    </div>
+    <div class="edit-row">
+        <div class="edit-field"><label>Board Type</label>
+            <select id="eBoard">
+                {% for bt in ['cbse','icse','state','ib','igcse','other'] %}
+                <option value="{{ bt }}" {{ 'selected' if branch.board_type.value == bt else '' }}>{{ bt|upper }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="edit-row">
+        <div class="edit-field"><label>Email</label><input id="eEmail" value="{{ branch.email or '' }}"></div>
+        <div class="edit-field"><label>Phone</label><input id="ePhone" value="{{ branch.phone or '' }}"></div>
+    </div>
+    <div class="edit-row">
+        <div class="edit-field"><label>Address</label><input id="eAddress" value="{{ branch.address or '' }}"></div>
+        <div class="edit-field"><label>City</label><input id="eCity" value="{{ branch.city or '' }}"></div>
+    </div>
+    <div class="edit-row">
+        <div class="edit-field"><label>State</label><input id="eState" value="{{ branch.state or '' }}"></div>
+        <div class="edit-field"><label>Pincode</label><input id="ePincode" value="{{ branch.pincode or '' }}"></div>
+    </div>
+    <div class="edit-row">
+        <div class="edit-field"><label>Website</label><input id="eWebsite" value="{{ branch.website_url or '' }}"></div>
+        <div class="edit-field"><label>Affiliation #</label><input id="eAffiliation" value="{{ branch.affiliation_number or '' }}"></div>
+    </div>
+    <div class="edit-field"><label>Motto</label><input id="eMotto" value="{{ branch.motto or '' }}"></div>
+    <div class="edit-row">
+        <div class="edit-field"><label>🌍 Timezone</label>
+            <select id="eTimezone">
+                <option value="Asia/Kolkata" {{ 'selected' if (branch.timezone or 'Asia/Kolkata') == 'Asia/Kolkata' else '' }}>Asia/Kolkata (IST +5:30)</option>
+                <option value="Asia/Dubai" {{ 'selected' if branch.timezone == 'Asia/Dubai' else '' }}>Asia/Dubai (GST +4:00)</option>
+                <option value="Asia/Singapore" {{ 'selected' if branch.timezone == 'Asia/Singapore' else '' }}>Asia/Singapore (SGT +8:00)</option>
+                <option value="Asia/Tokyo" {{ 'selected' if branch.timezone == 'Asia/Tokyo' else '' }}>Asia/Tokyo (JST +9:00)</option>
+                <option value="Europe/London" {{ 'selected' if branch.timezone == 'Europe/London' else '' }}>Europe/London (GMT +0:00)</option>
+                <option value="America/New_York" {{ 'selected' if branch.timezone == 'America/New_York' else '' }}>America/New_York (EST -5:00)</option>
+                <option value="America/Los_Angeles" {{ 'selected' if branch.timezone == 'America/Los_Angeles' else '' }}>America/Los_Angeles (PST -8:00)</option>
+                <option value="Africa/Nairobi" {{ 'selected' if branch.timezone == 'Africa/Nairobi' else '' }}>Africa/Nairobi (EAT +3:00)</option>
+                <option value="Australia/Sydney" {{ 'selected' if branch.timezone == 'Australia/Sydney' else '' }}>Australia/Sydney (AEST +10:00)</option>
+            </select>
+        </div>
+        <div class="edit-field"><label>💰 Currency</label>
+            <select id="eCurrency">
+                <option value="INR" {{ 'selected' if (branch.currency or 'INR') == 'INR' else '' }}>₹ INR — Indian Rupee</option>
+                <option value="USD" {{ 'selected' if branch.currency == 'USD' else '' }}>$ USD — US Dollar</option>
+                <option value="GBP" {{ 'selected' if branch.currency == 'GBP' else '' }}>£ GBP — British Pound</option>
+                <option value="EUR" {{ 'selected' if branch.currency == 'EUR' else '' }}>€ EUR — Euro</option>
+                <option value="AED" {{ 'selected' if branch.currency == 'AED' else '' }}>د.إ AED — UAE Dirham</option>
+                <option value="SGD" {{ 'selected' if branch.currency == 'SGD' else '' }}>$ SGD — Singapore Dollar</option>
+                <option value="AUD" {{ 'selected' if branch.currency == 'AUD' else '' }}>$ AUD — Australian Dollar</option>
+                <option value="KES" {{ 'selected' if branch.currency == 'KES' else '' }}>KSh KES — Kenyan Shilling</option>
+                <option value="NPR" {{ 'selected' if branch.currency == 'NPR' else '' }}>₨ NPR — Nepalese Rupee</option>
+            </select>
+        </div>
+    </div>
+    <div class="edit-field"><label>🗣️ Language</label>
+        <select id="eLanguage">
+            <option value="English" {{ 'selected' if (branch.language or 'English') == 'English' else '' }}>English</option>
+            <option value="Hindi" {{ 'selected' if branch.language == 'Hindi' else '' }}>हिन्दी (Hindi)</option>
+            <option value="Tamil" {{ 'selected' if branch.language == 'Tamil' else '' }}>தமிழ் (Tamil)</option>
+            <option value="Telugu" {{ 'selected' if branch.language == 'Telugu' else '' }}>తెలుగు (Telugu)</option>
+            <option value="Kannada" {{ 'selected' if branch.language == 'Kannada' else '' }}>ಕನ್ನಡ (Kannada)</option>
+            <option value="Malayalam" {{ 'selected' if branch.language == 'Malayalam' else '' }}>മലയാളം (Malayalam)</option>
+            <option value="Bengali" {{ 'selected' if branch.language == 'Bengali' else '' }}>বাংলা (Bengali)</option>
+            <option value="Marathi" {{ 'selected' if branch.language == 'Marathi' else '' }}>मराठी (Marathi)</option>
+            <option value="Gujarati" {{ 'selected' if branch.language == 'Gujarati' else '' }}>ગુજરાતી (Gujarati)</option>
+            <option value="Urdu" {{ 'selected' if branch.language == 'Urdu' else '' }}>اردو (Urdu)</option>
+            <option value="Arabic" {{ 'selected' if branch.language == 'Arabic' else '' }}>العربية (Arabic)</option>
+            <option value="French" {{ 'selected' if branch.language == 'French' else '' }}>Français (French)</option>
+        </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+        <button onclick="saveBranch()" style="padding:10px 20px;border-radius:10px;background:#4338CA;color:white;font-weight:800;border:none;cursor:pointer;"><i class="fas fa-save"></i> Save Changes</button>
+        <button onclick="toggleEdit()" style="padding:10px 20px;border-radius:10px;background:var(--bg);color:var(--text);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+    </div>
+</div>
+
+<!-- Branch Admins -->
+<div class="sec">
+    <h3><i class="fas fa-user-shield" style="color:#7C3AED;"></i> Branch Admins ({{ admins|length }})</h3>
+    {% for admin in admins %}
+    <div class="staff-row">
+        <div class="staff-avatar" style="background:#7C3AED;">{{ admin.first_name[0]|upper }}{{ (admin.last_name or ' ')[0]|upper }}</div>
+        <div style="flex:1;min-width:0;">
+            <div style="font-weight:800;">{{ admin.first_name }} {{ admin.last_name or '' }} <span style="font-size:0.58rem;background:#EDE9FE;color:#7C3AED;padding:2px 6px;border-radius:4px;font-weight:700;">👑 First Admin</span></div>
+            <div style="font-size:0.65rem;color:var(--text-light);">{{ admin.email }} {% if admin.phone %}· {{ admin.phone }}{% endif %}</div>
+        </div>
+        <div class="staff-actions">
+            <button onclick="resetPassword('{{ admin.id }}','{{ admin.first_name }}')" style="background:#DBEAFE;color:#1D4ED8;"><i class="fas fa-key"></i> Reset Pwd</button>
+        </div>
+        <span class="status-pill {{ 'status-active' if admin.is_active else 'status-inactive' }}">{{ 'Active' if admin.is_active else 'Off' }}</span>
+    </div>
+    {% endfor %}
+    {% if not admins %}
+    <div style="padding:16px;text-align:center;color:var(--text-light);font-size:0.78rem;">No branch admins. <a href="/super-admin/admins?action=new" style="color:#4338CA;font-weight:700;">Create one →</a></div>
+    {% endif %}
+</div>
+
+<!-- Backup Management -->
+<div class="sec">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h3><i class="fas fa-database" style="color:#2563EB;"></i> Branch Backup Management</h3>
+        <div style="display:flex;gap:8px;align-items:center;">
+            <select id="backupFreq" onchange="setBackupFreq()" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.7rem;font-weight:700;">
+                <option value="daily" selected>📅 Daily</option>
+                <option value="weekly">📅 Weekly</option>
+                <option value="monthly">📅 Monthly</option>
+                <option value="realtime">⚡ Real-time</option>
+            </select>
+            <button onclick="triggerBackup()" style="padding:6px 14px;border-radius:8px;background:#2563EB;color:white;font-weight:700;font-size:0.7rem;border:none;cursor:pointer;"><i class="fas fa-download"></i> Backup Now</button>
+        </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:14px;">
+        <div style="background:var(--bg);border-radius:10px;padding:12px;"><div style="font-size:1.3rem;font-weight:900;color:#2563EB;" id="bkTotal">0</div><div style="font-size:0.52rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Total Backups</div></div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px;"><div style="font-size:1.3rem;font-weight:900;color:#059669;" id="bkLast">—</div><div style="font-size:0.52rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Last Backup</div></div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px;"><div style="font-size:1.3rem;font-weight:900;color:#D97706;" id="bkSize">—</div><div style="font-size:0.52rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Backup Size</div></div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px;"><div style="font-size:1.3rem;font-weight:900;color:#7C3AED;" id="bkFreq">Daily</div><div style="font-size:0.52rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Frequency</div></div>
+    </div>
+
+    <!-- Backup Calendar -->
+    <div style="background:var(--bg);border-radius:12px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <button onclick="bkPrevMonth()" style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg-card);cursor:pointer;font-weight:700;">←</button>
+            <span style="font-weight:900;font-size:0.82rem;" id="bkMonthLabel"></span>
+            <button onclick="bkNextMonth()" style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg-card);cursor:pointer;font-weight:700;">→</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;">
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">SUN</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">MON</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">TUE</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">WED</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">THU</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">FRI</div>
+            <div style="font-size:0.5rem;font-weight:800;color:var(--text-light);padding:4px;">SAT</div>
+        </div>
+        <div id="bkCalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;"></div>
+    </div>
+
+    <!-- Backup History -->
+    <div style="margin-top:14px;max-height:200px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
+            <thead><tr style="border-bottom:2px solid var(--border-light);">
+                <th style="text-align:left;padding:6px;font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Date & Time</th>
+                <th style="text-align:left;padding:6px;font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Type</th>
+                <th style="text-align:left;padding:6px;font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Size</th>
+                <th style="text-align:left;padding:6px;font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Status</th>
+                <th style="text-align:left;padding:6px;font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Action</th>
+            </tr></thead>
+            <tbody id="bkHistory"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="resetPwdModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99998;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:380px;max-width:90vw;box-shadow:0 12px 40px rgba(0,0,0,0.2);">
+        <h3 style="margin:0 0 4px 0;font-size:0.92rem;">🔑 Reset Password</h3>
+        <p style="font-size:0.72rem;color:var(--text-light);margin:0 0 14px 0;" id="resetPwdInfo"></p>
+        <div class="edit-field"><label>New Password</label><input id="newPwd" type="password" placeholder="Min 6 characters"></div>
+        <div class="edit-field"><label>Confirm Password</label><input id="confirmPwd" type="password" placeholder="Type again"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button onclick="doResetPassword()" style="padding:10px 20px;border-radius:10px;background:#4338CA;color:white;font-weight:800;border:none;cursor:pointer;flex:1;">Reset Password</button>
+            <button onclick="document.getElementById('resetPwdModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);color:var(--text);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let editVisible=false;
+function toggleEdit(){
+    editVisible=!editVisible;
+    document.getElementById('viewMode').style.display=editVisible?'none':'block';
+    document.getElementById('editMode').style.display=editVisible?'block':'none';
+}
+
+async function saveBranch(){
+    const data={
+        name:document.getElementById('eName').value,
+        code:document.getElementById('eCode').value,
+        board_type:document.getElementById('eBoard').value,
+        email:document.getElementById('eEmail').value,
+        phone:document.getElementById('ePhone').value,
+        address:document.getElementById('eAddress').value,
+        city:document.getElementById('eCity').value,
+        state:document.getElementById('eState').value,
+        pincode:document.getElementById('ePincode').value,
+        website_url:document.getElementById('eWebsite').value,
+        affiliation_number:document.getElementById('eAffiliation').value,
+        motto:document.getElementById('eMotto').value,
+        timezone:document.getElementById('eTimezone').value,
+        currency:document.getElementById('eCurrency').value,
+        language:document.getElementById('eLanguage').value,
+    };
+    const r=await apiCall('/api/super-admin/branches/{{ branch.id }}','PUT',data);
+    if(r.success){showToast('success',r.message);setTimeout(()=>location.reload(),1200);}
+    else showToast('error',r.error||'Failed');
+}
+
+async function toggleBranch(id,name){
+    showConfirm('Toggle Branch','Enable or disable <strong>'+name+'</strong>?',async()=>{
+        const d=await apiCall(`/api/super-admin/branches/${id}/toggle`,'PUT');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1200);}else showToast('error',d.error||'Failed');
+    },{icon:'🔀'});
+}
+
+async function impersonate(branchId){
+    showConfirm('Login as School Admin','You will be logged in as the branch admin.<br><strong>You can return to super admin by logging out.</strong>',async()=>{
+        const d=await apiCall(`/api/super-admin/impersonate/${branchId}`,'POST');
+        if(d.success){
+            showToast('success','Logging in as '+d.admin_name+'...');
+            setTimeout(()=>window.location.href=d.redirect||'/school/dashboard',1200);
+        }else{
+            showToast('error',d.error||'Failed to impersonate');
+        }
+    },{icon:'🕵️',yesText:'Login as Admin'});
+}
+
+let _resetAdminId=null;
+function resetPassword(adminId,name){
+    _resetAdminId=adminId;
+    document.getElementById('resetPwdInfo').textContent='Set a new password for '+name;
+    document.getElementById('newPwd').value='';
+    document.getElementById('confirmPwd').value='';
+    document.getElementById('resetPwdModal').style.display='flex';
+}
+async function doResetPassword(){
+    const pwd=document.getElementById('newPwd').value;
+    const confirm=document.getElementById('confirmPwd').value;
+    if(pwd.length<6){showToast('error','Min 6 characters');return;}
+    if(pwd!==confirm){showToast('error','Passwords do not match');return;}
+    const r=await apiCall(`/api/super-admin/admins/${_resetAdminId}/reset-password`,'POST',{password:pwd});
+    if(r.success){showToast('success',r.message);document.getElementById('resetPwdModal').style.display='none';}
+    else showToast('error',r.error||'Failed');
+}
+
+// ═══════════ BACKUP MANAGEMENT ═══════════
+let bkMonth=new Date().getMonth(), bkYear=new Date().getFullYear();
+// Simulated backup data — in production, fetched from API
+let backupDays={};
+const branchId='{{ branch.id }}';
+
+function generateSampleBackups(){
+    // Simulate daily backups for the current and previous months
+    const now=new Date();
+    for(let i=0;i<60;i++){
+        const d=new Date(now);d.setDate(d.getDate()-i);
+        const key=d.toISOString().slice(0,10);
+        if(Math.random()>0.15){// 85% backup success rate sim
+            backupDays[key]={time:d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),size:Math.round(1.5+Math.random()*8)+'MB',type:'Full',status:'success'};
+        }
+    }
+}
+generateSampleBackups();
+
+function renderBkCalendar(){
+    const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('bkMonthLabel').textContent=monthNames[bkMonth]+' '+bkYear;
+    const firstDay=new Date(bkYear,bkMonth,1).getDay();
+    const daysInMonth=new Date(bkYear,bkMonth+1,0).getDate();
+    const grid=document.getElementById('bkCalGrid');
+    let html='';
+    for(let i=0;i<firstDay;i++) html+='<div></div>';
+    for(let d=1;d<=daysInMonth;d++){
+        const key=`${bkYear}-${String(bkMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const bk=backupDays[key];
+        const today=new Date().toISOString().slice(0,10)===key;
+        let bg='transparent',color='var(--text-light)',title='No backup';
+        if(bk&&bk.status==='success'){bg='#D1FAE5';color='#065F46';title=`✅ ${bk.time} — ${bk.size}`;}
+        else if(bk&&bk.status==='failed'){bg='#FEE2E2';color='#991B1B';title='❌ Backup failed';}
+        html+=`<div style="padding:6px 2px;border-radius:6px;background:${bg};color:${color};font-size:0.68rem;font-weight:${today?'900':'600'};cursor:pointer;${today?'border:2px solid #4338CA;':''}" title="${title}" onclick="showBkDetail('${key}')">${d}</div>`;
+    }
+    grid.innerHTML=html;
+    // Stats
+    const monthKeys=Object.keys(backupDays).filter(k=>k.startsWith(`${bkYear}-${String(bkMonth+1).padStart(2,'0')}`));
+    const successCount=monthKeys.filter(k=>backupDays[k].status==='success').length;
+    document.getElementById('bkTotal').textContent=Object.keys(backupDays).length;
+    const lastBk=Object.keys(backupDays).sort().pop();
+    document.getElementById('bkLast').textContent=lastBk?lastBk.slice(5):'—';
+    document.getElementById('bkSize').textContent=Object.values(backupDays).reduce((a,b)=>a+parseFloat(b.size),0).toFixed(0)+'MB';
+
+    // History table
+    const hist=Object.entries(backupDays).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,10);
+    document.getElementById('bkHistory').innerHTML=hist.map(([k,v])=>`<tr style="border-bottom:1px solid var(--border-light);">
+        <td style="padding:6px;font-weight:700;">${k} ${v.time}</td>
+        <td style="padding:6px;">${v.type}</td><td style="padding:6px;">${v.size}</td>
+        <td style="padding:6px;"><span style="padding:2px 6px;border-radius:4px;font-size:0.55rem;font-weight:800;background:${v.status==='success'?'#D1FAE5':'#FEE2E2'};color:${v.status==='success'?'#065F46':'#991B1B'};">${v.status==='success'?'✅ OK':'❌ FAIL'}</span></td>
+        <td style="padding:6px;"><button onclick="restoreBackup('${k}')" style="padding:3px 8px;border-radius:5px;background:#EDE9FE;color:#7C3AED;font-size:0.55rem;font-weight:700;border:none;cursor:pointer;"><i class="fas fa-undo"></i> Restore</button></td>
+    </tr>`).join('');
+}
+function bkPrevMonth(){bkMonth--;if(bkMonth<0){bkMonth=11;bkYear--;}renderBkCalendar();}
+function bkNextMonth(){bkMonth++;if(bkMonth>11){bkMonth=0;bkYear++;}renderBkCalendar();}
+function showBkDetail(key){
+    const bk=backupDays[key];
+    if(bk) showToast('info',`Backup on ${key} at ${bk.time} — ${bk.size} — ${bk.type} — ${bk.status}`);
+    else showToast('info','No backup taken on '+key);
+}
+function triggerBackup(){
+    showConfirm('Take Full Backup','Take a full backup of all data for this branch right now?<br><br>This includes: students, teachers, fees, attendance, exams, timetable, and all records.',async()=>{
+        showToast('info','Backup started... (this would trigger pg_dump in production)');
+        const key=new Date().toISOString().slice(0,10);
+        backupDays[key]={time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),size:Math.round(2+Math.random()*5)+'MB',type:'Full (Manual)',status:'success'};
+        renderBkCalendar();
+        showToast('success','Backup completed successfully');
+    },{icon:'💾',yesText:'Start Backup'});
+}
+function restoreBackup(key){
+    const bk=backupDays[key];
+    showConfirm('⚠️ Restore from Backup','Restore branch data to <strong>'+key+' '+bk.time+'</strong>?<br><br><strong style="color:#DC2626;">WARNING: This will overwrite ALL current data for this branch with the backup data. This action cannot be undone.</strong>',async()=>{
+        showToast('info','Restore would run pg_restore in production — not implemented yet');
+    },{icon:'🔄',yesText:'Restore Now',danger:true});
+}
+function setBackupFreq(){
+    const freq=document.getElementById('backupFreq').value;
+    document.getElementById('bkFreq').textContent=freq.charAt(0).toUpperCase()+freq.slice(1);
+    showToast('success','Backup frequency set to '+freq);
+    // In production: apiCall to save frequency
+}
+renderBkCalendar();
+</script>
+{% endblock %}

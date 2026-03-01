@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% block title %}Command Tower{% endblock %}
+{% block page_title %}🏛️ Command Tower{% endblock %}
+{% block page_subtitle %}Organization-wide oversight — all branches at a glance{% endblock %}
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+*{font-family:'Outfit',sans-serif;}
+
+/* ═══ PREMIUM VARIABLES ═══ */
+:root{
+    --ct-bg:#f8fafc; --ct-card:#ffffff; --ct-border:#e2e8f0; --ct-text:#0f172a; --ct-muted:#64748b; --ct-accent:#6366f1;
+    --ct-accent2:#8b5cf6; --ct-green:#059669; --ct-red:#dc2626; --ct-amber:#d97706; --ct-blue:#2563eb;
+    --ct-glow:rgba(99,102,241,0.15); --ct-shadow:0 4px 24px rgba(0,0,0,0.06);
+    --ct-glass:rgba(255,255,255,0.7); --ct-glass-border:rgba(255,255,255,0.3);
+}
+[data-theme="dark"]{
+    --ct-bg:#0f172a; --ct-card:#1e293b; --ct-border:#334155; --ct-text:#f1f5f9; --ct-muted:#94a3b8;
+    --ct-glow:rgba(99,102,241,0.25); --ct-shadow:0 4px 24px rgba(0,0,0,0.3);
+    --ct-glass:rgba(30,41,59,0.8); --ct-glass-border:rgba(51,65,85,0.5);
+}
+
+/* ═══ LAYOUT ═══ */
+.ct-wrap{max-width:1200px;margin:0 auto;padding:0 8px;}
+
+/* ═══ PULSE BANNER ═══ */
+.pulse-banner{
+    background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a78bfa 100%);
+    border-radius:20px;padding:28px 32px;margin-bottom:20px;color:white;position:relative;overflow:hidden;
+    animation:pulseSlide 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+.pulse-banner::before{content:'';position:absolute;top:-50%;right:-20%;width:300px;height:300px;background:radial-gradient(circle,rgba(255,255,255,0.1) 0%,transparent 70%);pointer-events:none;}
+.pulse-banner::after{content:'';position:absolute;bottom:-30%;left:10%;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05);pointer-events:none;}
+.pulse-title{font-size:0.65rem;text-transform:uppercase;letter-spacing:3px;opacity:0.8;margin-bottom:6px;font-weight:600;}
+.pulse-text{font-size:1.25rem;font-weight:700;line-height:1.5;}
+.pulse-text strong{font-weight:900;}
+.pulse-time{font-size:0.65rem;opacity:0.6;margin-top:8px;}
+.pulse-dots{position:absolute;right:30px;top:50%;transform:translateY(-50%);display:flex;gap:6px;}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.3);animation:dotPulse 2s infinite;}
+.pulse-dot:nth-child(2){animation-delay:0.3s;}.pulse-dot:nth-child(3){animation-delay:0.6s;}
+
+/* ═══ STAT CARDS ═══ */
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.stat-card{
+    background:var(--ct-card);border-radius:16px;padding:20px;border:1px solid var(--ct-border);
+    position:relative;overflow:hidden;transition:all 0.3s cubic-bezier(0.4,0,0.2,1);
+    animation:cardUp 0.5s cubic-bezier(0.16,1,0.3,1) both;
+}
+.stat-card:nth-child(1){animation-delay:0.1s;}.stat-card:nth-child(2){animation-delay:0.15s;}
+.stat-card:nth-child(3){animation-delay:0.2s;}.stat-card:nth-child(4){animation-delay:0.25s;}
+.stat-card:hover{transform:translateY(-4px);box-shadow:var(--ct-shadow);border-color:var(--ct-accent);}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0;}
+.stat-card:nth-child(1)::before{background:linear-gradient(90deg,#6366f1,#8b5cf6);}
+.stat-card:nth-child(2)::before{background:linear-gradient(90deg,#059669,#10b981);}
+.stat-card:nth-child(3)::before{background:linear-gradient(90deg,#2563eb,#60a5fa);}
+.stat-card:nth-child(4)::before{background:linear-gradient(90deg,#d97706,#fbbf24);}
+.stat-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;margin-bottom:12px;}
+.stat-card:nth-child(1) .stat-icon{background:rgba(99,102,241,0.1);color:#6366f1;}
+.stat-card:nth-child(2) .stat-icon{background:rgba(5,150,105,0.1);color:#059669;}
+.stat-card:nth-child(3) .stat-icon{background:rgba(37,99,235,0.1);color:#2563eb;}
+.stat-card:nth-child(4) .stat-icon{background:rgba(217,119,6,0.1);color:#d97706;}
+.stat-val{font-size:1.8rem;font-weight:900;color:var(--ct-text);line-height:1;}
+.stat-label{font-size:0.68rem;color:var(--ct-muted);font-weight:500;margin-top:4px;}
+.stat-change{font-size:0.6rem;font-weight:700;margin-top:6px;display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:6px;}
+.stat-up{background:rgba(5,150,105,0.1);color:#059669;}.stat-down{background:rgba(220,38,38,0.1);color:#dc2626;}
+
+/* ═══ SCORECARD TABLE ═══ */
+.sc-section{background:var(--ct-card);border-radius:16px;border:1px solid var(--ct-border);overflow:hidden;margin-bottom:20px;animation:cardUp 0.6s 0.3s cubic-bezier(0.16,1,0.3,1) both;}
+.sc-header{padding:18px 22px;border-bottom:1px solid var(--ct-border);display:flex;justify-content:space-between;align-items:center;}
+.sc-title{font-size:0.95rem;font-weight:800;color:var(--ct-text);}
+.sc-badge{font-size:0.55rem;padding:3px 10px;border-radius:6px;background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700;text-transform:uppercase;letter-spacing:1px;}
+.sc-table{width:100%;border-collapse:collapse;}
+.sc-table th{font-size:0.58rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:var(--ct-muted);padding:10px 14px;text-align:left;background:var(--ct-bg);}
+.sc-table td{padding:12px 14px;font-size:0.82rem;color:var(--ct-text);border-top:1px solid var(--ct-border);transition:background 0.2s;}
+.sc-table tr:hover td{background:var(--ct-glow);}
+.sc-table .branch-name{font-weight:700;display:flex;align-items:center;gap:8px;}
+.sc-table .branch-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.metric-pill{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:8px;font-size:0.72rem;font-weight:700;}
+.m-green{background:rgba(5,150,105,0.1);color:#059669;}.m-amber{background:rgba(217,119,6,0.1);color:#d97706;}.m-red{background:rgba(220,38,38,0.1);color:#dc2626;}
+
+/* ═══ REVENUE + ALERTS GRID ═══ */
+.dual-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:20px;}
+.rev-card,.alert-card{background:var(--ct-card);border-radius:16px;border:1px solid var(--ct-border);overflow:hidden;animation:cardUp 0.6s 0.4s cubic-bezier(0.16,1,0.3,1) both;}
+.rev-header,.alert-header{padding:16px 20px;border-bottom:1px solid var(--ct-border);display:flex;justify-content:space-between;align-items:center;}
+.rev-title,.alert-title{font-size:0.9rem;font-weight:800;color:var(--ct-text);}
+.rev-body{padding:16px 20px;}
+.rev-bar{display:flex;align-items:center;gap:10px;margin-bottom:12px;animation:barGrow 0.8s 0.6s both;}
+.rev-bar-label{font-size:0.72rem;font-weight:600;color:var(--ct-text);min-width:90px;}
+.rev-bar-track{flex:1;height:28px;background:var(--ct-bg);border-radius:8px;overflow:hidden;position:relative;}
+.rev-bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding:0 10px;font-size:0.62rem;font-weight:800;color:white;transition:width 1.5s cubic-bezier(0.4,0,0.2,1);white-space:nowrap;}
+.rev-bar-amt{font-size:0.68rem;font-weight:700;color:var(--ct-muted);min-width:70px;text-align:right;}
+.rev-total{display:flex;justify-content:space-between;padding:14px 0;border-top:1px solid var(--ct-border);margin-top:8px;}
+.rev-total-label{font-size:0.72rem;font-weight:700;color:var(--ct-muted);}.rev-total-val{font-size:1.1rem;font-weight:900;color:var(--ct-accent);}
+
+/* ═══ ALERTS ═══ */
+.alert-body{padding:12px 16px;max-height:300px;overflow-y:auto;}
+.alert-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:8px;font-size:0.78rem;color:var(--ct-text);transition:all 0.2s;animation:alertSlide 0.4s both;}
+.alert-item:hover{transform:translateX(4px);}
+.alert-item:nth-child(1){animation-delay:0.5s;}.alert-item:nth-child(2){animation-delay:0.6s;}.alert-item:nth-child(3){animation-delay:0.7s;}
+.alert-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;flex-shrink:0;}
+.alert-critical{background:rgba(220,38,38,0.08);}.alert-critical .alert-icon{background:rgba(220,38,38,0.15);color:#dc2626;}
+.alert-warning{background:rgba(217,119,6,0.08);}.alert-warning .alert-icon{background:rgba(217,119,6,0.15);color:#d97706;}
+.alert-info{background:rgba(37,99,235,0.08);}.alert-info .alert-icon{background:rgba(37,99,235,0.15);color:#2563eb;}
+.alert-success{background:rgba(5,150,105,0.08);}.alert-success .alert-icon{background:rgba(5,150,105,0.15);color:#059669;}
+.alert-text{flex:1;line-height:1.4;}.alert-time{font-size:0.55rem;color:var(--ct-muted);white-space:nowrap;}
+
+/* ═══ LOADING SKELETON ═══ */
+.skel{background:linear-gradient(90deg,var(--ct-border) 25%,var(--ct-bg) 50%,var(--ct-border) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:8px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes pulseSlide{from{opacity:0;transform:translateY(-20px) scale(0.98);}to{opacity:1;transform:translateY(0) scale(1);}}
+@keyframes cardUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+@keyframes dotPulse{0%,100%{opacity:0.3;transform:scale(1);}50%{opacity:1;transform:scale(1.3);}}
+@keyframes barGrow{from{opacity:0;transform:scaleX(0.3);}to{opacity:1;transform:scaleX(1);}}
+@keyframes alertSlide{from{opacity:0;transform:translateX(-10px);}to{opacity:1;transform:translateX(0);}}
+@keyframes countUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:768px){.stat-row{grid-template-columns:repeat(2,1fr);}.dual-grid{grid-template-columns:1fr;}.pulse-dots{display:none;}}
+@media(max-width:480px){.stat-row{grid-template-columns:1fr;}}
+
+/* ═══ COLUMN HELPER TOOLTIPS ═══ */
+.col-help{display:inline-flex;align-items:center;gap:4px;cursor:help;position:relative;}
+.col-help .help-icon{width:14px;height:14px;border-radius:50%;background:var(--ct-border);color:var(--ct-muted);display:inline-flex;align-items:center;justify-content:center;font-size:0.45rem;font-weight:900;font-style:normal;flex-shrink:0;transition:all 0.2s;line-height:1;}
+.col-help:hover .help-icon{background:var(--ct-accent);color:white;}
+[data-theme="dark"] #ctTooltip{background:#f1f5f9!important;color:#0f172a!important;}
+[data-theme="dark"] #ctTooltip::after{border-top-color:#f1f5f9!important;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="ct-wrap">
+
+    <!-- MORNING PULSE -->
+    <div class="pulse-banner" id="pulseBanner">
+        <div class="pulse-title">☀️ Morning Pulse — Live</div>
+        <div class="pulse-text" id="pulseText">Loading your organization overview...</div>
+        <div class="pulse-time" id="pulseTime"></div>
+        <div class="pulse-dots"><div class="pulse-dot"></div><div class="pulse-dot"></div><div class="pulse-dot"></div></div>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stat-row" id="statRow">
+        <div class="stat-card"><div class="skel" style="width:40px;height:40px;margin-bottom:12px;"></div><div class="skel" style="width:60px;height:24px;margin-bottom:6px;"></div><div class="skel" style="width:100px;height:12px;"></div></div>
+        <div class="stat-card"><div class="skel" style="width:40px;height:40px;margin-bottom:12px;"></div><div class="skel" style="width:60px;height:24px;margin-bottom:6px;"></div><div class="skel" style="width:100px;height:12px;"></div></div>
+        <div class="stat-card"><div class="skel" style="width:40px;height:40px;margin-bottom:12px;"></div><div class="skel" style="width:60px;height:24px;margin-bottom:6px;"></div><div class="skel" style="width:100px;height:12px;"></div></div>
+        <div class="stat-card"><div class="skel" style="width:40px;height:40px;margin-bottom:12px;"></div><div class="skel" style="width:60px;height:24px;margin-bottom:6px;"></div><div class="skel" style="width:100px;height:12px;"></div></div>
+    </div>
+
+    <!-- BRANCH SCORECARD -->
+    <div class="sc-section" id="scorecardSection">
+        <div class="sc-header">
+            <span class="sc-title">📊 Branch Scorecard</span>
+            <span class="sc-badge">Live</span>
+        </div>
+        <div style="padding:40px;text-align:center;"><div class="skel" style="width:100%;height:200px;"></div></div>
+    </div>
+
+    <!-- REVENUE + ALERTS -->
+    <div class="dual-grid">
+        <div class="rev-card" id="revenueCard">
+            <div class="rev-header">
+                <span class="rev-title">💰 Revenue — <span id="revMonth"></span></span>
+                <span class="col-help" data-tip="Month-To-Date: cumulative revenue collected from the 1st of this month until today" style="font-size:0.55rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#6366f1;">MTD<span class="help-icon">?</span></span>
+            </div>
+            <div class="rev-body" id="revBody"><div class="skel" style="width:100%;height:150px;"></div></div>
+        </div>
+        <div class="alert-card">
+            <div class="alert-header">
+                <span class="alert-title">🔔 Smart Alerts</span>
+                <span class="sc-badge" id="alertCount">0</span>
+            </div>
+            <div class="alert-body" id="alertBody">
+                <div class="alert-item alert-info"><div class="alert-icon">📡</div><div class="alert-text">Scanning for alerts...</div></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const fmt=n=>{if(n>=10000000)return '₹'+(n/10000000).toFixed(1)+'Cr';if(n>=100000)return '₹'+(n/100000).toFixed(1)+'L';if(n>=1000)return '₹'+(n/1000).toFixed(1)+'K';return '₹'+n.toFixed(0);};
+const pct=v=>{if(v>=90)return 'm-green';if(v>=75)return 'm-amber';return 'm-red';};
+const COLORS=['#6366f1','#059669','#2563eb','#d97706','#ec4899','#14b8a6','#f43f5e','#8b5cf6'];
+
+async function loadPulse(){
+    try{
+        const r=await fetch('/api/chairman/pulse',{credentials:'same-origin'});const d=await r.json();
+        const p=d;
+        document.getElementById('pulseText').innerHTML=
+            `Across <strong>${p.branches} branch${p.branches!==1?'es':''}</strong>: <strong>${p.total_students.toLocaleString()}</strong> students, `+
+            `<strong>${p.total_staff}</strong> staff. Today's attendance: <strong>${p.attendance_pct}%</strong>. `+
+            `Fee collected this month: <strong>${fmt(p.fee_this_month)}</strong>.`+
+            (p.alerts.length?` <strong style="color:#fbbf24;">${p.alerts.length} alert${p.alerts.length>1?'s':''}</strong> need attention.`:'');
+        document.getElementById('pulseTime').textContent='Updated: '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})+' • '+new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+        // Stat cards
+        document.getElementById('statRow').innerHTML=`
+            <div class="stat-card"><div class="stat-icon">🎓</div><div class="stat-val">${p.total_students.toLocaleString()}</div><div class="stat-label"><span class="col-help" data-tip="All currently enrolled & active students across every branch in your organization">Total Students<span class="help-icon">?</span></span></div></div>
+            <div class="stat-card"><div class="stat-icon">👨‍🏫</div><div class="stat-val">${p.total_staff}</div><div class="stat-label"><span class="col-help" data-tip="All active employees — teachers, admins, clerks, and support staff across all branches">Total Staff<span class="help-icon">?</span></span></div></div>
+            <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-val">${p.attendance_pct}%</div><div class="stat-label"><span class="col-help" data-tip="Average student attendance across all branches for today. Calculated as (present ÷ total) × 100">Today's Attendance<span class="help-icon">?</span></span></div></div>
+            <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-val">${fmt(p.fee_this_month)}</div><div class="stat-label"><span class="col-help" data-tip="Total fee payments received across all branches from the 1st of this month until now">Fee This Month<span class="help-icon">?</span></span></div></div>
+        `;
+
+        // Alerts
+        renderAlerts(p.alerts);
+    }catch(e){document.getElementById('pulseText').textContent='Unable to load pulse data. Please check your connection.';}
+}
+
+async function loadScorecard(){
+    try{
+        const r=await fetch('/api/chairman/branch-scorecard',{credentials:'same-origin'});const d=await r.json();
+        const sc=d.scorecard;
+        if(!sc||!sc.length){
+            document.getElementById('scorecardSection').innerHTML='<div style="padding:40px;text-align:center;color:var(--ct-muted);"><i class="fas fa-building" style="font-size:2rem;display:block;margin-bottom:8px;"></i>No branches found in your organization.</div>';
+            return;
+        }
+        let html=`<div class="sc-header"><span class="sc-title">📊 Branch Scorecard — ${sc.length} Branches</span><span class="sc-badge">Today</span></div>
+        <table class="sc-table"><thead><tr>
+            <th>Branch</th>
+            <th><span class="col-help" data-tip="Total enrolled students currently active in this branch">Students<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="Number of teaching staff assigned to this branch">Teachers<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="Student-to-Teacher ratio. Lower is better — ideal is 20:1 to 30:1">Ratio<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="Today's student attendance %. Green 90%+, Amber 75-89%, Red below 75%">Attendance<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="Fee collected Month-To-Date — total payments received from the 1st of this month until today">Fee MTD<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="New student admissions this month. Higher numbers indicate growing enrollment">Admissions<span class="help-icon">?</span></span></th>
+            <th><span class="col-help" data-tip="Transfer Certificates issued this month — students who have left this branch">TCs<span class="help-icon">?</span></span></th>
+        </tr></thead><tbody>`;
+        sc.forEach((b,i)=>{
+            const attClass=pct(b.attendance_pct);
+            html+=`<tr>
+                <td><div class="branch-name"><span class="branch-dot" style="background:${COLORS[i%COLORS.length]};"></span>${b.name}${b.city?` <span style="font-size:0.6rem;color:var(--ct-muted);">(${b.city})</span>`:''}</div></td>
+                <td style="font-weight:700;">${b.students.toLocaleString()}</td>
+                <td>${b.teachers}</td>
+                <td>${b.ratio}:1</td>
+                <td><span class="metric-pill ${attClass}">${b.attendance_pct}%</span></td>
+                <td style="font-weight:700;">${fmt(b.fee_collected)}</td>
+                <td>${b.new_admissions>0?'<span style="color:#059669;font-weight:700;">+'+b.new_admissions+'</span>':'0'}</td>
+                <td>${b.withdrawals>0?'<span style="color:#dc2626;font-weight:700;">-'+b.withdrawals+'</span>':'0'}</td>
+            </tr>`;
+        });
+        html+='</tbody></table>';
+        document.getElementById('scorecardSection').innerHTML=html;
+    }catch(e){}
+}
+
+async function loadRevenue(){
+    try{
+        const r=await fetch('/api/chairman/revenue',{credentials:'same-origin'});const d=await r.json();
+        document.getElementById('revMonth').textContent=d.month||'';
+        const maxVal=Math.max(...d.branches.map(b=>b.collected),1);
+        let html='';
+        d.branches.forEach((b,i)=>{
+            const pctW=Math.max(5,Math.round(b.collected/maxVal*100));
+            html+=`<div class="rev-bar" style="animation-delay:${0.5+i*0.1}s;">
+                <span class="rev-bar-label">${b.branch}</span>
+                <div class="rev-bar-track"><div class="rev-bar-fill" style="width:${pctW}%;background:${COLORS[i%COLORS.length]};">${pctW>20?fmt(b.collected):''}</div></div>
+                <span class="rev-bar-amt">${fmt(b.collected)}</span>
+            </div>`;
+        });
+        html+=`<div class="rev-total"><span class="rev-total-label">Total Collected</span><span class="rev-total-val">${fmt(d.total_collected)}</span></div>`;
+        html+=`<div class="rev-total" style="border-top:none;padding-top:0;"><span class="rev-total-label">Total Pending</span><span class="rev-total-val" style="color:var(--ct-red);">${fmt(d.total_pending)}</span></div>`;
+        document.getElementById('revBody').innerHTML=html;
+
+        // Animate bars
+        setTimeout(()=>{
+            document.querySelectorAll('.rev-bar-fill').forEach(el=>{
+                const w=el.style.width;el.style.width='0%';
+                setTimeout(()=>el.style.width=w,100);
+            });
+        },200);
+    }catch(e){}
+}
+
+function renderAlerts(apiAlerts){
+    let alerts=apiAlerts||[];
+    // Generate smart alerts from scorecard data
+    const body=document.getElementById('alertBody');
+    // If no alerts, show success
+    if(!alerts.length){
+        body.innerHTML=`
+            <div class="alert-item alert-success"><div class="alert-icon">✅</div><div class="alert-text">All branches running smoothly. No issues detected.</div><div class="alert-time">Now</div></div>
+            <div class="alert-item alert-info"><div class="alert-icon">💡</div><div class="alert-text">Tip: Upload branch logos and principal signatures for professional certificates.</div><div class="alert-time">System</div></div>
+        `;
+    }else{
+        body.innerHTML=alerts.map((a,i)=>{
+            const cls=a.type==='critical'?'alert-critical':a.type==='warning'?'alert-warning':a.type==='success'?'alert-success':'alert-info';
+            const icon=a.type==='critical'?'🔴':a.type==='warning'?'🟡':a.type==='success'?'🟢':'🔵';
+            return `<div class="alert-item ${cls}" style="animation-delay:${0.5+i*0.1}s;"><div class="alert-icon">${icon}</div><div class="alert-text">${a.text}</div><div class="alert-time">Now</div></div>`;
+        }).join('');
+    }
+    document.getElementById('alertCount').textContent=alerts.length;
+}
+
+// Load everything
+loadPulse();
+loadScorecard();
+loadRevenue();
+
+// Auto-refresh every 5 minutes
+setInterval(()=>{loadPulse();loadScorecard();loadRevenue();},300000);
+
+// ═══ TOOLTIP — single floating div, never clipped ═══
+(function(){
+    const tip=document.createElement('div');
+    tip.id='ctTooltip';
+    tip.style.cssText='display:none;position:fixed;background:#0f172a;color:#f1f5f9;font-size:0.68rem;font-weight:500;padding:10px 14px;border-radius:10px;max-width:250px;line-height:1.5;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.25);pointer-events:none;transition:opacity 0.15s;';
+    document.body.appendChild(tip);
+
+    document.addEventListener('mouseenter',function(e){
+        const el=e.target.closest('.col-help');
+        if(!el||!el.dataset.tip)return;
+        tip.textContent=el.dataset.tip;
+        tip.style.display='block';
+        tip.style.opacity='0';
+        requestAnimationFrame(()=>{
+            const r=el.getBoundingClientRect();
+            let left=r.left+r.width/2-tip.offsetWidth/2;
+            let top=r.top-tip.offsetHeight-10;
+            // Keep on screen
+            if(left<8) left=8;
+            if(left+tip.offsetWidth>window.innerWidth-8) left=window.innerWidth-tip.offsetWidth-8;
+            if(top<4) top=r.bottom+10; // flip below
+            tip.style.left=left+'px';
+            tip.style.top=top+'px';
+            tip.style.opacity='1';
+        });
+    },true);
+
+    document.addEventListener('mouseleave',function(e){
+        if(e.target.closest('.col-help')) tip.style.display='none';
+    },true);
+})();
+</script>
+{% endblock %}

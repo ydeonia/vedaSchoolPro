@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Certificates{% endblock %}
+{% block page_title %}📜 Certificate Generation{% endblock %}
+{% block page_subtitle %}Transfer, Bonafide, Character certificates{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Generate Certificate</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <select id="cType" class="form-select">
+                <option value="transfer_certificate">Transfer Certificate (TC)</option>
+                <option value="bonafide_certificate">Bonafide Certificate</option>
+                <option value="character_certificate">Character Certificate</option>
+                <option value="study_certificate">Study Certificate</option>
+            </select>
+            <select id="cClass" class="form-select" onchange="loadCertStudents()"><option value="">Select Class</option>{% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+            <select id="cStudent" class="form-select"><option value="">Select Student</option></select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+            <input type="text" id="cReason" class="form-input" placeholder="Reason (for TC: why leaving)">
+            <input type="text" id="cDest" class="form-input" placeholder="Destination School (for TC)">
+        </div>
+        <button class="btn btn-primary mt-2" onclick="generateCert()"><i class="fas fa-certificate"></i> Generate</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Issued Certificates</h2></div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>No.</th><th>Type</th><th>Student</th><th>Date</th><th></th></tr></thead>
+        <tbody>{% for c in certificates %}<tr>
+            <td>{{ c.certificate_number or '—' }}</td><td style="text-transform:capitalize;">{{ c.cert_type.value|replace('_',' ') }}</td>
+            <td>{{ c.student_id }}</td><td>{{ c.issue_date.strftime('%d %b %Y') if c.issue_date else '—' }}</td>
+            <td><a href="/api/school/certificates/pdf/{{ c.id }}" target="_blank" class="btn btn-ghost btn-sm"><i class="fas fa-file-pdf" style="color:var(--danger);"></i></a></td>
+        </tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function generateCert(){const d={student_id:document.getElementById('cStudent').value,cert_type:document.getElementById('cType').value,reason:document.getElementById('cReason').value,destination_school:document.getElementById('cDest').value};if(!d.student_id){showToast('error','Select a student');return;}const r=await apiCall('/api/school/certificates/generate','POST',d);showToast('success','Certificate Generated',r.number);setTimeout(()=>location.reload(),1000);}
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Library{% endblock %}
+{% block page_title %}📚 Library{% endblock %}
+{% block page_subtitle %}Browse available books{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        {% if books %}
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;">
+        {% for b in books %}
+        <div style="background:var(--bg);border-radius:var(--radius);padding:14px;border-left:4px solid var(--primary);">
+            <div style="font-weight:800;">{{ b.title }}</div>
+            <div style="font-size:0.82rem;color:var(--text-light);">{{ b.author or '' }} {% if b.isbn %}· ISBN: {{ b.isbn }}{% endif %}</div>
+            <div style="margin-top:6px;"><span class="badge badge-success">Available</span></div>
+        </div>
+        {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="fas fa-book-reader"></i><h3>Library Catalog Coming Soon</h3><p>Books will appear here once the librarian adds them.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

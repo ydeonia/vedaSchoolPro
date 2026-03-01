@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Transport — Assignments{% endblock %}
+{% block page_title %}👨‍🎓 Student-Route Assignment{% endblock %}
+{% block page_subtitle %}Assign students to transport routes and stops{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Assign Student to Route</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr 120px; gap:10px;">
+            <select id="aStudent" class="form-select"><option value="">Select Student</option>{% for s in students %}<option value="{{ s.id }}">{{ s.full_name }} ({{ s.class_.name if s.class_ else '' }})</option>{% endfor %}</select>
+            <select id="aRoute" class="form-select"><option value="">Select Route</option>{% for r in routes %}<option value="{{ r.id }}">{{ r.route_name }} (₹{{ r.monthly_fee|int }}/mo)</option>{% endfor %}</select>
+            <button class="btn btn-primary" onclick="assignStudent()"><i class="fas fa-link"></i> Assign</button>
+        </div>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Current Assignments ({{ assignments|length }})</h2></div>
+    <div class="card-body">
+        {% if assignments %}
+        <p style="font-size:0.82rem; color:var(--text-secondary);">{{ assignments|length }} students assigned to transport routes.</p>
+        {% else %}
+        <div class="empty-state"><i class="fas fa-users"></i><h3>No Assignments</h3><p>Assign students to routes above.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function assignStudent(){
+    const sid=document.getElementById('aStudent').value, rid=document.getElementById('aRoute').value;
+    if(!sid||!rid){showToast('error','Select student and route');return;}
+    await apiCall('/api/school/transport/assign','POST',{student_id:sid,route_id:rid});
+    showToast('success','Assigned');setTimeout(()=>location.reload(),800);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}{{ child.full_name }} — Performance{% endblock %}
+{% block page_title %}📊 {{ child.full_name }}'s Performance{% endblock %}
+{% block page_subtitle %}Track progress, understand strengths — everything in one place{% endblock %}
+
+{% block extra_css %}
+<style>
+:root { --cp:#6366F1; --cs:#F59E0B; --cg:#10B981; --cr:#EF4444; }
+.analytics-hero { background:linear-gradient(135deg,#1E1B4B 0%,#312E81 50%,#4338CA 100%); border-radius:16px; padding:24px; color:white; margin-bottom:20px; position:relative; overflow:hidden; }
+.analytics-hero::before { content:''; position:absolute; top:-50%; right:-20%; width:300px; height:300px; background:radial-gradient(circle,rgba(255,255,255,0.06) 0%,transparent 70%); border-radius:50%; }
+.hero-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; }
+.hero-stat { text-align:center; padding:10px 8px; background:rgba(255,255,255,0.08); border-radius:12px; }
+.hero-stat .num { font-size:1.6rem; font-weight:900; line-height:1; }
+.hero-stat .label { font-size:0.68rem; opacity:0.65; margin-top:3px; text-transform:uppercase; letter-spacing:0.5px; }
+.hero-stat .sub { font-size:0.72rem; opacity:0.85; margin-top:2px; }
+.percentile-badge { display:inline-block; background:linear-gradient(135deg,#F59E0B,#D97706); padding:3px 12px; border-radius:20px; font-weight:800; font-size:0.75rem; margin-top:4px; }
+.chart-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.chart-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+.chart-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:16px; }
+.chart-card h3 { font-size:0.88rem; font-weight:800; margin:0 0 2px; display:flex; align-items:center; gap:6px; }
+.chart-card .chart-sub { font-size:0.68rem; color:var(--text-light); margin-bottom:10px; }
+.full-width { grid-column:1/-1; }
+.explain-btn { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:8px; background:#EEF2FF; color:#6366F1; font-size:0.68rem; font-weight:700; cursor:pointer; border:none; margin-left:auto; }
+.explain-btn:hover { background:#E0E7FF; }
+.explain-box { display:none; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:10px; padding:10px 14px; font-size:0.78rem; color:#166534; line-height:1.5; margin-bottom:10px; }
+.explain-box strong { color:#15803D; }
+/* Insights */
+.insight-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
+.insight-card { padding:12px; border-radius:10px; display:flex; align-items:flex-start; gap:10px; }
+.insight-card .icon { font-size:1.3rem; flex-shrink:0; }
+.insight-card .title { font-weight:700; font-size:0.82rem; }
+.insight-card .desc { font-size:0.72rem; color:var(--text-secondary); margin-top:2px; line-height:1.4; }
+.insight-green { background:#ECFDF5; border:1px solid #A7F3D0; }
+.insight-yellow { background:#FFFBEB; border:1px solid #FDE68A; }
+.insight-red { background:#FEF2F2; border:1px solid #FECACA; }
+.insight-blue { background:#EFF6FF; border:1px solid #BFDBFE; }
+/* Teacher feedback */
+.tf-subject { margin-bottom:14px; }
+.tf-subject-name { font-weight:800; font-size:0.88rem; margin-bottom:6px; padding-bottom:4px; border-bottom:2px solid var(--border); }
+.tf-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.tf-label { font-size:0.72rem; font-weight:700; min-width:80px; margin-top:4px; }
+.tf-label.str { color:#10B981; } .tf-label.con { color:#EF4444; } .tf-label.sug { color:#3B82F6; }
+.tf-tag { display:inline-block; padding:3px 10px; border-radius:12px; font-size:0.72rem; margin:2px; }
+.tf-tag.str { background:#ECFDF5; color:#059669; border:1px solid #A7F3D0; }
+.tf-tag.con { background:#FEF2F2; color:#DC2626; border:1px solid #FECACA; }
+.tf-tag.sug { background:#EFF6FF; color:#2563EB; border:1px solid #BFDBFE; }
+.tf-custom { font-style:italic; font-size:0.78rem; color:var(--text-secondary); padding:6px 10px; background:var(--bg); border-radius:8px; border-left:3px solid #6366F1; margin-top:6px; }
+/* Table */
+.subject-table { width:100%; border-collapse:collapse; font-size:0.78rem; }
+.subject-table th { text-align:left; padding:8px 10px; background:var(--bg); font-weight:700; font-size:0.68rem; text-transform:uppercase; color:var(--text-light); }
+.subject-table td { padding:8px 10px; border-bottom:1px solid var(--border); }
+.bar-inline { height:5px; border-radius:3px; background:var(--bg-secondary); overflow:hidden; width:80px; display:inline-block; vertical-align:middle; margin-left:6px; }
+.bar-inline .fill { height:100%; border-radius:3px; }
+/* Attendance heatmap */
+.att-heatmap { display:flex; gap:3px; flex-wrap:wrap; }
+.att-dot { width:14px; height:14px; border-radius:3px; display:inline-block; cursor:default; transition:transform 0.15s; }
+.att-dot:hover { transform:scale(1.4); }
+.att-dot.present { background:#10B981; } .att-dot.absent { background:#EF4444; }
+.att-dot.late { background:#F59E0B; } .att-dot.none { background:#E2E8F0; }
+.legend-row { display:flex; gap:14px; font-size:0.68rem; color:var(--text-light); flex-wrap:wrap; }
+.legend-dot { width:8px; height:8px; border-radius:3px; display:inline-block; margin-right:3px; vertical-align:middle; }
+.loading-state { text-align:center; padding:60px; color:var(--text-light); }
+.loading-state i { font-size:2rem; margin-bottom:12px; animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+@media(max-width:768px) { .hero-grid { grid-template-columns:repeat(3,1fr); } .chart-row,.chart-row-3 { grid-template-columns:1fr; } }
+[data-theme="dark"] .chart-card { background:var(--card-bg); }
+[data-theme="dark"] .explain-box { background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.3); color:#86EFAC; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:12px;">
+    <a href="/parent/dashboard" style="font-size:0.82rem;color:var(--primary);text-decoration:none;"><i class="fas fa-arrow-left"></i> Back to Dashboard</a>
+</div>
+<div id="analyticsRoot">
+    <div class="loading-state"><i class="fas fa-circle-notch"></i><div>Loading {{ child.full_name }}'s analytics...</div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+let chartInstances = {};
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+async function loadAnalytics() {
+    try {
+        // Use the student analytics API with child's context
+        const [aResp, rResp] = await Promise.all([
+            fetch('/api/parent/child-analytics/{{ child.id }}', {credentials:'same-origin'}),
+            fetch('/api/parent/child-remarks/{{ child.id }}', {credentials:'same-origin'}).catch(()=>null),
+        ]);
+        if (!aResp.ok) throw new Error('Failed');
+        const data = await aResp.json();
+        const remarks = rResp && rResp.ok ? await rResp.json() : null;
+        data._remarks = remarks;
+        renderDashboard(data);
+    } catch(e) {
+        document.getElementById('analyticsRoot').innerHTML = '<div class="chart-card"><div style="text-align:center;padding:40px;color:var(--text-light);"><i class="fas fa-chart-bar" style="font-size:2rem;margin-bottom:8px;"></i><h3>Analytics Not Available Yet</h3><p>Data will appear after exam results are published.</p></div></div>';
+    }
+}
+
+function renderDashboard(d) {
+    const latestExam = d.exams.length > 0 ? d.exams[d.exams.length-1] : null;
+    const percentile = latestExam ? latestExam.percentile : 0;
+    const latestPct = latestExam ? latestExam.pct : 0;
+    const prevPct = d.exams.length > 1 ? d.exams[d.exams.length-2].pct : null;
+    const improvement = prevPct !== null ? latestPct - prevPct : null;
+    const improvementText = improvement !== null ? (improvement>0 ? `↑ +${improvement}%` : improvement<0 ? `↓ ${improvement}%` : '→ Same') : 'First exam';
+    const improvementColor = improvement>0 ? '#10B981' : improvement<0 ? '#EF4444' : '#F59E0B';
+
+    let html = `
+    <div class="analytics-hero">
+        <div style="margin-bottom:10px;">
+            <div style="font-size:1.1rem;font-weight:800;">${d.student.name}</div>
+            <div style="font-size:0.72rem;opacity:0.7;">${d.student.class} ${d.student.section} · Roll #${d.student.roll}</div>
+        </div>
+        <div class="hero-grid">
+            <div class="hero-stat"><div class="num">${latestPct}%</div><div class="label">Latest Score</div><div class="sub" style="color:${improvementColor}">${improvementText}</div></div>
+            <div class="hero-stat"><div class="num">${d.attendance.pct}%</div><div class="label">Attendance</div><div class="sub">${d.attendance.present}/${d.attendance.total} days</div></div>
+            <div class="hero-stat"><div class="num">${percentile}%</div><div class="label">Ahead Of Class</div><div class="percentile-badge">Top ${100-percentile}%</div></div>
+            <div class="hero-stat"><div class="num">₹${d.fees.balance.toLocaleString()}</div><div class="label">Fee Pending</div><div class="sub">₹${d.fees.total_paid.toLocaleString()} paid</div></div>
+            <div class="hero-stat"><div class="num">${d.exams.length}</div><div class="label">Exams Taken</div><div class="sub">${d.class_info.strength} classmates</div></div>
+        </div>
+    </div>
+
+    <!-- PARENT-FRIENDLY INSIGHTS -->
+    <div class="chart-card" style="margin-bottom:16px;">
+        <h3>💡 What You Need to Know <button class="explain-btn" onclick="toggleExplain('insightExplain')">🤔 What is this?</button></h3>
+        <div class="explain-box" id="insightExplain"><strong>Dear Parent,</strong> these cards summarize your child's academic situation. Green cards = good news. Yellow = needs attention. Red = urgent. Each card tells you exactly what to do.</div>
+        <div class="chart-sub">Personalized insights about your child's performance</div>
+        <div class="insight-grid" id="insightsGrid"></div>
+    </div>
+
+    <!-- TEACHER FEEDBACK -->
+    <div class="chart-card" style="margin-bottom:16px;display:none;" id="teacherFeedbackCard">
+        <h3>👩‍🏫 What Teachers Say <button class="explain-btn" onclick="toggleExplain('tfExplain')">🤔 What is this?</button></h3>
+        <div class="explain-box" id="tfExplain"><strong>Dear Parent,</strong> your child's teachers have given specific feedback on strengths and areas that need work. The <span style="color:#10B981;font-weight:700;">green tags</span> are what your child does well. <span style="color:#EF4444;font-weight:700;">Red tags</span> need your attention. <span style="color:#3B82F6;font-weight:700;">Blue tags</span> are action items — things you can do at home to help.</div>
+        <div class="chart-sub">Subject-wise teacher observations</div>
+        <div id="teacherFeedbackContent"></div>
+    </div>
+
+    <!-- CHARTS -->
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3>📈 Score Trend <button class="explain-btn" onclick="toggleExplain('trendExplain')">🤔 Explain</button></h3>
+            <div class="explain-box" id="trendExplain"><strong>What this shows:</strong> Your child's overall percentage in each exam. An upward line means improvement. A flat or downward line means they need more focus. Look at the most recent 2-3 exams to see the direction.</div>
+            <canvas id="progressChart" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🎯 Subject Strengths <button class="explain-btn" onclick="toggleExplain('radarExplain')">🤔 Explain</button></h3>
+            <div class="explain-box" id="radarExplain"><strong>What this shows:</strong> The colored area shows your child's performance in each subject. The bigger the shape, the better. The dashed line is the class average. Subjects where your child's shape is smaller than the class = needs more attention.</div>
+            <div class="legend-row"><span><span class="legend-dot" style="background:rgba(99,102,241,0.5);"></span>Your Child</span><span><span class="legend-dot" style="background:rgba(245,158,11,0.4);"></span>Class Average</span></div>
+            <canvas id="radarChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-row-3">
+        <div class="chart-card">
+            <h3>📊 Subject Comparison <button class="explain-btn" onclick="toggleExplain('subjExplain')">🤔 Explain</button></h3>
+            <div class="explain-box" id="subjExplain"><strong>What this shows:</strong> Each bar compares your child's marks with the class average. <span style="color:#6366F1;font-weight:700;">Purple = above average</span>. <span style="color:#EF4444;font-weight:700;">Red = below average</span>. Focus on the red ones.</div>
+            <canvas id="subjectChart" height="260"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🥧 Attendance <button class="explain-btn" onclick="toggleExplain('pieExplain')">🤔 Explain</button></h3>
+            <div class="explain-box" id="pieExplain"><strong>What this shows:</strong> How many days your child was present (green), absent (red), or late (yellow). Schools require minimum 75% attendance. Below 75% can affect exam eligibility.</div>
+            <canvas id="attPieChart" height="200"></canvas>
+            <div class="legend-row" style="justify-content:center;margin-top:8px;">
+                <span><span class="legend-dot" style="background:#10B981;"></span>Present ${d.attendance.present}</span>
+                <span><span class="legend-dot" style="background:#EF4444;"></span>Absent ${d.attendance.absent}</span>
+                <span><span class="legend-dot" style="background:#F59E0B;"></span>Late ${d.attendance.late}</span>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>📅 30-Day Attendance</h3>
+            <div class="chart-sub">Each square = one school day</div>
+            <div class="att-heatmap" id="attHeatmap"></div>
+            <div class="legend-row" style="margin-top:8px;"><span><span class="legend-dot" style="background:#10B981;"></span>Present</span><span><span class="legend-dot" style="background:#EF4444;"></span>Absent</span><span><span class="legend-dot" style="background:#F59E0B;"></span>Late</span></div>
+        </div>
+    </div>`;
+
+    // Marks table
+    if (latestExam) {
+        html += `<div class="chart-row"><div class="chart-card full-width">
+            <h3>📝 ${latestExam.exam_name} — Detailed Marks <button class="explain-btn" onclick="toggleExplain('marksExplain')">🤔 Explain</button></h3>
+            <div class="explain-box" id="marksExplain"><strong>How to read this:</strong> "Class Avg" = average marks of the entire class. If your child scored above class avg, that's good (shown in green). If below, that subject needs extra focus (red). "Highest" shows the top score in class for reference.</div>
+            <table class="subject-table"><thead><tr><th>Subject</th><th>Marks</th><th>Class Avg</th><th>Highest</th><th>Grade</th><th>vs Average</th></tr></thead><tbody>`;
+        for (const s of latestExam.subjects) {
+            const pct = Math.round(s.my_marks/s.max_marks*100);
+            const color = pct>=80?'#10B981':pct>=60?'#6366F1':pct>=40?'#F59E0B':'#EF4444';
+            const diff = (s.my_marks-s.class_avg).toFixed(1);
+            const vs = diff>=0 ? `<span style="color:#10B981;font-weight:700;">+${diff}</span>` : `<span style="color:#EF4444;font-weight:700;">${diff}</span>`;
+            html += `<tr><td><strong>${s.subject}</strong></td><td>${s.my_marks}/${s.max_marks}</td><td>${s.class_avg}</td><td>${s.class_highest}</td><td><span style="font-weight:800;color:${color};">${s.grade}</span></td><td>${vs} <span class="bar-inline"><span class="fill" style="width:${pct}%;background:${color};"></span></span></td></tr>`;
+        }
+        html += `<tr style="font-weight:800;background:var(--bg);"><td>TOTAL</td><td>${latestExam.total}/${latestExam.max}</td><td colspan="2">${latestExam.pct}%</td><td></td><td>Ahead of ${latestExam.percentile}% of class</td></tr></tbody></table></div></div>`;
+    }
+
+    html += `<div style="text-align:center;padding:12px;font-size:0.72rem;color:var(--text-light);"><i class="fas fa-lock"></i> All comparisons are anonymized. No other child's name is shown.</div>`;
+
+    document.getElementById('analyticsRoot').innerHTML = html;
+    renderCharts(d); renderHeatmap(d.attendance.trend); generateInsights(d);
+}
+
+function renderCharts(d) {
+    const latestExam = d.exams.length>0 ? d.exams[d.exams.length-1] : null;
+    if (d.progress_trend.length>0) {
+        destroyChart('progressChart');
+        chartInstances['progressChart'] = new Chart(document.getElementById('progressChart'), {
+            type:'line', data:{ labels:d.progress_trend.map(e=>e.exam), datasets:[{label:'Score %',data:d.progress_trend.map(e=>e.pct),borderColor:'#6366F1',backgroundColor:'rgba(99,102,241,0.08)',borderWidth:3,fill:true,tension:0.4,pointRadius:5}]},
+            options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}}}},
+        });
+    }
+    if (d.radar.length>=3) {
+        destroyChart('radarChart');
+        chartInstances['radarChart'] = new Chart(document.getElementById('radarChart'), {
+            type:'radar', data:{ labels:d.radar.map(r=>r.subject), datasets:[
+                {label:'Child',data:d.radar.map(r=>r.my_pct),borderColor:'#6366F1',backgroundColor:'rgba(99,102,241,0.12)',borderWidth:2,pointRadius:3},
+                {label:'Class Avg',data:d.radar.map(r=>r.class_avg_pct),borderColor:'#F59E0B',backgroundColor:'rgba(245,158,11,0.06)',borderWidth:2,pointRadius:2,borderDash:[5,5]},
+            ]}, options:{responsive:true,scales:{r:{min:0,max:100,ticks:{stepSize:20,display:false},pointLabels:{font:{size:10,weight:'600'}}}},plugins:{legend:{display:false}}},
+        });
+    }
+    if (latestExam) {
+        destroyChart('subjectChart');
+        chartInstances['subjectChart'] = new Chart(document.getElementById('subjectChart'), {
+            type:'bar', data:{ labels:latestExam.subjects.map(s=>s.subject), datasets:[
+                {label:'Child',data:latestExam.subjects.map(s=>s.my_pct),backgroundColor:latestExam.subjects.map(s=>s.my_pct>=s.class_avg_pct?'#6366F1':'#EF4444'),borderRadius:4,barPercentage:0.45},
+                {label:'Class Avg',data:latestExam.subjects.map(s=>s.class_avg_pct),backgroundColor:'#E2E8F0',borderRadius:4,barPercentage:0.45},
+            ]}, options:{responsive:true,indexAxis:'y',scales:{x:{min:0,max:100,ticks:{callback:v=>v+'%'}}},plugins:{legend:{position:'bottom',labels:{usePointStyle:true,padding:12}}}},
+        });
+    }
+    destroyChart('attPieChart');
+    const canvas = document.getElementById('attPieChart');
+    if (canvas) {
+        chartInstances['attPieChart'] = new Chart(canvas, {
+            type:'doughnut', data:{labels:['Present','Absent','Late'],datasets:[{data:[d.attendance.present,d.attendance.absent,d.attendance.late],backgroundColor:['#10B981','#EF4444','#F59E0B'],borderWidth:2,borderColor:'#fff'}]},
+            options:{responsive:true,cutout:'60%',plugins:{legend:{display:false}}},
+            plugins:[{id:'ct',beforeDraw(chart){const{ctx,width,height}=chart;ctx.save();ctx.font='bold 18px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle=d.attendance.pct>=85?'#10B981':d.attendance.pct>=75?'#F59E0B':'#EF4444';ctx.fillText(d.attendance.pct+'%',width/2,height/2);ctx.restore();}}],
+        });
+    }
+}
+
+function renderHeatmap(trend) {
+    const c = document.getElementById('attHeatmap'); if(!c) return;
+    c.innerHTML = ''; trend.forEach(t => { const dot=document.createElement('span'); dot.className='att-dot '+t.status; dot.title=`${t.date}: ${t.status}`; c.appendChild(dot); });
+}
+
+function generateInsights(d) {
+    const grid = document.getElementById('insightsGrid'); if(!grid) return;
+    const ins = []; const rm = d._remarks;
+
+    if (d.progress_trend.length>=2) {
+        const last=d.progress_trend[d.progress_trend.length-1].pct, prev=d.progress_trend[d.progress_trend.length-2].pct, diff=last-prev;
+        if (diff>5) ins.push({i:'🚀',t:`+${diff}% improvement!`,d:`Your child jumped from ${prev}% to ${last}%. Praise them — positive reinforcement works!`,c:'insight-green'});
+        else if (diff<-5) ins.push({i:'⚠️',t:`${diff}% dip in marks`,d:`Dropped from ${prev}% to ${last}%. Talk to your child gently. Check if something is distracting them.`,c:'insight-yellow'});
+        else ins.push({i:'✅',t:'Steady performance',d:`Consistent at ${last}%. Small improvements in weak subjects can make a big difference.`,c:'insight-green'});
+    }
+
+    if (d.attendance.pct<75) ins.push({i:'🔴',t:'Attendance critically low!',d:`At ${d.attendance.pct}% — below the 75% minimum required. ${d.attendance.absent} absences. This can affect exam eligibility. Please ensure regular attendance.`,c:'insight-red'});
+    else if (d.attendance.pct>=95) ins.push({i:'🌟',t:'Excellent attendance!',d:`${d.attendance.pct}% — your child is very regular. This consistency helps learning.`,c:'insight-green'});
+    else if (d.attendance.pct<85) ins.push({i:'⚠️',t:`Attendance at ${d.attendance.pct}%`,d:`${d.attendance.absent} absences so far. Try to keep above 85% for best results.`,c:'insight-yellow'});
+
+    if (d.radar.length>=2) {
+        let best=d.radar.reduce((a,b)=>a.my_pct>b.my_pct?a:b), weak=d.radar.reduce((a,b)=>a.my_pct<b.my_pct?a:b);
+        if (best.subject!==weak.subject) {
+            let weakTip = '';
+            if (rm && rm.subject_feedback && rm.subject_feedback[weak.subject]) {
+                const wf = rm.subject_feedback[weak.subject];
+                if (wf.concerns.length>0) weakTip = ' Teacher says: "'+wf.concerns[0]+'"';
+                if (wf.suggestions.length>0) weakTip += ' Action: '+wf.suggestions[0];
+            }
+            ins.push({i:'💪',t:`Best subject: ${best.subject} (${best.my_pct}%)`,d:'Encourage your child to maintain this strength!',c:'insight-blue'});
+            ins.push({i:'📚',t:`Weakest: ${weak.subject} (${weak.my_pct}%)`,d:`This subject needs extra attention at home.${weakTip}`,c:'insight-yellow'});
+        }
+    }
+
+    if (d.fees.balance>0) ins.push({i:'💰',t:`₹${d.fees.balance.toLocaleString()} fee pending`,d:'Please clear pending fees to avoid late charges. Visit the Fee section for details.',c:'insight-red'});
+
+    const latestExam = d.exams.length>0?d.exams[d.exams.length-1]:null;
+    if (latestExam && latestExam.percentile>=80) ins.push({i:'🏆',t:`Top ${100-latestExam.percentile}% of class!`,d:`Your child scored higher than ${latestExam.percentile}% of classmates. Celebrate this achievement!`,c:'insight-green'});
+
+    if (!ins.length) ins.push({i:'📊',t:'Building profile...',d:'Insights will appear as more exam and attendance data comes in.',c:'insight-blue'});
+
+    grid.innerHTML = ins.map(i=>`<div class="insight-card ${i.c}"><div class="icon">${i.i}</div><div><div class="title">${i.t}</div><div class="desc">${i.d}</div></div></div>`).join('');
+
+    // Teacher feedback
+    if (rm && rm.subject_feedback && Object.keys(rm.subject_feedback).length>0) {
+        const card = document.getElementById('teacherFeedbackCard');
+        const content = document.getElementById('teacherFeedbackContent');
+        card.style.display = 'block';
+        let tfHtml = '';
+        for (const [subj,fb] of Object.entries(rm.subject_feedback)) {
+            if (!fb.strengths.length && !fb.concerns.length && !fb.suggestions.length) continue;
+            tfHtml += `<div class="tf-subject"><div class="tf-subject-name">${subj}</div>`;
+            if (fb.strengths.length) tfHtml += `<div class="tf-row"><span class="tf-label str">💪 Good at</span>${fb.strengths.map(t=>`<span class="tf-tag str">${t}</span>`).join('')}</div>`;
+            if (fb.concerns.length) tfHtml += `<div class="tf-row"><span class="tf-label con">⚠️ Needs work</span>${fb.concerns.map(t=>`<span class="tf-tag con">${t}</span>`).join('')}</div>`;
+            if (fb.suggestions.length) tfHtml += `<div class="tf-row"><span class="tf-label sug">💡 You can help</span>${fb.suggestions.map(t=>`<span class="tf-tag sug">${t}</span>`).join('')}</div>`;
+            tfHtml += '</div>';
+        }
+        if (rm.remarks) {
+            const customs = rm.remarks.filter(r=>r.custom_remark).slice(0,5);
+            if (customs.length) { tfHtml += '<div style="margin-top:14px;font-size:0.78rem;font-weight:700;margin-bottom:8px;">✏️ Teacher Notes</div>';
+                customs.forEach(r=>{tfHtml += `<div class="tf-custom">"${r.custom_remark}" — <strong>${r.teacher}</strong> (${r.subject}, ${r.date})</div>`;});
+            }
+        }
+        content.innerHTML = tfHtml || '';
+        if (!tfHtml) card.style.display = 'none';
+    }
+}
+
+function toggleExplain(id) { const el=document.getElementById(id); el.style.display=el.style.display==='block'?'none':'block'; }
+
+document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}

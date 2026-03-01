@@ -1,0 +1,66 @@
+{
+    "_meta": {
+        "name": "Malayalam",
+        "native": "മലയാളം",
+        "direction": "ltr",
+        "version": "1.0"
+    },
+    "common": {
+        "save": "സേവ്",
+        "cancel": "റദ്ദാക്കുക",
+        "delete": "ഇല്ലാതാക്കുക",
+        "edit": "എഡിറ്റ്",
+        "search": "തിരയുക...",
+        "loading": "ലോഡ് ചെയ്യുന്നു...",
+        "no_data": "ഡാറ്റ ഇല്ല",
+        "success": "വിജയം",
+        "error": "പിശക്",
+        "back": "പിന്നിലേക്ക്",
+        "next": "അടുത്തത്",
+        "submit": "സമർപ്പിക്കുക",
+        "close": "അടയ്ക്കുക",
+        "view": "കാണുക",
+        "download": "ഡൗൺലോഡ്",
+        "print": "പ്രിന്റ്",
+        "yes": "അതെ",
+        "no": "ഇല്ല",
+        "ok": "ശരി",
+        "all": "എല്ലാം",
+        "name": "പേര്",
+        "email": "ഇമെയിൽ",
+        "phone": "ഫോൺ",
+        "address": "വിലാസം",
+        "amount": "തുക",
+        "total": "ആകെ",
+        "date": "തീയതി",
+        "time": "സമയം",
+        "status": "നില",
+        "male": "പുരുഷൻ",
+        "female": "സ്ത്രീ",
+        "other": "മറ്റുള്ളവ"
+    },
+    "nav": {
+        "dashboard": "ഡാഷ്‌ബോർഡ്",
+        "students": "വിദ്യാർത്ഥികൾ",
+        "teachers": "അധ്യാപകർ",
+        "classes": "ക്ലാസുകൾ",
+        "attendance": "ഹാജർ",
+        "exams": "പരീക്ഷകൾ",
+        "results": "ഫലങ്ങൾ",
+        "fees": "ഫീസ്",
+        "settings": "ക്രമീകരണങ്ങൾ",
+        "logout": "ലോഗ് ഔട്ട്",
+        "login": "ലോഗിൻ"
+    },
+    "dashboard": {
+        "welcome": "സ്വാഗതം",
+        "total_students": "ആകെ വിദ്യാർത്ഥികൾ",
+        "today_attendance": "ഇന്നത്തെ ഹാജർ",
+        "fee_collected": "ഫീസ് ശേഖരിച്ചത്"
+    },
+    "attendance": {
+        "mark_attendance": "ഹാജർ രേഖപ്പെടുത്തുക",
+        "present": "ഹാജർ",
+        "absent": "ഹാജരല്ല"
+    }
+}

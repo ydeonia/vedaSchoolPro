@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Transport — Vehicles{% endblock %}
+{% block page_title %}🚌 Vehicle Management{% endblock %}
+{% block page_subtitle %}Manage your school's transport fleet{% endblock %}
+
+{% block extra_css %}
+<style>
+.v-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;transition:all 0.2s;}
+.v-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+.v-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.v-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+.v-icon.bus{background:#DBEAFE;}.v-icon.van{background:#D1FAE5;}.v-icon.auto{background:#FEF3C7;}
+.v-number{font-weight:900;font-size:1rem;}.v-model{font-size:0.75rem;color:var(--text-light);}
+.v-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
+.vd-label{font-size:0.62rem;color:var(--text-light);text-transform:uppercase;font-weight:700;}
+.vd-val{font-size:0.82rem;font-weight:700;}
+.vd-sub{font-size:0.70rem;color:var(--text-light);}
+.v-tags{display:flex;gap:6px;flex-wrap:wrap;}
+.v-tag{padding:3px 10px;border-radius:8px;font-size:0.68rem;font-weight:700;}
+.v-tag.green{background:#D1FAE5;color:#059669;}.v-tag.blue{background:#DBEAFE;color:#2563EB;}.v-tag.gray{background:var(--bg);color:var(--text-secondary);}
+.v-tag.red{background:#FEE2E2;color:#DC2626;}.v-tag.orange{background:#FEF3C7;color:#D97706;}
+/* Student pills on vehicle */
+.stu-pills{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+.stu-pill{padding:3px 8px;border-radius:6px;font-size:0.65rem;background:var(--bg);color:var(--text-secondary);font-weight:600;}
+/* Add/Edit form */
+.form-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.v-btn{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;display:inline-flex;align-items:center;gap:4px;}
+.v-btn:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
+.v-btn.danger{color:#DC2626;border-color:#FCA5A5;}.v-btn.danger:hover{background:#FEE2E2;}
+.v-footer{display:flex;gap:16px;font-size:0.70rem;color:var(--text-light);border-top:1px solid var(--border-light);padding-top:8px;flex-wrap:wrap;}
+/* Edit modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal-box{background:white;border-radius:16px;padding:24px;width:90%;max-width:640px;max-height:80vh;overflow-y:auto;}
+.modal-box h3{margin-bottom:14px;font-size:0.95rem;}
+@media(max-width:768px){.f-row{grid-template-columns:1fr 1fr;}.v-grid{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Add Vehicle -->
+<div class="form-card">
+    <h3 style="font-size:0.92rem;margin-bottom:12px;">➕ Add New Vehicle</h3>
+    <div class="f-row">
+        <div class="f-grp"><label>Vehicle Number *</label><input id="vNumber" placeholder="KA-01-AB-1234"></div>
+        <div class="f-grp"><label>Type</label><select id="vType"><option value="bus">🚌 Bus</option><option value="van">🚐 Van</option><option value="auto">🛺 Auto</option></select></div>
+        <div class="f-grp"><label>Capacity</label><input type="number" id="vCapacity" value="40"></div>
+        <div class="f-grp"><label>Make/Model</label><input id="vModel" placeholder="Tata Starbus"></div>
+    </div>
+    <div class="f-row">
+        <div class="f-grp"><label>Driver Name</label><input id="vDriver" placeholder="Driver name"></div>
+        <div class="f-grp"><label>Driver Phone</label><input id="vDriverPhone" placeholder="9876543210"></div>
+        <div class="f-grp"><label>Driver License</label><input id="vDriverLicense" placeholder="DL-1234567890"></div>
+        <div class="f-grp"><label>Conductor Name</label><input id="vConductor" placeholder="Conductor name"></div>
+    </div>
+    <div class="f-row">
+        <div class="f-grp"><label>Conductor Phone</label><input id="vConductorPhone" placeholder="9876543210"></div>
+        <div class="f-grp"><label>Insurance Expiry</label><input type="date" id="vInsExp"></div>
+        <div class="f-grp"><label>Fitness Expiry</label><input type="date" id="vFitExp"></div>
+        <div class="f-grp"><label>&nbsp;</label><button class="btn-primary" onclick="addVehicle()" style="width:100%;"><i class="fas fa-plus"></i> Add Vehicle</button></div>
+    </div>
+</div>
+
+<!-- Fleet -->
+<h3 style="margin-bottom:12px;">🚌 Fleet ({{ vehicles|length }} vehicles)</h3>
+
+{% for v in vehicles %}
+<div class="v-card" id="vc_{{ v.id }}">
+    <div class="v-header">
+        <div class="v-icon {{ v.vehicle_type }}">{% if v.vehicle_type == 'bus' %}🚌{% elif v.vehicle_type == 'van' %}🚐{% else %}🛺{% endif %}</div>
+        <div style="flex:1;"><div class="v-number">{{ v.vehicle_number }}</div><div class="v-model">{{ v.make_model or v.vehicle_type|title }} · {{ v.capacity }} seats</div></div>
+        <div class="v-tags">
+            <span class="v-tag blue">{{ v.vehicle_type|title }}</span>
+            <span class="v-tag gray">{{ v.capacity }} seats</span>
+            {% if v.routes %}<span class="v-tag green">{{ v.routes|length }} route(s)</span>{% endif %}
+            {% if assigned_counts and assigned_counts.get(v.id|string, 0) > 0 %}<span class="v-tag orange">{{ assigned_counts[v.id|string] }} students</span>{% endif %}
+        </div>
+    </div>
+    <div class="v-grid">
+        <div><div class="vd-label">🧑‍✈️ Driver</div><div class="vd-val">{{ v.driver_name or '— Not set' }}</div>
+            {% if v.driver_phone %}<div class="vd-sub">📞 {{ v.driver_phone }}</div>{% endif %}
+            {% if v.driver_license %}<div class="vd-sub">🪪 {{ v.driver_license }}</div>{% endif %}
+        </div>
+        <div><div class="vd-label">🧑 Conductor</div><div class="vd-val">{{ v.conductor_name or '— Not set' }}</div>
+            {% if v.conductor_phone %}<div class="vd-sub">📞 {{ v.conductor_phone }}</div>{% endif %}
+        </div>
+        <div><div class="vd-label">🛣️ Routes & Stops</div>
+            {% if v.routes %}{% for r in v.routes %}<div class="vd-val">{{ r.route_name }}</div><div class="vd-sub">📍 {{ r.stops|length if r.stops else 0 }} stops · ₹{{ r.monthly_fee or 0 }}/mo</div>{% endfor %}
+            {% else %}<div class="vd-val" style="color:var(--text-light);">No routes</div>{% endif %}
+        </div>
+        <div><div class="vd-label">👨‍🎓 Students Onboard</div>
+            {% if student_map and student_map.get(v.id|string) %}
+            <div class="stu-pills">{% for s in student_map[v.id|string][:8] %}<span class="stu-pill">{{ s.name }}</span>{% endfor %}
+            {% if student_map[v.id|string]|length > 8 %}<span class="stu-pill">+{{ student_map[v.id|string]|length - 8 }} more</span>{% endif %}</div>
+            {% else %}<div class="vd-val" style="color:var(--text-light);">None assigned</div>{% endif %}
+        </div>
+    </div>
+    <div class="v-footer">
+        <span>🛡️ Insurance: {% if v.insurance_expiry %}{{ v.insurance_expiry.strftime('%d %b %Y') }}{% else %}—{% endif %}</span>
+        <span>🔧 Fitness: {% if v.fitness_expiry %}{{ v.fitness_expiry.strftime('%d %b %Y') }}{% else %}—{% endif %}</span>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px;">
+        <button class="v-btn" onclick="openEdit('{{ v.id }}','{{ v.vehicle_number }}','{{ v.vehicle_type }}','{{ v.capacity }}','{{ v.make_model or '' }}','{{ v.driver_name or '' }}','{{ v.driver_phone or '' }}','{{ v.driver_license or '' }}','{{ v.conductor_name or '' }}','{{ v.conductor_phone or '' }}')"><i class="fas fa-edit"></i> Edit</button>
+        <button class="v-btn danger" onclick="if(confirm('Remove this vehicle?'))deleteVehicle('{{ v.id }}')"><i class="fas fa-trash"></i></button>
+    </div>
+</div>
+{% endfor %}
+
+{% if not vehicles %}<div style="text-align:center;padding:60px;color:var(--text-light);"><i class="fas fa-bus" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No vehicles yet.</div>{% endif %}
+
+<!-- Edit Modal -->
+<div class="modal-bg" id="editModal">
+    <div class="modal-box">
+        <h3>✏️ Edit Vehicle <button style="float:right;background:none;border:none;font-size:1.2rem;cursor:pointer;" onclick="closeEdit()">✕</button></h3>
+        <input type="hidden" id="eId">
+        <div class="f-row" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>Vehicle Number</label><input id="eNumber"></div>
+            <div class="f-grp"><label>Type</label><select id="eType"><option value="bus">🚌 Bus</option><option value="van">🚐 Van</option><option value="auto">🛺 Auto</option></select></div>
+        </div>
+        <div class="f-row" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>Capacity</label><input type="number" id="eCapacity"></div>
+            <div class="f-grp"><label>Make/Model</label><input id="eModel"></div>
+        </div>
+        <div class="f-row" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="f-grp"><label>Driver Name</label><input id="eDriver"></div>
+            <div class="f-grp"><label>Driver Phone</label><input id="eDriverPhone"></div>
+            <div class="f-grp"><label>Driver License</label><input id="eDriverLicense"></div>
+        </div>
+        <div class="f-row" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>Conductor Name</label><input id="eConductor"></div>
+            <div class="f-grp"><label>Conductor Phone</label><input id="eConductorPhone"></div>
+        </div>
+        <button class="btn-primary" onclick="saveEdit()"><i class="fas fa-save"></i> Save Changes</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function addVehicle(){
+    const d={vehicle_number:g('vNumber'),vehicle_type:g('vType'),capacity:parseInt(g('vCapacity'))||40,make_model:g('vModel'),
+        driver_name:g('vDriver'),driver_phone:g('vDriverPhone'),driver_license:g('vDriverLicense'),
+        conductor_name:g('vConductor'),conductor_phone:g('vConductorPhone'),
+        insurance_expiry:g('vInsExp')||null,fitness_expiry:g('vFitExp')||null};
+    if(!d.vehicle_number){alert('Enter vehicle number');return;}
+    await apiCall('/api/school/transport/vehicles/create','POST',d);
+    showToast('success','Vehicle Added');setTimeout(()=>location.reload(),800);
+}
+function g(id){return document.getElementById(id).value.trim();}
+async function deleteVehicle(id){await apiCall('/api/school/transport/vehicles/'+id,'DELETE');location.reload();}
+
+function openEdit(id,num,type,cap,model,drv,drvPh,drvLic,cond,condPh){
+    document.getElementById('eId').value=id;document.getElementById('eNumber').value=num;
+    document.getElementById('eType').value=type;document.getElementById('eCapacity').value=cap;
+    document.getElementById('eModel').value=model;document.getElementById('eDriver').value=drv;
+    document.getElementById('eDriverPhone').value=drvPh;document.getElementById('eDriverLicense').value=drvLic;
+    document.getElementById('eConductor').value=cond;document.getElementById('eConductorPhone').value=condPh;
+    document.getElementById('editModal').classList.add('show');
+}
+function closeEdit(){document.getElementById('editModal').classList.remove('show');}
+
+async function saveEdit(){
+    const id=document.getElementById('eId').value;
+    const d={vehicle_number:g('eNumber'),vehicle_type:g('eType'),capacity:parseInt(g('eCapacity'))||40,make_model:g('eModel'),
+        driver_name:g('eDriver'),driver_phone:g('eDriverPhone'),driver_license:g('eDriverLicense'),
+        conductor_name:g('eConductor'),conductor_phone:g('eConductorPhone')};
+    await apiCall('/api/school/transport/vehicles/'+id,'PUT',d);
+    showToast('success','Vehicle Updated');closeEdit();setTimeout(()=>location.reload(),800);
+}
+</script>
+{% endblock %}

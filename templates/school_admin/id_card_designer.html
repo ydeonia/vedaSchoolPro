@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+{% block title %}ID Card Designer{% endblock %}
+{% block page_title %}🪪 ID Card Designer{% endblock %}
+{% block page_subtitle %}Design student, teacher, and employee ID cards{% endblock %}
+{% block extra_css %}
+<style>
+.designer-layout{display:grid;grid-template-columns:260px 1fr 220px;gap:12px;min-height:70vh;}
+.tool-panel{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:14px;overflow-y:auto;max-height:75vh;}
+.tool-section{margin-bottom:14px;}
+.tool-section h4{font-size:0.68rem;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:6px;letter-spacing:0.5px;}
+.tool-btn{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--border-light,#e2e8f0);background:var(--bg-card,white);width:100%;text-align:left;font-size:0.75rem;font-weight:600;margin-bottom:3px;transition:all 0.15s;color:var(--text,#1e293b);}
+.tool-btn:hover{background:var(--primary-50,#eef2ff);border-color:var(--primary);color:var(--primary);}
+.tool-btn i{width:16px;text-align:center;font-size:0.7rem;}
+.canvas-wrap{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:14px;display:flex;flex-direction:column;align-items:center;}
+.canvas-toolbar{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;width:100%;}
+.ct-btn{padding:5px 10px;border-radius:8px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--border,#e2e8f0);background:var(--bg-card,white);display:flex;align-items:center;gap:3px;color:var(--text,#333);}
+.ct-btn:hover{background:var(--bg,#f8f9fa);}
+.ct-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
+#idCanvas{border:2px dashed var(--border,#cbd5e1);border-radius:8px;cursor:crosshair;background:#f8fafc;}
+.prop-panel{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:14px;overflow-y:auto;max-height:75vh;}
+.prop-panel h4{font-size:0.68rem;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:6px;}
+.prop-row{margin-bottom:6px;}
+.prop-row label{font-size:0.58rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;display:block;margin-bottom:2px;}
+.prop-row input,.prop-row select{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--border,#e2e8f0);font-size:0.75rem;background:var(--bg-card,white);color:var(--text,#333);}
+.prop-row input[type=color]{height:28px;padding:2px;cursor:pointer;}
+.tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px;}
+.tmpl-card{border:2px solid var(--border-light,#e2e8f0);border-radius:8px;padding:6px;cursor:pointer;text-align:center;transition:all 0.15s;}
+.tmpl-card:hover,.tmpl-card.active{border-color:var(--primary);background:var(--primary-50,#eef2ff);}
+.tmpl-preview{width:100%;aspect-ratio:1.6;background:var(--bg,#f1f5f9);border-radius:4px;margin-bottom:3px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;}
+.tmpl-name{font-size:0.62rem;font-weight:700;}
+/* Card type tabs */
+.type-tabs{display:flex;gap:3px;margin-bottom:10px;background:var(--bg,#f1f5f9);border-radius:8px;padding:3px;}
+.type-tab{flex:1;padding:6px;text-align:center;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.type-tab.active{background:var(--primary);color:white;}
+.btn-primary{padding:8px 16px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;font-size:0.78rem;}
+.btn-sm{padding:5px 10px;font-size:0.70rem;}
+@media(max-width:900px){.designer-layout{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="designer-layout">
+    <!-- Left: Tools -->
+    <div class="tool-panel">
+        <!-- Card Type -->
+        <div class="tool-section">
+            <h4>🪪 Card Type</h4>
+            <div class="type-tabs">
+                <div class="type-tab active" onclick="setCardType('student',this)">🎓 Student</div>
+                <div class="type-tab" onclick="setCardType('employee',this)">👥 Employee</div>
+                <div class="type-tab" onclick="setCardType('teacher',this)">🧑‍🏫 Teacher</div>
+            </div>
+        </div>
+        <!-- Templates -->
+        <div class="tool-section">
+            <h4>📐 Templates</h4>
+            <div class="tmpl-grid">
+                <div class="tmpl-card active" data-tmpl="classic" onclick="loadTemplate('classic',this)"><div class="tmpl-preview">🏫</div><div class="tmpl-name">Classic</div></div>
+                <div class="tmpl-card" data-tmpl="modern" onclick="loadTemplate('modern',this)"><div class="tmpl-preview">✨</div><div class="tmpl-name">Modern</div></div>
+                <div class="tmpl-card" data-tmpl="minimal" onclick="loadTemplate('minimal',this)"><div class="tmpl-preview">📋</div><div class="tmpl-name">Minimal</div></div>
+                <div class="tmpl-card" data-tmpl="colorful" onclick="loadTemplate('colorful',this)"><div class="tmpl-preview">🌈</div><div class="tmpl-name">Colorful</div></div>
+            </div>
+        </div>
+        <!-- Add Elements -->
+        <div class="tool-section">
+            <h4>➕ Add Elements</h4>
+            <button class="tool-btn" onclick="addElement('text')"><i class="fas fa-font"></i> Text Label</button>
+            <button class="tool-btn" onclick="addElement('photo')"><i class="fas fa-camera"></i> Photo Box</button>
+            <button class="tool-btn" onclick="addElement('logo')"><i class="fas fa-image"></i> School Logo</button>
+            <button class="tool-btn" onclick="addElement('qr')"><i class="fas fa-qrcode"></i> QR Code</button>
+            <button class="tool-btn" onclick="addElement('barcode')"><i class="fas fa-barcode"></i> Barcode</button>
+            <button class="tool-btn" onclick="addElement('line')"><i class="fas fa-minus"></i> Line</button>
+            <button class="tool-btn" onclick="addElement('rect')"><i class="fas fa-square"></i> Rectangle</button>
+        </div>
+        <!-- Fields -->
+        <div class="tool-section" id="fieldButtons">
+            <h4>📋 Data Fields</h4>
+            <!-- populated by setCardType -->
+        </div>
+    </div>
+
+    <!-- Center: Canvas -->
+    <div class="canvas-wrap">
+        <div class="canvas-toolbar">
+            <button class="ct-btn active" id="btnFront" onclick="setSide('front')"><i class="fas fa-image"></i> Front</button>
+            <button class="ct-btn" id="btnBack" onclick="setSide('back')"><i class="fas fa-undo"></i> Back</button>
+            <span style="border-left:1px solid var(--border);margin:0 4px;"></span>
+            <button class="ct-btn" onclick="setCardSize('horizontal')"><i class="fas fa-id-card"></i> Horizontal</button>
+            <button class="ct-btn" onclick="setCardSize('vertical')"><i class="fas fa-mobile-alt"></i> Vertical</button>
+            <div style="flex:1;"></div>
+            <button class="ct-btn" onclick="deleteSelected()" title="Delete selected"><i class="fas fa-trash" style="color:var(--danger,#dc2626);"></i></button>
+        </div>
+        <canvas id="idCanvas" width="540" height="340"></canvas>
+        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn-primary btn-sm" onclick="saveDesign()"><i class="fas fa-save"></i> Save Design</button>
+            <button class="btn-primary btn-sm" style="background:var(--success,#10b981);" onclick="applyToAll()"><i class="fas fa-users"></i> Apply to All</button>
+            <button class="ct-btn" onclick="loadSavedDesign()"><i class="fas fa-download"></i> Load Saved</button>
+        </div>
+    </div>
+
+    <!-- Right: Properties -->
+    <div class="prop-panel">
+        <h4>🎨 Card Properties</h4>
+        <div class="prop-row"><label>Background</label><input type="color" id="bgColor" value="#ffffff" onchange="redraw()"></div>
+        <div class="prop-row"><label>Border Color</label><input type="color" id="borderColor" value="#1e3a5f" onchange="redraw()"></div>
+        <div class="prop-row"><label>Border Width</label><input type="range" id="borderWidth" min="0" max="8" value="3" onchange="redraw()"></div>
+        <div class="prop-row"><label>Corner Radius</label><input type="range" id="borderRadius" min="0" max="20" value="10" onchange="redraw()"></div>
+        <hr style="border-color:var(--border-light);margin:10px 0;">
+        <h4>📝 Selected Element</h4>
+        <div id="selectedProps"><p style="font-size:0.70rem;color:var(--text-light);">Click element on canvas</p></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const canvas = document.getElementById('idCanvas');
+const ctx = canvas.getContext('2d');
+
+// State
+let cardType = 'student'; // student, employee, teacher
+let currentSide = 'front'; // front, back
+let frontElements = [];
+let backElements = [];
+let selectedElement = null;
+let dragging = false;
+let dragOffX = 0, dragOffY = 0;
+
+function getElements() { return currentSide === 'front' ? frontElements : backElements; }
+function setElements(els) { if (currentSide === 'front') frontElements = els; else backElements = els; }
+
+// === CARD TYPE ===
+function setCardType(type, btn) {
+    cardType = type;
+    document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    updateFieldButtons();
+    // Reload template for new type
+    const activeTmpl = document.querySelector('.tmpl-card.active');
+    loadTemplate(activeTmpl ? activeTmpl.dataset.tmpl : 'classic');
+}
+
+function updateFieldButtons() {
+    const container = document.getElementById('fieldButtons');
+    let fields = [];
+    if (cardType === 'student') {
+        fields = [
+            ['student_name','👤 Student Name'],['father_name',"👨 Father's Name"],['class_section','📚 Class & Section'],
+            ['roll_number','#️⃣ Roll Number'],['admission_no','🆔 Admission No'],['dob','📅 Date of Birth'],
+            ['blood_group','🩸 Blood Group'],['address','📍 Address'],['phone','📞 Phone'],
+            ['house_name','🏠 House'],['role_title','👑 Role/Position'],['valid_upto','📆 Valid Upto']
+        ];
+    } else if (cardType === 'employee') {
+        fields = [
+            ['emp_name','👤 Employee Name'],['designation','💼 Designation'],['department','🏢 Department'],
+            ['emp_code','🆔 Employee Code'],['phone','📞 Phone'],['blood_group','🩸 Blood Group'],
+            ['dob','📅 Date of Birth'],['doj','📅 Date of Joining'],['address','📍 Address'],
+            ['emergency_contact','🆘 Emergency Contact'],['valid_upto','📆 Valid Upto']
+        ];
+    } else {
+        fields = [
+            ['teacher_name','👤 Teacher Name'],['designation','💼 Designation'],['department','🏢 Department'],
+            ['subjects','📚 Subjects'],['phone','📞 Phone'],['blood_group','🩸 Blood Group'],
+            ['qualification','🎓 Qualification'],['emp_code','🆔 Employee Code'],['valid_upto','📆 Valid Upto']
+        ];
+    }
+    container.innerHTML = '<h4>📋 Data Fields</h4>' + fields.map(([f, label]) =>
+        `<button class="tool-btn" onclick="addField('${f}','${label.split(' ').slice(1).join(' ')}')"><i class="fas fa-tag"></i> ${label}</button>`
+    ).join('');
+}
+
+// === SIDE (FRONT/BACK) ===
+function setSide(side) {
+    currentSide = side;
+    document.getElementById('btnFront').classList.toggle('active', side === 'front');
+    document.getElementById('btnBack').classList.toggle('active', side === 'back');
+    selectedElement = null;
+    redraw();
+}
+
+// === CARD SIZE ===
+function setCardSize(size) {
+    if (size === 'horizontal') { canvas.width = 540; canvas.height = 340; }
+    else { canvas.width = 340; canvas.height = 540; }
+    redraw();
+}
+
+// === TEMPLATES ===
+function loadTemplate(name, btn) {
+    if (btn) {
+        document.querySelectorAll('.tmpl-card').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+    }
+    const W = canvas.width, H = canvas.height;
+    let els = [];
+
+    if (name === 'classic') {
+        document.getElementById('bgColor').value = '#ffffff';
+        document.getElementById('borderColor').value = '#1e3a5f';
+        const nameField = cardType === 'employee' ? 'emp_name' : cardType === 'teacher' ? 'teacher_name' : 'student_name';
+        els = [
+            {type:'rect',x:0,y:0,w:W,h:50,fill:'#1e3a5f'},
+            {type:'text',x:W/2,y:22,text:'DELHI PUBLIC SCHOOL',font:'bold 16px Arial',color:'#ffffff',align:'center'},
+            {type:'text',x:W/2,y:40,text:'Affiliated to CBSE • New Delhi',font:'11px Arial',color:'#dbeafe',align:'center'},
+            {type:'photo',x:20,y:65,w:90,h:110},
+            {type:'field',x:130,y:78,field:nameField,label:'Name',font:'bold 14px Arial',color:'#1e293b'},
+            {type:'field',x:130,y:108,field:cardType==='student'?'father_name':'designation',label:cardType==='student'?"Father":'Designation',font:'12px Arial',color:'#475569'},
+            {type:'field',x:130,y:138,field:cardType==='student'?'class_section':'department',label:cardType==='student'?'Class':'Dept',font:'12px Arial',color:'#475569'},
+            {type:'field',x:130,y:168,field:cardType==='student'?'roll_number':'emp_code',label:cardType==='student'?'Roll':'Code',font:'12px Arial',color:'#475569'},
+            {type:'field',x:130,y:198,field:'blood_group',label:'Blood',font:'bold 12px Arial',color:'#DC2626'},
+            {type:'qr',x:W-80,y:65,w:60,h:60},
+            {type:'line',x:20,y:240,w:W-40,color:'#cbd5e1'},
+            {type:'rect',x:0,y:H-35,w:W,h:35,fill:'#1e3a5f'},
+            {type:'text',x:W/2,y:H-14,text:'📞 011-23456789 | www.school.edu.in',font:'10px Arial',color:'#dbeafe',align:'center'},
+        ];
+    } else if (name === 'modern') {
+        document.getElementById('bgColor').value = '#f0f4ff';
+        document.getElementById('borderColor').value = '#6366f1';
+        const nameField = cardType === 'employee' ? 'emp_name' : cardType === 'teacher' ? 'teacher_name' : 'student_name';
+        els = [
+            {type:'rect',x:0,y:0,w:W,h:8,fill:'#6366f1'},
+            {type:'text',x:W/2,y:35,text:'MODERN SCHOOL',font:'bold 15px Arial',color:'#312e81',align:'center'},
+            {type:'photo',x:W/2-50,y:55,w:100,h:120},
+            {type:'field',x:W/2,y:195,field:nameField,label:'Name',font:'bold 16px Arial',color:'#312e81',align:'center'},
+            {type:'field',x:W/2,y:218,field:cardType==='student'?'class_section':'designation',label:cardType==='student'?'Class':'Role',font:'13px Arial',color:'#4f46e5',align:'center'},
+            {type:'qr',x:W/2-25,y:240,w:50,h:50},
+            {type:'rect',x:0,y:H-6,w:W,h:6,fill:'#6366f1'},
+        ];
+    } else if (name === 'minimal') {
+        document.getElementById('bgColor').value = '#ffffff';
+        document.getElementById('borderColor').value = '#374151';
+        const nameField = cardType === 'employee' ? 'emp_name' : cardType === 'teacher' ? 'teacher_name' : 'student_name';
+        els = [
+            {type:'text',x:20,y:28,text:'SCHOOL NAME',font:'bold 18px Arial',color:'#111827'},
+            {type:'line',x:20,y:38,w:W-40,color:'#374151'},
+            {type:'photo',x:20,y:50,w:80,h:100},
+            {type:'field',x:120,y:68,field:nameField,label:'Name',font:'bold 14px Arial',color:'#111827'},
+            {type:'field',x:120,y:98,field:cardType==='student'?'class_section':'designation',label:cardType==='student'?'Class':'Role',font:'12px Arial',color:'#6b7280'},
+            {type:'qr',x:W-70,y:50,w:50,h:50},
+        ];
+    } else if (name === 'colorful') {
+        document.getElementById('bgColor').value = '#fefce8';
+        document.getElementById('borderColor').value = '#f59e0b';
+        const nameField = cardType === 'employee' ? 'emp_name' : cardType === 'teacher' ? 'teacher_name' : 'student_name';
+        els = [
+            {type:'rect',x:0,y:0,w:W,h:55,fill:'#f59e0b'},
+            {type:'text',x:W/2,y:25,text:'🌟 SUNSHINE ACADEMY 🌟',font:'bold 16px Arial',color:'#ffffff',align:'center'},
+            {type:'text',x:W/2,y:44,text:'Nurturing Young Minds',font:'italic 11px Arial',color:'#fef3c7',align:'center'},
+            {type:'photo',x:20,y:70,w:100,h:120},
+            {type:'field',x:140,y:85,field:nameField,label:'Name',font:'bold 15px Arial',color:'#92400e'},
+            {type:'field',x:140,y:115,field:cardType==='student'?'class_section':'designation',label:cardType==='student'?'Class':'Role',font:'12px Arial',color:'#78350f'},
+            {type:'field',x:140,y:145,field:'blood_group',label:'Blood',font:'bold 12px Arial',color:'#DC2626'},
+            {type:'qr',x:W-80,y:210,w:60,h:60},
+            {type:'rect',x:0,y:H-30,w:W,h:30,fill:'#f59e0b'},
+        ];
+    }
+
+    // Set front or back
+    if (currentSide === 'front') frontElements = els;
+    else backElements = els;
+    selectedElement = null;
+    redraw();
+}
+
+// === DRAWING ===
+function redraw() {
+    const bg = document.getElementById('bgColor').value;
+    const bc = document.getElementById('borderColor').value;
+    const bw = parseInt(document.getElementById('borderWidth').value);
+    const br = parseInt(document.getElementById('borderRadius').value);
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    // Background
+    ctx.fillStyle = bg;
+    roundRect(ctx, bw/2, bw/2, W-bw, H-bw, br, true, false);
+
+    // Side label
+    ctx.fillStyle = currentSide === 'front' ? '#10b981' : '#6366f1';
+    ctx.font = 'bold 9px Arial';
+    ctx.fillText(currentSide.toUpperCase() + ' SIDE', W - 70, 14);
+
+    // Elements
+    const elements = getElements();
+    elements.forEach((el, i) => {
+        const isSel = (selectedElement === i);
+        drawElement(el, isSel);
+    });
+
+    // Border
+    if (bw > 0) { ctx.strokeStyle = bc; ctx.lineWidth = bw; roundRect(ctx, bw/2, bw/2, W-bw, H-bw, br, false, true); }
+}
+
+function drawElement(el, isSel) {
+    if (el.type === 'rect') {
+        ctx.fillStyle = el.fill || '#e2e8f0';
+        ctx.fillRect(el.x, el.y, el.w, el.h);
+    } else if (el.type === 'text') {
+        ctx.font = el.font || '14px Arial'; ctx.fillStyle = el.color || '#000'; ctx.textAlign = el.align || 'left';
+        ctx.fillText(el.text, el.x, el.y); ctx.textAlign = 'left';
+    } else if (el.type === 'field') {
+        ctx.font = '9px Arial'; ctx.fillStyle = '#94a3b8'; ctx.textAlign = el.align || 'left';
+        ctx.fillText(el.label + ':', el.x, el.y - 2);
+        ctx.font = el.font || '12px Arial'; ctx.fillStyle = el.color || '#1e293b';
+        ctx.fillText('{{' + el.field + '}}', el.x, el.y + 12); ctx.textAlign = 'left';
+    } else if (el.type === 'photo') {
+        ctx.fillStyle = '#e2e8f0'; ctx.fillRect(el.x, el.y, el.w, el.h);
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.strokeRect(el.x, el.y, el.w, el.h);
+        ctx.fillStyle = '#94a3b8'; ctx.font = '20px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('📷', el.x + el.w/2, el.y + el.h/2 + 6); ctx.textAlign = 'left';
+    } else if (el.type === 'qr') {
+        ctx.fillStyle = '#f1f5f9'; ctx.fillRect(el.x, el.y, el.w, el.h);
+        ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.strokeRect(el.x, el.y, el.w, el.h);
+        const s = Math.min(el.w, el.h) / 8; ctx.fillStyle = '#374151';
+        for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) { if ((r+c) % 3 === 0) ctx.fillRect(el.x+c*s, el.y+r*s, s-1, s-1); }
+        ctx.fillStyle = '#64748b'; ctx.font = '8px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('🔒 Signed QR', el.x+el.w/2, el.y+el.h+10); ctx.textAlign = 'left';
+    } else if (el.type === 'barcode') {
+        ctx.fillStyle = '#f1f5f9'; ctx.fillRect(el.x, el.y, el.w||120, el.h||30);
+        for (let i = 0; i < 30; i++) { ctx.fillStyle = i%2===0?'#000':'#fff'; ctx.fillRect(el.x+i*4, el.y, 2+(i%3), el.h||30); }
+    } else if (el.type === 'line') {
+        ctx.strokeStyle = el.color || '#cbd5e1'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(el.x, el.y); ctx.lineTo(el.x+(el.w||200), el.y); ctx.stroke();
+    } else if (el.type === 'logo') {
+        ctx.fillStyle = '#e2e8f0'; ctx.fillRect(el.x, el.y, el.w||50, el.h||50);
+        ctx.fillStyle = '#94a3b8'; ctx.font = '20px Arial'; ctx.textAlign = 'center';
+        ctx.fillText('🏫', el.x+(el.w||50)/2, el.y+(el.h||50)/2+6); ctx.textAlign = 'left';
+    }
+    // Selection box
+    if (isSel) {
+        ctx.strokeStyle = '#6366f1'; ctx.lineWidth = 2; ctx.setLineDash([4,4]);
+        const bx = el.x-3, by = el.y-(el.type==='text'||el.type==='field'?18:3);
+        ctx.strokeRect(bx, by, (el.w||140)+6, (el.h||(el.type==='field'?22:18))+6);
+        ctx.setLineDash([]);
+    }
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+    ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+    ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+    if (fill) ctx.fill(); if (stroke) ctx.stroke();
+}
+
+// === INTERACTION ===
+canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const elements = getElements();
+    selectedElement = null;
+    for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        const ex = el.x - 5, ey = el.y - (el.type==='text'||el.type==='field'?20:5);
+        const ew = (el.w||140)+10, eh = (el.h||(el.type==='field'?22:18))+10;
+        if (mx >= ex && mx <= ex+ew && my >= ey && my <= ey+eh) {
+            selectedElement = i; dragging = true;
+            dragOffX = mx - el.x; dragOffY = my - el.y;
+            showProps(i); break;
+        }
+    }
+    redraw();
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (!dragging || selectedElement === null) return;
+    const rect = canvas.getBoundingClientRect();
+    const elements = getElements();
+    elements[selectedElement].x = e.clientX - rect.left - dragOffX;
+    elements[selectedElement].y = e.clientY - rect.top - dragOffY;
+    redraw();
+});
+
+canvas.addEventListener('mouseup', () => { dragging = false; });
+
+// === PROPERTIES ===
+function showProps(idx) {
+    const el = getElements()[idx];
+    let html = `<div class="prop-row"><label>Type</label><input value="${el.type}" disabled></div>`;
+    if (el.type === 'text') {
+        html += `<div class="prop-row"><label>Text</label><input value="${el.text||''}" onchange="getElements()[${idx}].text=this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Color</label><input type="color" value="${el.color||'#000'}" onchange="getElements()[${idx}].color=this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Font Size</label><input type="range" min="8" max="36" value="${parseInt(el.font)||14}" onchange="getElements()[${idx}].font=this.value+'px Arial';redraw()"></div>`;
+    } else if (el.type === 'field') {
+        html += `<div class="prop-row"><label>Field</label><input value="${el.field}" disabled></div>`;
+        html += `<div class="prop-row"><label>Label</label><input value="${el.label||''}" onchange="getElements()[${idx}].label=this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Color</label><input type="color" value="${el.color||'#000'}" onchange="getElements()[${idx}].color=this.value;redraw()"></div>`;
+    } else if (el.type === 'photo' || el.type === 'qr' || el.type === 'logo') {
+        html += `<div class="prop-row"><label>Width</label><input type="number" value="${el.w}" onchange="getElements()[${idx}].w=+this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Height</label><input type="number" value="${el.h}" onchange="getElements()[${idx}].h=+this.value;redraw()"></div>`;
+    } else if (el.type === 'rect') {
+        html += `<div class="prop-row"><label>Fill</label><input type="color" value="${el.fill||'#e2e8f0'}" onchange="getElements()[${idx}].fill=this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Width</label><input type="number" value="${el.w}" onchange="getElements()[${idx}].w=+this.value;redraw()"></div>`;
+        html += `<div class="prop-row"><label>Height</label><input type="number" value="${el.h}" onchange="getElements()[${idx}].h=+this.value;redraw()"></div>`;
+    }
+    html += `<div class="prop-row"><label>X</label><input type="number" value="${Math.round(el.x)}" onchange="getElements()[${idx}].x=+this.value;redraw()"></div>`;
+    html += `<div class="prop-row"><label>Y</label><input type="number" value="${Math.round(el.y)}" onchange="getElements()[${idx}].y=+this.value;redraw()"></div>`;
+    document.getElementById('selectedProps').innerHTML = html;
+}
+
+// === ADD ELEMENTS ===
+function addElement(type) {
+    const el = {type, x:120, y:150};
+    if (type==='text') { el.text='New Text'; el.font='14px Arial'; el.color='#1e293b'; }
+    else if (type==='photo') { el.w=90; el.h=110; }
+    else if (type==='logo') { el.w=50; el.h=50; }
+    else if (type==='qr') { el.w=60; el.h=60; }
+    else if (type==='barcode') { el.w=120; el.h=30; }
+    else if (type==='line') { el.w=200; el.color='#cbd5e1'; }
+    else if (type==='rect') { el.w=150; el.h=40; el.fill='#e2e8f0'; }
+    getElements().push(el);
+    selectedElement = getElements().length - 1;
+    redraw(); showProps(selectedElement);
+}
+
+function addField(field, label) {
+    const elements = getElements();
+    elements.push({type:'field', x:130, y:80+elements.length*25, field, label:label||field, font:'12px Arial', color:'#1e293b'});
+    selectedElement = elements.length - 1;
+    redraw(); showProps(selectedElement);
+}
+
+function deleteSelected() {
+    if (selectedElement !== null) {
+        getElements().splice(selectedElement, 1);
+        selectedElement = null; redraw();
+        document.getElementById('selectedProps').innerHTML = '<p style="font-size:0.70rem;color:var(--text-light);">Deleted</p>';
+    }
+}
+
+// === SAVE/LOAD ===
+async function saveDesign() {
+    const design = {
+        cardType, frontElements, backElements,
+        bgColor: document.getElementById('bgColor').value,
+        borderColor: document.getElementById('borderColor').value,
+        borderWidth: document.getElementById('borderWidth').value,
+        borderRadius: document.getElementById('borderRadius').value,
+        canvasW: canvas.width, canvasH: canvas.height
+    };
+    try {
+        await apiCall('/api/school/id-card-design', 'POST', design);
+        showToast('success', 'Design saved!');
+    } catch(e) { showToast('error', 'Save failed'); }
+}
+
+async function loadSavedDesign() {
+    try {
+        const r = await fetch('/api/school/id-card-design', {credentials:'same-origin'});
+        const d = await r.json();
+        if (d.design) {
+            frontElements = d.design.frontElements || [];
+            backElements = d.design.backElements || [];
+            cardType = d.design.cardType || 'student';
+            document.getElementById('bgColor').value = d.design.bgColor || '#ffffff';
+            document.getElementById('borderColor').value = d.design.borderColor || '#1e3a5f';
+            document.getElementById('borderWidth').value = d.design.borderWidth || 3;
+            document.getElementById('borderRadius').value = d.design.borderRadius || 10;
+            if (d.design.canvasW) canvas.width = d.design.canvasW;
+            if (d.design.canvasH) canvas.height = d.design.canvasH;
+            // Update UI
+            document.querySelectorAll('.type-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.type-tab')[cardType==='student'?0:cardType==='employee'?1:2].classList.add('active');
+            updateFieldButtons();
+            currentSide = 'front'; setSide('front');
+            showToast('success', 'Design loaded');
+        } else { showToast('info', 'No saved design found'); }
+    } catch(e) { showToast('error', 'Load failed'); }
+}
+
+async function applyToAll() {
+    if (!confirm(`Apply this ${cardType} ID card design to ALL ${cardType}s? This will save the design and mark it as the active template.`)) return;
+    await saveDesign();
+    showToast('success', `Design saved and will be used for all ${cardType} ID cards!`);
+}
+
+// === INIT ===
+updateFieldButtons();
+loadTemplate('classic');
+</script>
+{% endblock %}

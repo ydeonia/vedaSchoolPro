@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}My Results{% endblock %}
+{% block page_title %}My Results{% endblock %}
+{% block page_subtitle %}Your exam performance — private to you{% endblock %}
+
+{% block extra_css %}
+<style>
+    .exam-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 16px; overflow: hidden; }
+    .exam-header { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+    .exam-header:hover { background: var(--bg-secondary); }
+    .exam-name { font-weight: 800; font-size: 1rem; }
+    .exam-pct { font-size: 1.4rem; font-weight: 800; }
+    .exam-body { padding: 0 20px 20px; display: none; }
+    .exam-body.open { display: block; }
+    .subj-row { display: grid; grid-template-columns: 1fr 80px 80px 60px; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; align-items: center; }
+    .subj-row:last-child { border: none; }
+    .subj-row.header { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-light); }
+    .subj-bar { height: 6px; border-radius: 3px; background: #E5E7EB; overflow: hidden; margin-top: 4px; }
+    .subj-fill { height: 100%; border-radius: 3px; }
+    .grade-pill { padding: 2px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+    .pass-badge { padding: 4px 14px; border-radius: 14px; font-weight: 700; font-size: 0.82rem; }
+    .pass-badge.pass { background: #D1FAE5; color: #059669; }
+    .pass-badge.fail { background: #FEE2E2; color: #DC2626; }
+    .encourage-msg { padding: 12px; border-radius: var(--radius-sm); font-size: 0.82rem; margin-top: 12px; text-align: center; }
+    @media (max-width: 640px) { .subj-row { grid-template-columns: 1fr 60px 50px 50px; font-size: 0.78rem; } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if exam_results %}
+<div style="text-align:right; margin-bottom:12px;">
+    <a href="/student/results/report-card-pdf" target="_blank" class="btn btn-secondary"><i class="fas fa-file-pdf"></i> Download Report Card</a>
+</div>
+{% for exam in exam_results %}
+<div class="exam-card">
+    <div class="exam-header" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.chevron').classList.toggle('fa-chevron-down'); this.querySelector('.chevron').classList.toggle('fa-chevron-up');">
+        <div>
+            <div class="exam-name">{{ exam.name }}</div>
+            <div style="font-size:0.78rem; color:var(--text-light);">{{ exam.subjects|length }} subjects · Total: {{ exam.total }}/{{ exam.max }}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="exam-pct" style="color:{% if exam.pct >= 80 %}var(--success){% elif exam.pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ exam.pct }}%</div>
+            <span class="pass-badge {{ 'pass' if exam.passed else 'fail' }}">{{ 'PASS' if exam.passed else 'NEEDS WORK' }}</span>
+            <i class="fas fa-chevron-down chevron" style="color:var(--text-light);"></i>
+        </div>
+    </div>
+    <div class="exam-body">
+        <div class="subj-row header">
+            <div>Subject</div><div>Marks</div><div>Grade</div><div>Status</div>
+        </div>
+        {% for s in exam.subjects %}
+        <div class="subj-row">
+            <div>
+                <strong>{{ s.name }}</strong>
+                {% set spct = ((s.obtained / s.max * 100) if s.max > 0 else 0)|round|int %}
+                <div class="subj-bar"><div class="subj-fill" style="width:{{ spct }}%; background:{% if spct >= 80 %}#22C55E{% elif spct >= 50 %}#F59E0B{% else %}#EF4444{% endif %};"></div></div>
+            </div>
+            <div>{% if s.absent %}<span style="color:var(--danger);">AB</span>{% else %}{{ s.obtained }}/{{ s.max }}{% endif %}</div>
+            <div><span class="grade-pill" style="background:{% if s.grade in ['A1','A2'] %}#D1FAE5; color:#059669{% elif s.grade in ['B1','B2'] %}#DBEAFE; color:#2563EB{% elif s.grade in ['C1','C2'] %}#FEF3C7; color:#D97706{% else %}#FEE2E2; color:#DC2626{% endif %};">{{ s.grade or '—' }}</span></div>
+            <div>{% if s.absent %}—{% elif s.passed %}✅{% else %}<span style="color:var(--danger);">⚠️</span>{% endif %}</div>
+        </div>
+        {% endfor %}
+
+        <div class="encourage-msg" style="background:{% if exam.pct >= 80 %}#D1FAE5{% elif exam.pct >= 50 %}#DBEAFE{% else %}#FEF3C7{% endif %}; color:{% if exam.pct >= 80 %}#059669{% elif exam.pct >= 50 %}#2563EB{% else %}#D97706{% endif %};">
+            {% if exam.pct >= 90 %}🌟 Outstanding work! You scored {{ exam.pct }}% — keep shining!
+            {% elif exam.pct >= 80 %}👏 Excellent performance at {{ exam.pct }}%! Great effort!
+            {% elif exam.pct >= 60 %}👍 Good job with {{ exam.pct }}%! There's room to grow.
+            {% elif exam.pct >= 40 %}💪 {{ exam.pct }}% — every step counts. Focus on weak areas and you'll improve!
+            {% else %}🤝 {{ exam.pct }}% — this is a starting point, not the finish line. Talk to your teachers for help.{% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><div class="card-body"><div class="empty-state">
+    <i class="fas fa-chart-bar"></i><h3>No Published Results</h3><p>Your exam results will appear here once published by your school.</p>
+</div></div></div>
+{% endif %}
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:8px;">
+    <i class="fas fa-lock"></i> Your results are private. No rankings or comparisons are shown — only your personal progress.
+</div>
+{% endblock %}

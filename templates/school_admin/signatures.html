@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Signature Management{% endblock %}
+{% block page_title %}Signature Management{% endblock %}
+{% block page_subtitle %}Upload signatures for PDF report cards & fee receipts{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sig-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .sig-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; }
+    .sig-card h3 { font-size: 0.92rem; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+    .sig-card p { font-size: 0.75rem; color: var(--text-light); margin-bottom: 12px; }
+    .sig-preview { width: 100%; height: 80px; border: 2px dashed var(--border-light); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; background: var(--bg-secondary); overflow: hidden; }
+    .sig-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .sig-preview.empty { color: var(--text-light); font-size: 0.78rem; }
+    .upload-btn { position: relative; overflow: hidden; display: inline-block; }
+    .upload-btn input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    .teacher-sig-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+    .teacher-sig-row:last-child { border: none; }
+    .teacher-sig-row .name { flex: 1; font-weight: 600; font-size: 0.85rem; }
+    .teacher-sig-row .sig-mini { width: 100px; height: 40px; border: 1px dashed var(--border-light); border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--bg-secondary); }
+    .teacher-sig-row .sig-mini img { max-width: 100%; max-height: 100%; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="padding:10px 16px; background:#EFF6FF; border:1px solid #BFDBFE; border-radius:var(--radius-sm); margin-bottom:16px; font-size:0.82rem; color:#1E40AF;">
+    <i class="fas fa-info-circle"></i>
+    Upload signatures (PNG/JPG, max 500KB). They'll be automatically printed on PDF report cards and fee receipts. <strong>Transparent PNG recommended</strong> for best results.
+</div>
+
+<div class="sig-grid">
+    <!-- Principal Signature -->
+    <div class="sig-card">
+        <h3><i class="fas fa-user-tie" style="color:var(--primary);"></i> Principal's Signature</h3>
+        <p>Used on report cards and fee receipts as "Authorized Signatory"</p>
+        <div class="sig-preview" id="principalPreview">
+            <span class="empty-text">No signature uploaded</span>
+        </div>
+        <div class="upload-btn">
+            <button class="btn btn-primary btn-sm"><i class="fas fa-upload"></i> Upload Signature</button>
+            <input type="file" accept="image/png,image/jpeg" onchange="uploadSig(this, 'principal', 'principalPreview')">
+        </div>
+    </div>
+
+    <!-- School Stamp -->
+    <div class="sig-card">
+        <h3><i class="fas fa-stamp" style="color:var(--warning);"></i> School Stamp / Seal</h3>
+        <p>Used on fee receipts as school verification stamp</p>
+        <div class="sig-preview" id="stampPreview">
+            <span class="empty-text">No stamp uploaded</span>
+        </div>
+        <div class="upload-btn">
+            <button class="btn btn-primary btn-sm"><i class="fas fa-upload"></i> Upload Stamp</button>
+            <input type="file" accept="image/png,image/jpeg" onchange="uploadSig(this, 'stamp', 'stampPreview')">
+        </div>
+    </div>
+</div>
+
+<!-- Class Teacher Signatures -->
+<div class="card">
+    <div class="card-header"><h2><i class="fas fa-chalkboard-teacher" style="color:var(--success); margin-right:8px;"></i> Class Teacher Signatures</h2></div>
+    <div class="card-body">
+        <p style="font-size:0.78rem; color:var(--text-light); margin-bottom:12px;">Upload signatures for class teachers — they'll appear on report cards for their respective classes.</p>
+        <div id="teacherList">
+            <div class="empty-state"><i class="fas fa-spinner fa-spin"></i><p>Loading...</p></div>
+        </div>
+    </div>
+</div>
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:12px;">
+    ✏️ You can update or replace signatures anytime. Changes apply to all future PDFs.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadSignatures() {
+    try {
+        const data = await apiCall('/api/school/signatures/info');
+
+        // Principal
+        const pp = document.getElementById('principalPreview');
+        if (data.principal_signature) {
+            pp.innerHTML = `<img src="${data.principal_signature}">`;
+        }
+
+        // Stamp
+        const sp = document.getElementById('stampPreview');
+        if (data.school_stamp) {
+            sp.innerHTML = `<img src="${data.school_stamp}">`;
+        }
+
+        // Teachers
+        const tl = document.getElementById('teacherList');
+        if (data.class_teachers.length === 0) {
+            tl.innerHTML = '<div class="empty-state"><i class="fas fa-chalkboard-teacher"></i><h3>No Class Teachers Assigned</h3><p>Assign class teachers in teacher management first.</p></div>';
+            return;
+        }
+        tl.innerHTML = data.class_teachers.map(t => `
+            <div class="teacher-sig-row">
+                <div class="name">${t.name}</div>
+                <div class="sig-mini" id="tsig_${t.id}">
+                    ${t.signature ? `<img src="${t.signature}">` : '<span style="font-size:0.65rem; color:var(--text-light);">None</span>'}
+                </div>
+                <div class="upload-btn">
+                    <button class="btn btn-ghost btn-sm"><i class="fas fa-upload"></i></button>
+                    <input type="file" accept="image/png,image/jpeg" onchange="uploadSig(this, 'teacher', 'tsig_${t.id}', '${t.id}')">
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        document.getElementById('teacherList').innerHTML = `<p style="color:var(--danger);">${e.message}</p>`;
+    }
+}
+
+async function uploadSig(input, target, previewId, teacherId) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 512000) { showToast('error', 'File too large', 'Max 500KB'); return; }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    let url = `/api/school/upload-signature?target=${target}`;
+    if (teacherId) url += `&teacher_id=${teacherId}`;
+
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            credentials: 'include',
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Upload failed');
+
+        // Update preview
+        const preview = document.getElementById(previewId);
+        preview.innerHTML = `<img src="${data.url}?t=${Date.now()}">`;
+        showToast('success', 'Uploaded!', 'Signature will appear on future PDFs');
+    } catch(e) {
+        showToast('error', 'Upload Error', e.message);
+    }
+    input.value = '';
+}
+
+loadSignatures();
+</script>
+{% endblock %}

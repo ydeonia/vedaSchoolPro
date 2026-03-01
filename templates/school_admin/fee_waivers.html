@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Fee Waivers{% endblock %}
+{% block page_title %}🎫 Fee Waivers & Discounts{% endblock %}
+{% block page_subtitle %}Manage scholarships, sibling discounts, and fee concessions{% endblock %}
+{% block extra_css %}
+<style>
+.w-tabs{display:flex;gap:4px;background:white;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
+.w-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.w-tab.active{background:var(--primary);color:white;}
+.add-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.w-card{background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.w-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.w-icon.scholarship{background:#DBEAFE;}.w-icon.sibling_discount{background:#D1FAE5;}.w-icon.staff_ward{background:#FEF3C7;}.w-icon.merit{background:#EDE9FE;}.w-icon.rte{background:#FCE7F3;}.w-icon.financial_aid{background:#FEE2E2;}
+.w-info{flex:1;}.w-title{font-weight:800;font-size:0.85rem;}.w-meta{font-size:0.70rem;color:var(--text-light);}
+.w-value{font-weight:900;font-size:1rem;color:var(--primary);}
+.w-status{padding:3px 8px;border-radius:6px;font-size:0.65rem;font-weight:700;}
+.w-status.active{background:#D1FAE5;color:#059669;}.w-status.expired{background:#FEE2E2;color:#DC2626;}.w-status.revoked{background:var(--bg);color:var(--text-light);}
+.w-btn{padding:4px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;margin-left:4px;}
+.info-banner{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:0.78rem;color:#4338CA;display:flex;align-items:center;gap:8px;}
+@media(max-width:768px){.f-row{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="info-banner">
+    <i class="fas fa-info-circle"></i>
+    <span>Active waivers are <strong>automatically applied</strong> when generating fee for the student. Percentage waivers apply to tuition fee, fixed waivers are deducted from total.</span>
+</div>
+<div class="w-tabs">
+    <div class="w-tab active" onclick="switchTab('list',this)">📋 All Waivers</div>
+    <div class="w-tab" onclick="switchTab('add',this)">➕ Grant Waiver</div>
+</div>
+<div id="listTab">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <select id="filterType" onchange="loadWaivers()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;">
+            <option value="">All Types</option><option value="scholarship">Scholarship</option><option value="sibling_discount">Sibling</option><option value="staff_ward">Staff Ward</option><option value="merit">Merit</option><option value="financial_aid">Financial Aid</option><option value="rte">RTE</option>
+        </select>
+        <select id="filterStatus" onchange="loadWaivers()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;">
+            <option value="">All Status</option><option value="active">Active</option><option value="revoked">Revoked</option>
+        </select>
+    </div>
+    <div id="waiverCount" style="font-size:0.72rem;color:var(--text-light);margin-bottom:8px;"></div>
+    <div id="waiverList"><div style="padding:30px;text-align:center;color:var(--text-light);">Loading...</div></div>
+</div>
+<div id="addTab" style="display:none;">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:14px;">🎫 Grant Fee Waiver / Discount</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Class</label><select id="wClass" onchange="loadWaiverSections()"><option value="">Select Class</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="wSection" onchange="loadWaiverStudents()"><option value="">All Sections</option></select></div>
+            <div class="f-grp"><label>Student</label><select id="wStudent"><option value="">← Select class first</option></select></div>
+            <div class="f-grp"><label>Waiver Type</label><select id="wType">
+                <option value="scholarship">🎓 Scholarship</option><option value="sibling_discount">👨‍👩‍👧‍👦 Sibling Discount</option><option value="staff_ward">🏫 Staff Ward</option><option value="merit">🏆 Merit Based</option><option value="financial_aid">💰 Financial Aid</option><option value="rte">📜 RTE Quota</option>
+            </select></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Title</label><input id="wTitle" placeholder="e.g., Merit Scholarship 50%"></div>
+            <div class="f-grp"><label>Discount Type</label><select id="wDiscType" onchange="toggleDiscLabel()"><option value="percentage">% Percentage</option><option value="fixed">₹ Fixed Amount</option></select></div>
+            <div class="f-grp"><label id="discLabel">Discount %</label><input type="number" id="wValue" placeholder="50"></div>
+            <div class="f-grp"><label>Applicable To</label><select id="wApply"><option value="all">All Fees</option><option value="tuition">Tuition Only</option><option value="transport">Transport Only</option></select></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Valid From</label><input type="date" id="wFrom"></div>
+            <div class="f-grp"><label>Valid To</label><input type="date" id="wTo"></div>
+            <div class="f-grp"><label>Remarks</label><input id="wRemarks" placeholder="Approved by principal"></div>
+            <div class="f-grp"><label>&nbsp;</label><button class="btn-primary" onclick="grantWaiver()" style="width:100%;"><i class="fas fa-check"></i> Grant Waiver</button></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function switchTab(t,btn){document.querySelectorAll('.w-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');document.getElementById('listTab').style.display=t==='list'?'block':'none';document.getElementById('addTab').style.display=t==='add'?'block':'none';}
+function toggleDiscLabel(){document.getElementById('discLabel').textContent=document.getElementById('wDiscType').value==='percentage'?'Discount %':'Amount (₹)';}
+
+async function init(){
+    try{const r=await fetch('/api/school/classes',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('wClass').innerHTML='<option value="">Select Class</option>'+(d.classes||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}catch(e){}
+    loadWaivers();
+}
+
+async function loadWaiverSections(){
+    const cid=document.getElementById('wClass').value;
+    const sel=document.getElementById('wSection');
+    sel.innerHTML='<option value="">All Sections</option>';
+    document.getElementById('wStudent').innerHTML='<option value="">Loading...</option>';
+    if(!cid){document.getElementById('wStudent').innerHTML='<option value="">← Select class first</option>';return;}
+    try{const r=await fetch(`/api/school/classes/${cid}/sections`,{credentials:'same-origin'});const d=await r.json();
+    (d.sections||[]).forEach(s=>{sel.innerHTML+=`<option value="${s.id}">${s.name}</option>`;});}catch(e){}
+    loadWaiverStudents();
+}
+
+async function loadWaiverStudents(){
+    const cid=document.getElementById('wClass').value;
+    if(!cid){document.getElementById('wStudent').innerHTML='<option value="">← Select class first</option>';return;}
+    const sid=document.getElementById('wSection').value;
+    let url=`/api/school/students?class_id=${cid}`;
+    if(sid) url+=`&section_id=${sid}`;
+    try{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json();
+    const sts=d.students||[];
+    document.getElementById('wStudent').innerHTML=`<option value="">Select Student (${sts.length})</option>`+sts.map(s=>`<option value="${s.id}">${s.name}${s.roll?' — Roll '+s.roll:''}</option>`).join('');}catch(e){}
+}
+
+async function loadWaivers(){
+    const typeF=document.getElementById('filterType').value;
+    const statusF=document.getElementById('filterStatus').value;
+    let url='/api/school/fee-waivers?';
+    if(typeF) url+=`type=${typeF}&`;
+    if(statusF) url+=`status=${statusF}&`;
+    try{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json();
+    const waivers=d.waivers||[];
+    document.getElementById('waiverCount').textContent=`${waivers.length} waiver(s) · ${waivers.filter(w=>w.status==='active').length} active`;
+    const el=document.getElementById('waiverList');
+    if(!waivers.length){el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-light);"><i class="fas fa-ticket-alt" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No waivers yet.</div>';return;}
+    const icons={'scholarship':'🎓','sibling_discount':'👨‍👩‍👧‍👦','staff_ward':'🏫','merit':'🏆','rte':'📜','financial_aid':'💰'};
+    el.innerHTML=waivers.map(w=>`<div class="w-card">
+        <div class="w-icon ${w.waiver_type}">${icons[w.waiver_type]||'🎫'}</div>
+        <div class="w-info"><div class="w-title">${w.student_name} — ${w.title}</div>
+        <div class="w-meta">${w.waiver_type.replace(/_/g,' ')} · ${w.class_name||''} · ${w.valid_from||'start'} → ${w.valid_to||'ongoing'}${w.remarks?' · '+w.remarks:''}</div></div>
+        <div class="w-value">${w.discount_type==='percentage'?w.discount_value+'%':'₹'+w.discount_value.toLocaleString()}</div>
+        <span class="w-status ${w.status}">${w.status}</span>
+        ${w.status==='active'?`<button class="w-btn" onclick="revokeWaiver('${w.id}')">Revoke</button>`:''}
+    </div>`).join('');}catch(e){}
+}
+
+async function grantWaiver(){
+    const sid=document.getElementById('wStudent').value;
+    const val=parseFloat(document.getElementById('wValue').value)||0;
+    if(!sid){alert('Select class → section → student first');return;}
+    if(!val){alert('Enter discount value');return;}
+    const d={student_id:sid,waiver_type:document.getElementById('wType').value,
+        title:document.getElementById('wTitle').value.trim()||(document.getElementById('wType').value.replace(/_/g,' ')+' '+val+(document.getElementById('wDiscType').value==='percentage'?'%':'')),
+        discount_type:document.getElementById('wDiscType').value,discount_value:val,
+        applicable_fees:document.getElementById('wApply').value,
+        valid_from:document.getElementById('wFrom').value||null,valid_to:document.getElementById('wTo').value||null,
+        remarks:document.getElementById('wRemarks').value.trim()};
+    try{await apiCall('/api/school/fee-waivers','POST',d);showToast('success','Waiver granted!');loadWaivers();switchTab('list',document.querySelectorAll('.w-tab')[0]);}catch(e){showToast('error','Failed');}
+}
+
+async function revokeWaiver(id){if(!confirm('Revoke this waiver?'))return;
+try{await apiCall('/api/school/fee-waivers/'+id+'/revoke','POST');showToast('success','Revoked');loadWaivers();}catch(e){}}
+init();
+</script>
+{% endblock %}

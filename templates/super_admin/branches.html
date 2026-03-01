@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Branches{% endblock %}
+{% block page_title %}School Branches{% endblock %}
+{% block page_subtitle %}Manage all school branches across organizations{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>All Branches ({{ branches | length }})</h2>
+        <button class="btn btn-primary" onclick="openModal('addBranchModal')">
+            <i class="fas fa-plus"></i> New Branch
+        </button>
+    </div>
+    <div class="card-body">
+        {% if branches %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Branch</th>
+                        <th>Organization</th>
+                        <th>Board</th>
+                        <th>Location</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for branch in branches %}
+                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not branch.is_active else '' }}">
+                        <td>
+                            <div style="font-weight: 600;">{{ branch.name }}</div>
+                            <div class="text-xs text-muted">{{ branch.code or '' }}</div>
+                        </td>
+                        <td class="text-sm">{{ branch.organization.name if branch.organization else '—' }}</td>
+                        <td><span class="badge badge-info">{{ branch.board_type.value | upper }}</span></td>
+                        <td>
+                            <div class="text-sm">{{ branch.city or '—' }}</div>
+                            <div class="text-xs text-muted">{{ branch.state or '' }}</div>
+                        </td>
+                        <td>
+                            {% if branch.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-gray" style="background:#FEE2E2;color:#991B1B;">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <a href="/super-admin/branches/{{ branch.id }}" class="btn btn-secondary btn-sm" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if branch.is_active %}
+                                <button class="btn btn-sm" style="background:#FEF3C7;color:#92400E;border:none;font-size:0.65rem;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700;" onclick="toggleBranch('{{ branch.id }}','{{ branch.name }}')" title="Deactivate">
+                                    <i class="fas fa-power-off"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm" style="background:#D1FAE5;color:#065F46;border:none;font-size:0.65rem;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700;" onclick="toggleBranch('{{ branch.id }}','{{ branch.name }}')" title="Activate">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-school"></i>
+            <h3>No branches yet</h3>
+            <p>Create an organization first, then add branches</p>
+            <button class="btn btn-primary" onclick="openModal('addBranchModal')">
+                <i class="fas fa-plus"></i> Add Branch
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Branch Modal -->
+<div class="modal-overlay" id="addBranchModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2>Create New Branch</h2>
+            <button class="modal-close" onclick="closeModal('addBranchModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="addBranchForm">
+                <div class="form-group">
+                    <label class="form-label">Organization <span class="required">*</span></label>
+                    <select name="org_id" class="form-select" required>
+                        <option value="">Select Organization</option>
+                        {% for org in organizations %}
+                        <option value="{{ org.id }}">{{ org.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Branch Name <span class="required">*</span></label>
+                        <input type="text" name="name" class="form-input" placeholder="e.g., Main Campus" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Branch Code</label>
+                        <input type="text" name="code" class="form-input" placeholder="e.g., DPS-GZB-01">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Board Type</label>
+                        <select name="board_type" class="form-select">
+                            <option value="cbse">CBSE</option>
+                            <option value="icse">ICSE</option>
+                            <option value="state">State Board</option>
+                            <option value="ib">IB</option>
+                            <option value="igcse">IGCSE</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Principal Name</label>
+                        <input type="text" name="principal_name" class="form-input" placeholder="Principal's name">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-input" placeholder="branch@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" name="phone" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-textarea" rows="2" placeholder="Branch address"></textarea>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">City</label>
+                        <input type="text" name="city" class="form-input" placeholder="City">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">State</label>
+                        <input type="text" name="state" class="form-input" placeholder="State">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pincode</label>
+                        <input type="text" name="pincode" class="form-input" placeholder="110001" maxlength="6">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addBranchModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitBranchForm()">
+                <i class="fas fa-plus"></i> Create Branch
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function submitBranchForm() {
+    const data = getFormData('addBranchForm');
+    if (!data.org_id || !data.name) {
+        showToast('error', 'Organization and branch name are required');
+        return;
+    }
+    try {
+        const r = await apiCall('/api/super-admin/branches', 'POST', data);
+        if(r.error){showToast('error',r.error);return;}
+        showToast('success', 'Branch created successfully');
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {showToast('error',e.message);}
+}
+async function toggleBranch(id,name){
+    showConfirm('Toggle Branch','Enable or disable <strong>'+name+'</strong>?<br><span style="font-size:0.7rem;color:var(--text-light);">All users under this branch will be affected.</span>',async()=>{
+        const d=await apiCall(`/api/super-admin/branches/${id}/toggle`,'PUT');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1200);}else showToast('error',d.error||'Failed');
+    },{icon:'🔀'});
+}
+</script>
+{% endblock %}

@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Online Quiz{% endblock %}
+{% block page_title %}📝 Online Quiz{% endblock %}
+{% block page_subtitle %}Create and manage MCQ quizzes for students{% endblock %}
+
+{% block extra_css %}
+<style>
+.quiz-tabs { display:flex; gap:4px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:16px; }
+.quiz-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
+.quiz-tab.active { background:var(--primary); color:white; }
+/* Quiz cards */
+.qz-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.qz-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px; transition:all 0.2s; }
+.qz-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.qz-title { font-weight:800; font-size:0.92rem; margin-bottom:4px; }
+.qz-meta { font-size:0.72rem; color:var(--text-light); margin-bottom:8px; }
+.qz-stats { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.qz-stat { padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; background:var(--bg); }
+.qz-stat.pub { background:#D1FAE5; color:#059669; } .qz-stat.draft { background:#FEF3C7; color:#D97706; }
+.qz-actions { display:flex; gap:6px; }
+.qz-btn { padding:6px 12px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:white; }
+.qz-btn:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
+.qz-btn.primary { background:var(--primary); color:white; border-color:var(--primary); }
+/* Create form */
+.create-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
+.f-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+.f-grp { display:flex; flex-direction:column; gap:3px; }
+.f-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.f-grp input,.f-grp select,.f-grp textarea { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+/* Question builder */
+.q-card { background:var(--bg); border-radius:12px; padding:16px; margin-bottom:10px; border:1px solid var(--border-light); }
+.q-num { font-weight:800; font-size:0.82rem; color:var(--primary); margin-bottom:8px; }
+.q-options { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:8px 0; }
+.q-opt { display:flex; align-items:center; gap:6px; }
+.q-opt input[type=radio] { width:16px; height:16px; }
+.q-opt input[type=text] { flex:1; padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:0.78rem; }
+.q-opt .opt-label { font-weight:700; font-size:0.78rem; width:20px; color:var(--text-secondary); }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+.btn-secondary { padding:8px 14px; border-radius:8px; background:var(--bg-secondary); color:var(--text-secondary); border:none; font-weight:700; cursor:pointer; font-size:0.78rem; }
+@media(max-width:768px) { .f-row { grid-template-columns:1fr; } .q-options { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="quiz-tabs">
+    <div class="quiz-tab active" onclick="switchTab('list',this)">📋 My Quizzes</div>
+    <div class="quiz-tab" onclick="switchTab('create',this)">➕ Create Quiz</div>
+</div>
+
+<div id="listTab">
+    <div class="qz-grid" id="quizGrid"><div style="padding:40px;text-align:center;color:var(--text-light);grid-column:1/-1;">Loading...</div></div>
+</div>
+
+<div id="createTab" style="display:none;">
+    <div class="create-card">
+        <h3 style="font-size:0.92rem;margin-bottom:14px;">📝 Create New Quiz</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Title</label><input id="qTitle" placeholder="e.g., Chapter 5 - Algebra Test"></div>
+            <div class="f-grp"><label>Class</label><select id="qClass"></select></div>
+            <div class="f-grp"><label>Subject</label><select id="qSubject"></select></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Time Limit (minutes)</label><input type="number" id="qTime" value="30"></div>
+            <div class="f-grp"><label>Pass Marks</label><input type="number" id="qPass" value="40"></div>
+            <div class="f-grp"><label>Shuffle Questions</label><select id="qShuffle"><option value="0">No</option><option value="1">Yes</option></select></div>
+        </div>
+    </div>
+
+    <!-- Questions -->
+    <div id="questionsContainer"></div>
+    <div style="display:flex;gap:8px;margin:12px 0;">
+        <button class="btn-secondary" onclick="addQuestion()"><i class="fas fa-plus"></i> Add Question</button>
+        <button class="btn-secondary" onclick="addBulkQuestions()"><i class="fas fa-list"></i> Bulk Add (5)</button>
+        <div style="flex:1;"></div>
+        <button class="btn-secondary" onclick="saveQuiz(false)">💾 Save as Draft</button>
+        <button class="btn-primary" onclick="saveQuiz(true)"><i class="fas fa-paper-plane"></i> Publish Quiz</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let quizzes = [], questions = [];
+function switchTab(t, btn) { document.querySelectorAll('.quiz-tab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); document.getElementById('listTab').style.display=t==='list'?'block':'none'; document.getElementById('createTab').style.display=t==='create'?'block':'none'; }
+
+async function init() {
+    try {
+        const r = await fetch('/api/school/classes', {credentials:'same-origin'});
+        const d = await r.json();
+        document.getElementById('qClass').innerHTML = (d.classes||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    } catch(e) {}
+    loadQuizzes();
+}
+
+async function loadQuizzes() {
+    try {
+        const r = await fetch('/api/school/quizzes', {credentials:'same-origin'});
+        const d = await r.json();
+        quizzes = d.quizzes || [];
+        renderQuizzes();
+    } catch(e) { document.getElementById('quizGrid').innerHTML = '<p style="color:var(--text-light);text-align:center;grid-column:1/-1;">No quizzes yet.</p>'; }
+}
+
+function renderQuizzes() {
+    const g = document.getElementById('quizGrid');
+    if (!quizzes.length) { g.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text-light);grid-column:1/-1;"><i class="fas fa-clipboard-list" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No quizzes yet. Create your first!</div>'; return; }
+    g.innerHTML = quizzes.map(q => `<div class="qz-card">
+        <div class="qz-title">${q.title}</div>
+        <div class="qz-meta">${q.class_name||''} · ${q.subject_name||''} · ${q.time_limit_minutes} min</div>
+        <div class="qz-stats">
+            <span class="qz-stat ${q.is_published?'pub':'draft'}">${q.is_published?'Published':'Draft'}</span>
+            <span class="qz-stat">${q.question_count||0} questions</span>
+            <span class="qz-stat">${q.attempt_count||0} attempts</span>
+        </div>
+        <div class="qz-actions">
+            ${!q.is_published ? `<button class="qz-btn primary" onclick="publishQuiz('${q.id}')">🚀 Publish</button>` : ''}
+            <button class="qz-btn" onclick="viewResults('${q.id}')">📊 Results</button>
+            <button class="qz-btn" onclick="deleteQuiz('${q.id}')"><i class="fas fa-trash" style="color:var(--danger);"></i></button>
+        </div>
+    </div>`).join('');
+}
+
+let qNum = 0;
+function addQuestion() {
+    qNum++;
+    const div = document.createElement('div');
+    div.className = 'q-card';
+    div.id = 'q_' + qNum;
+    div.innerHTML = `<div class="q-num">Question ${qNum} <button style="float:right;background:none;border:none;cursor:pointer;color:var(--danger);" onclick="this.closest('.q-card').remove()"><i class="fas fa-times"></i></button></div>
+        <textarea class="q-text" placeholder="Enter question text..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-size:0.82rem;min-height:40px;font-family:inherit;"></textarea>
+        <div class="q-options">
+            <div class="q-opt"><input type="radio" name="ans_${qNum}" value="A" checked><span class="opt-label">A</span><input type="text" class="opt-a" placeholder="Option A"></div>
+            <div class="q-opt"><input type="radio" name="ans_${qNum}" value="B"><span class="opt-label">B</span><input type="text" class="opt-b" placeholder="Option B"></div>
+            <div class="q-opt"><input type="radio" name="ans_${qNum}" value="C"><span class="opt-label">C</span><input type="text" class="opt-c" placeholder="Option C"></div>
+            <div class="q-opt"><input type="radio" name="ans_${qNum}" value="D"><span class="opt-label">D</span><input type="text" class="opt-d" placeholder="Option D"></div>
+        </div>
+        <div style="display:flex;gap:8px;font-size:0.72rem;"><label>Marks: <input type="number" class="q-marks" value="1" style="width:50px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;"></label></div>`;
+    document.getElementById('questionsContainer').appendChild(div);
+}
+
+function addBulkQuestions() { for(let i=0;i<5;i++) addQuestion(); }
+
+async function saveQuiz(publish) {
+    const title = document.getElementById('qTitle').value.trim();
+    if (!title) { alert('Enter quiz title'); return; }
+    const qCards = document.querySelectorAll('.q-card');
+    const qs = [];
+    qCards.forEach((card, i) => {
+        const text = card.querySelector('.q-text').value.trim();
+        if (!text) return;
+        const ans = card.querySelector(`input[name^="ans_"]:checked`)?.value || 'A';
+        qs.push({
+            question_text: text,
+            option_a: card.querySelector('.opt-a').value.trim(),
+            option_b: card.querySelector('.opt-b').value.trim(),
+            option_c: card.querySelector('.opt-c').value.trim(),
+            option_d: card.querySelector('.opt-d').value.trim(),
+            correct_answer: ans,
+            marks: parseFloat(card.querySelector('.q-marks').value) || 1,
+            order_num: i + 1
+        });
+    });
+    if (!qs.length) { alert('Add at least one question'); return; }
+    try {
+        const res = await fetch('/api/school/quizzes', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({title, class_id: document.getElementById('qClass').value, subject_id: document.getElementById('qSubject').value || null,
+                time_limit_minutes: parseInt(document.getElementById('qTime').value) || 30, pass_marks: parseInt(document.getElementById('qPass').value) || 40,
+                shuffle_questions: document.getElementById('qShuffle').value === '1', is_published: publish, questions: qs})});
+        if (!res.ok) throw new Error();
+        alert(publish ? '✅ Quiz published!' : '💾 Quiz saved as draft');
+        loadQuizzes(); switchTab('list', document.querySelectorAll('.quiz-tab')[0]);
+    } catch(e) { alert('Failed to save quiz'); }
+}
+
+async function publishQuiz(id) { try { await fetch(`/api/school/quizzes/${id}/publish`, {method:'POST', credentials:'same-origin'}); loadQuizzes(); } catch(e){} }
+async function deleteQuiz(id) { if(!confirm('Delete this quiz?')) return; try { await fetch(`/api/school/quizzes/${id}`, {method:'DELETE', credentials:'same-origin'}); loadQuizzes(); } catch(e){} }
+function viewResults(id) { alert('Results view coming soon!'); }
+
+init();
+</script>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Notification Center{% endblock %}
+{% block page_title %}Notification Center{% endblock %}
+{% block page_subtitle %}All notifications grouped by importance — signal over noise{% endblock %}
+
+{% block extra_css %}
+<style>
+    .notif-tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    .notif-tab { padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.82rem; font-weight: 600; background: var(--bg-secondary); color: var(--text-secondary); transition: all 0.2s; }
+    .notif-tab.active { background: var(--primary); color: white; }
+    .notif-tab .count { display: inline-block; background: rgba(255,255,255,0.2); padding: 1px 8px; border-radius: 10px; font-size: 0.68rem; margin-left: 4px; }
+    .notif-item { display: flex; gap: 12px; padding: 14px 16px; background: white; border-radius: var(--radius-sm); margin-bottom: 6px; border-left: 4px solid var(--border); cursor: pointer; transition: all 0.15s; }
+    .notif-item:hover { transform: translateX(3px); box-shadow: var(--shadow-sm); }
+    .notif-item.unread { background: #F0F7FF; border-left-color: var(--primary); }
+    .notif-item.urgent { border-left-color: var(--danger); }
+    .notif-item.high { border-left-color: var(--warning); }
+    .notif-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.88rem; flex-shrink: 0; }
+    .notif-icon.attendance { background: #DBEAFE; color: #2563EB; }
+    .notif-icon.fee { background: #FEF3C7; color: #D97706; }
+    .notif-icon.announcement { background: #EDE9FE; color: #7C3AED; }
+    .notif-icon.result { background: #D1FAE5; color: #059669; }
+    .notif-icon.alert { background: #FEE2E2; color: #DC2626; }
+    .notif-icon.message { background: #E0F2FE; color: #0284C7; }
+    .notif-body { flex: 1; min-width: 0; }
+    .notif-title { font-weight: 600; font-size: 0.85rem; margin-bottom: 2px; }
+    .notif-msg { font-size: 0.78rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .notif-time { font-size: 0.68rem; color: var(--text-light); margin-top: 4px; }
+    .notif-action { display: inline-block; padding: 4px 12px; border-radius: 12px; background: var(--primary); color: white; font-size: 0.72rem; font-weight: 700; text-decoration: none; margin-top: 6px; }
+    .notif-action:hover { opacity: 0.9; }
+    .mark-all-btn { margin-left: auto; }
+    @media (max-width: 640px) { .notif-item { padding: 10px 12px; } .notif-icon { width: 32px; height: 32px; font-size: 0.78rem; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+    <div class="notif-tabs" id="tabs">
+        <div class="notif-tab active" data-filter="all" onclick="filterNotifs(this)">All</div>
+        <div class="notif-tab" data-filter="unread" onclick="filterNotifs(this)">Unread <span class="count" id="unreadBadge">0</span></div>
+        <div class="notif-tab" data-filter="urgent" onclick="filterNotifs(this)">🔴 Urgent</div>
+        <div class="notif-tab" data-filter="announcement" onclick="filterNotifs(this)">📢 Announcements</div>
+        <div class="notif-tab" data-filter="fee_reminder" onclick="filterNotifs(this)">💰 Fees</div>
+        <div class="notif-tab" data-filter="attendance" onclick="filterNotifs(this)">📋 Attendance</div>
+    </div>
+    <button class="btn btn-secondary btn-sm mark-all-btn" onclick="markAllRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
+</div>
+
+<div id="notifList">
+    <div style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ICONS = {
+    attendance: {cls: 'attendance', icon: '📋'},
+    fee_reminder: {cls: 'fee', icon: '💰'},
+    fee_received: {cls: 'fee', icon: '✅'},
+    result_published: {cls: 'result', icon: '🏆'},
+    announcement: {cls: 'announcement', icon: '📢'},
+    message: {cls: 'message', icon: '💬'},
+    alert: {cls: 'alert', icon: '🔔'},
+    admission: {cls: 'attendance', icon: '📝'},
+};
+let allNotifs = [];
+
+async function loadNotifications() {
+    try {
+        const result = await apiCall('/api/school/notifications/list');
+        allNotifs = result.notifications || [];
+        document.getElementById('unreadBadge').textContent = result.unread_count || 0;
+        renderNotifs(allNotifs);
+    } catch(e) {
+        document.getElementById('notifList').innerHTML = '<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>Could not load notifications</h3></div>';
+    }
+}
+
+function renderNotifs(notifs) {
+    if (notifs.length === 0) {
+        document.getElementById('notifList').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No Notifications</h3><p>You\'re all caught up!</p></div></div></div>';
+        return;
+    }
+    document.getElementById('notifList').innerHTML = notifs.map(n => {
+        const ico = ICONS[n.type] || {cls: 'alert', icon: '🔔'};
+        const priorityCls = n.priority === 'urgent' ? 'urgent' : (n.priority === 'high' ? 'high' : '');
+        return `<div class="notif-item ${n.is_read ? '' : 'unread'} ${priorityCls}" onclick="markRead('${n.id}')">
+            <div class="notif-icon ${ico.cls}">${ico.icon}</div>
+            <div class="notif-body">
+                <div class="notif-title">${n.title}</div>
+                <div class="notif-msg">${n.message}</div>
+                <div class="notif-time">${n.time}</div>
+                ${n.action_url ? `<a href="${n.action_url}" class="notif-action" onclick="event.stopPropagation();">${n.action_label || 'View'}</a>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function filterNotifs(el) {
+    document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    const filter = el.dataset.filter;
+    if (filter === 'all') renderNotifs(allNotifs);
+    else if (filter === 'unread') renderNotifs(allNotifs.filter(n => !n.is_read));
+    else if (filter === 'urgent') renderNotifs(allNotifs.filter(n => n.priority === 'urgent' || n.priority === 'high'));
+    else renderNotifs(allNotifs.filter(n => n.type === filter));
+}
+
+async function markRead(id) {
+    try {
+        await apiCall(`/api/school/notifications/mark-read?notification_id=${id}`, 'POST');
+        const n = allNotifs.find(x => x.id === id);
+        if (n) n.is_read = true;
+        const unread = allNotifs.filter(x => !x.is_read).length;
+        document.getElementById('unreadBadge').textContent = unread;
+        renderNotifs(allNotifs);
+    } catch(e) {}
+}
+
+async function markAllRead() {
+    try {
+        await apiCall('/api/school/notifications/mark-read', 'POST');
+        allNotifs.forEach(n => n.is_read = true);
+        document.getElementById('unreadBadge').textContent = 0;
+        renderNotifs(allNotifs);
+        showToast('success', 'All marked as read ✅', '');
+    } catch(e) {}
+}
+
+loadNotifications();
+</script>
+{% endblock %}

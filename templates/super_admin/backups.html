@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+{% block title %}Backup Management{% endblock %}
+{% block page_title %}💾 Backup Management{% endblock %}
+{% block page_subtitle %}Manage database backups across all branches{% endblock %}
+{% block extra_css %}
+<style>
+.bk-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+.bk-stat{background:var(--bg-card,white);border-radius:14px;padding:16px;border:1px solid var(--border-light,#f1f5f9);display:flex;align-items:center;gap:12px;}
+.bk-stat-icon{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.bk-stat-icon.blue{background:rgba(37,99,235,0.1);color:#2563EB;}.bk-stat-icon.green{background:rgba(5,150,105,0.1);color:#059669;}
+.bk-stat-icon.amber{background:rgba(217,119,6,0.1);color:#D97706;}.bk-stat-icon.red{background:rgba(220,38,38,0.1);color:#DC2626;}
+.bk-stat-val{font-size:1.5rem;font-weight:900;color:var(--text-primary);}.bk-stat-lbl{font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.5px;}
+
+.org-block{background:var(--bg-card,white);border-radius:14px;border:1px solid var(--border-light,#f1f5f9);margin-bottom:16px;overflow:hidden;}
+.org-block-header{padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border-light,#f1f5f9);cursor:pointer;transition:background 0.2s;}
+.org-block-header:hover{background:var(--bg-secondary,#f8fafc);}
+.org-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:0.75rem;flex-shrink:0;}
+.org-title{font-weight:800;font-size:0.88rem;color:var(--text-primary);}.org-meta{font-size:0.62rem;color:var(--text-light);}
+.org-chevron{margin-left:auto;font-size:0.75rem;color:var(--text-light);transition:transform 0.3s;}.org-block.open .org-chevron{transform:rotate(180deg);}
+.org-body{display:none;padding:0;}.org-block.open .org-body{display:block;}
+
+.branch-row{display:grid;grid-template-columns:200px 1fr 120px 100px;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border-light,#f1f5f9);align-items:center;transition:background 0.15s;}
+.branch-row:last-child{border-bottom:none;}
+.branch-row:hover{background:var(--bg-secondary,#f8fafc);}
+.br-name{font-weight:700;font-size:0.82rem;color:var(--text-primary);}
+.br-city{font-size:0.62rem;color:var(--text-light);}
+
+/* Mini calendar strip — shows last 30 days as dots */
+.cal-strip{display:flex;gap:2px;align-items:flex-end;height:28px;}
+.cal-dot{width:8px;border-radius:2px;transition:all 0.15s;cursor:pointer;position:relative;}
+.cal-dot:hover{opacity:0.8;transform:scaleY(1.3);}
+.cal-dot.success{background:#22C55E;}.cal-dot.fail{background:#EF4444;}.cal-dot.none{background:var(--border,#e2e8f0);}
+.cal-dot .cal-tip{display:none;position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);background:var(--bg-card,#1e293b);color:var(--text,white);font-size:0.55rem;padding:3px 6px;border-radius:4px;white-space:nowrap;z-index:10;box-shadow:0 2px 8px rgba(0,0,0,0.15);border:1px solid var(--border);}
+.cal-dot:hover .cal-tip{display:block;}
+
+.bk-status{font-size:0.62rem;font-weight:700;padding:3px 8px;border-radius:6px;}
+.bk-status.ok{background:rgba(34,197,94,0.1);color:#059669;}.bk-status.warn{background:rgba(217,119,6,0.1);color:#D97706;}
+.bk-status.fail{background:rgba(220,38,38,0.1);color:#DC2626;}.bk-status.never{background:var(--bg-secondary);color:var(--text-light);}
+.bk-actions{display:flex;gap:6px;}
+.bk-btn{padding:5px 10px;border-radius:7px;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;}
+.bk-btn:hover{transform:translateY(-1px);}
+.bk-btn.primary{background:#2563EB;color:white;}.bk-btn.ghost{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);}
+
+/* Detail panel */
+.detail-panel{display:none;background:var(--bg-secondary,#f8fafc);padding:16px 18px;border-top:1px solid var(--border-light);}
+.detail-panel.open{display:block;}
+.dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.dp-cal{background:var(--bg-card,white);border-radius:10px;padding:14px;border:1px solid var(--border-light,#f1f5f9);}
+.dp-cal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.dp-cal-nav{padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--bg-card);cursor:pointer;font-weight:700;font-size:0.72rem;color:var(--text-primary);}
+.dp-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;}
+.dp-day-header{font-size:0.45rem;font-weight:800;color:var(--text-light);padding:3px;}
+.dp-day{padding:5px 2px;border-radius:5px;font-size:0.65rem;cursor:pointer;transition:all 0.15s;color:var(--text-primary);}
+.dp-day:hover{background:var(--bg-secondary);}
+.dp-day.has-backup{background:rgba(34,197,94,0.12);color:#059669;font-weight:700;}
+.dp-day.has-fail{background:rgba(220,38,38,0.12);color:#DC2626;font-weight:700;}
+.dp-day.today{border:2px solid var(--primary);font-weight:900;}
+.dp-history{background:var(--bg-card,white);border-radius:10px;padding:14px;border:1px solid var(--border-light,#f1f5f9);max-height:260px;overflow-y:auto;}
+.dp-history table{width:100%;border-collapse:collapse;font-size:0.7rem;}
+.dp-history th{text-align:left;padding:6px;font-size:0.5rem;font-weight:800;text-transform:uppercase;color:var(--text-light);border-bottom:1.5px solid var(--border);}
+.dp-history td{padding:6px;border-bottom:1px solid var(--border-light);color:var(--text-primary);}
+.dp-history tr:hover td{background:var(--bg-secondary);}
+
+@media(max-width:900px){.bk-stats{grid-template-columns:1fr 1fr;}.branch-row{grid-template-columns:1fr;gap:6px;}}
+@media(max-width:600px){.bk-stats{grid-template-columns:1fr;}.dp-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Global stats -->
+<div class="bk-stats" id="bkGlobalStats">
+    <div class="bk-stat"><div class="bk-stat-icon blue"><i class="fas fa-database"></i></div><div><div class="bk-stat-val" id="gTotalBk">0</div><div class="bk-stat-lbl">Total Backups</div></div></div>
+    <div class="bk-stat"><div class="bk-stat-icon green"><i class="fas fa-check-circle"></i></div><div><div class="bk-stat-val" id="gSuccess">0</div><div class="bk-stat-lbl">Successful (30d)</div></div></div>
+    <div class="bk-stat"><div class="bk-stat-icon red"><i class="fas fa-times-circle"></i></div><div><div class="bk-stat-val" id="gFailed">0</div><div class="bk-stat-lbl">Failed (30d)</div></div></div>
+    <div class="bk-stat"><div class="bk-stat-icon amber"><i class="fas fa-hdd"></i></div><div><div class="bk-stat-val" id="gSize">0</div><div class="bk-stat-lbl">Total Size</div></div></div>
+</div>
+
+<!-- Org blocks -->
+{% for item in org_data %}
+<div class="org-block {% if loop.first %}open{% endif %}" id="org_{{ item.org.id }}">
+    <div class="org-block-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="org-avatar" style="background:{{ ['#7C3AED','#2563EB','#059669','#D97706','#DC2626'][loop.index0 % 5] }};">{{ item.org.name[0]|upper }}</div>
+        <div>
+            <div class="org-title">{{ item.org.name }}</div>
+            <div class="org-meta">{{ item.branches|length }} branch{{ 'es' if item.branches|length != 1 else '' }} · {{ item.org.city or '' }}</div>
+        </div>
+        <i class="fas fa-chevron-down org-chevron"></i>
+    </div>
+    <div class="org-body">
+        {% for b in item.branches %}
+        <div class="branch-row" id="br_{{ b.id }}">
+            <div>
+                <div class="br-name">{{ b.name }}</div>
+                <div class="br-city">{{ b.city or '' }}{{ ', ' + b.state if b.state else '' }}</div>
+            </div>
+            <div class="cal-strip" id="cal_{{ b.id }}"></div>
+            <div><span class="bk-status ok" id="status_{{ b.id }}">Loading...</span></div>
+            <div class="bk-actions">
+                <button class="bk-btn primary" onclick="triggerBackup('{{ b.id }}','{{ b.name }}')"><i class="fas fa-download"></i> Now</button>
+                <button class="bk-btn ghost" onclick="toggleDetail('{{ b.id }}')"><i class="fas fa-calendar-alt"></i></button>
+            </div>
+        </div>
+        <!-- Detail panel (hidden by default) -->
+        <div class="detail-panel" id="detail_{{ b.id }}">
+            <div class="dp-grid">
+                <div class="dp-cal">
+                    <div class="dp-cal-header">
+                        <button class="dp-cal-nav" onclick="dpPrev('{{ b.id }}')">←</button>
+                        <span style="font-weight:800;font-size:0.78rem;" id="dpMonth_{{ b.id }}"></span>
+                        <button class="dp-cal-nav" onclick="dpNext('{{ b.id }}')">→</button>
+                    </div>
+                    <div class="dp-cal-grid">
+                        <div class="dp-day-header">S</div><div class="dp-day-header">M</div><div class="dp-day-header">T</div><div class="dp-day-header">W</div><div class="dp-day-header">T</div><div class="dp-day-header">F</div><div class="dp-day-header">S</div>
+                    </div>
+                    <div class="dp-cal-grid" id="dpGrid_{{ b.id }}"></div>
+                </div>
+                <div class="dp-history">
+                    <div style="font-weight:800;font-size:0.75rem;margin-bottom:8px;color:var(--text-primary);">📋 Backup History</div>
+                    <table><thead><tr><th>Date</th><th>Time</th><th>Size</th><th>Status</th><th></th></tr></thead>
+                    <tbody id="dpHist_{{ b.id }}"></tbody></table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% if not item.branches %}
+        <div style="padding:20px;text-align:center;color:var(--text-light);font-size:0.78rem;">No active branches</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% if not org_data %}
+<div style="text-align:center;padding:60px;color:var(--text-light);">
+    <i class="fas fa-database" style="font-size:2rem;opacity:0.2;"></i>
+    <p style="margin-top:8px;">No organizations found.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block extra_js %}
+<script>
+// ═══ SIMULATED BACKUP DATA ═══
+// In production: fetch from /api/super-admin/backups/{branch_id}
+const allBackups={};
+const branchIds=[{% for item in org_data %}{% for b in item.branches %}'{{ b.id }}',{% endfor %}{% endfor %}];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const dpState={};// per-branch calendar month/year
+
+function initBackups(){
+    const now=new Date();
+    let totalBk=0, success30=0, failed30=0, totalSize=0;
+    const thirtyAgo=new Date();thirtyAgo.setDate(thirtyAgo.getDate()-30);
+
+    branchIds.forEach(bid=>{
+        allBackups[bid]={};
+        dpState[bid]={month:now.getMonth(),year:now.getFullYear()};
+        for(let i=0;i<90;i++){
+            const d=new Date(now);d.setDate(d.getDate()-i);
+            const key=d.toISOString().slice(0,10);
+            if(Math.random()>0.12){
+                const size=+(1.5+Math.random()*8).toFixed(1);
+                const ok=Math.random()>0.05;
+                allBackups[bid][key]={
+                    time:d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
+                    size:size+'MB',sizeNum:size,
+                    type:i%7===0?'Full':'Incremental',
+                    status:ok?'success':'failed'
+                };
+                totalBk++;totalSize+=size;
+                if(d>=thirtyAgo){ok?success30++:failed30++;}
+            }
+        }
+        renderStrip(bid);
+        renderStatus(bid);
+        renderDpCal(bid);
+        renderDpHist(bid);
+    });
+
+    document.getElementById('gTotalBk').textContent=totalBk.toLocaleString();
+    document.getElementById('gSuccess').textContent=success30;
+    document.getElementById('gFailed').textContent=failed30;
+    document.getElementById('gSize').textContent=totalSize>1024?(totalSize/1024).toFixed(1)+'GB':Math.round(totalSize)+'MB';
+}
+
+function renderStrip(bid){
+    const el=document.getElementById('cal_'+bid);if(!el)return;
+    const now=new Date();let html='';
+    for(let i=29;i>=0;i--){
+        const d=new Date(now);d.setDate(d.getDate()-i);
+        const key=d.toISOString().slice(0,10);
+        const bk=allBackups[bid][key];
+        const cls=bk?(bk.status==='success'?'success':'fail'):'none';
+        const h=bk?(bk.status==='success'?Math.min(28,12+bk.sizeNum*1.5):6):4;
+        const tip=bk?`${key} · ${bk.time} · ${bk.size} · ${bk.status==='success'?'✅':'❌'}`:`${key} · No backup`;
+        html+=`<div class="cal-dot ${cls}" style="height:${h}px;"><div class="cal-tip">${tip}</div></div>`;
+    }
+    el.innerHTML=html;
+}
+
+function renderStatus(bid){
+    const el=document.getElementById('status_'+bid);if(!el)return;
+    const today=new Date().toISOString().slice(0,10);
+    const bk=allBackups[bid][today];
+    if(bk&&bk.status==='success'){el.className='bk-status ok';el.textContent='✅ Today OK';}
+    else if(bk&&bk.status==='failed'){el.className='bk-status fail';el.textContent='❌ Failed';}
+    else{
+        // Check yesterday
+        const y=new Date();y.setDate(y.getDate()-1);
+        const ybk=allBackups[bid][y.toISOString().slice(0,10)];
+        if(ybk&&ybk.status==='success'){el.className='bk-status warn';el.textContent='⏳ Pending';}
+        else{el.className='bk-status fail';el.textContent='⚠️ Missed';}
+    }
+}
+
+function toggleDetail(bid){
+    const el=document.getElementById('detail_'+bid);
+    el.classList.toggle('open');
+}
+
+function renderDpCal(bid){
+    const s=dpState[bid];
+    document.getElementById('dpMonth_'+bid).textContent=MONTHS[s.month]+' '+s.year;
+    const firstDay=new Date(s.year,s.month,1).getDay();
+    const daysInMonth=new Date(s.year,s.month+1,0).getDate();
+    const today=new Date().toISOString().slice(0,10);
+    const grid=document.getElementById('dpGrid_'+bid);
+    let html='';
+    for(let i=0;i<firstDay;i++) html+='<div></div>';
+    for(let d=1;d<=daysInMonth;d++){
+        const key=`${s.year}-${String(s.month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const bk=allBackups[bid]?.[key];
+        let cls='dp-day';
+        if(bk&&bk.status==='success') cls+=' has-backup';
+        else if(bk&&bk.status==='failed') cls+=' has-fail';
+        if(key===today) cls+=' today';
+        html+=`<div class="${cls}" title="${bk?bk.time+' · '+bk.size+' · '+bk.status:'No backup'}">${d}</div>`;
+    }
+    grid.innerHTML=html;
+}
+function dpPrev(bid){dpState[bid].month--;if(dpState[bid].month<0){dpState[bid].month=11;dpState[bid].year--;}renderDpCal(bid);}
+function dpNext(bid){dpState[bid].month++;if(dpState[bid].month>11){dpState[bid].month=0;dpState[bid].year++;}renderDpCal(bid);}
+
+function renderDpHist(bid){
+    const hist=Object.entries(allBackups[bid]||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,15);
+    document.getElementById('dpHist_'+bid).innerHTML=hist.map(([k,v])=>`<tr>
+        <td style="font-weight:700;">${k}</td><td>${v.time}</td><td>${v.size}</td>
+        <td><span class="bk-status ${v.status==='success'?'ok':'fail'}">${v.status==='success'?'✅ OK':'❌ Fail'}</span></td>
+        <td><button class="bk-btn ghost" style="padding:2px 6px;font-size:0.55rem;" onclick="restoreBackup('${bid}','${k}')"><i class="fas fa-undo"></i></button></td>
+    </tr>`).join('');
+}
+
+function triggerBackup(bid,name){
+    showConfirm('Take Backup Now','Create a full backup of <strong>'+name+'</strong> right now?<br><br>Includes: students, teachers, fees, attendance, exams, and all records.',async()=>{
+        showToast('info','Backup started...');
+        const key=new Date().toISOString().slice(0,10);
+        allBackups[bid][key]={time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),size:(2+Math.random()*5).toFixed(1)+'MB',sizeNum:+(2+Math.random()*5).toFixed(1),type:'Full (Manual)',status:'success'};
+        renderStrip(bid);renderStatus(bid);renderDpCal(bid);renderDpHist(bid);
+        showToast('success','Backup completed for '+name);
+    },{icon:'💾',yesText:'Start Backup'});
+}
+
+function restoreBackup(bid,key){
+    showConfirm('⚠️ Restore Backup','Restore to <strong>'+key+'</strong>?<br><br><strong style="color:#DC2626;">WARNING: This overwrites ALL current data. This cannot be undone.</strong>',()=>{
+        showToast('info','Restore would run pg_restore in production.');
+    },{icon:'🔄',yesText:'Restore Now',danger:true});
+}
+
+initBackups();
+</script>
+{% endblock %}

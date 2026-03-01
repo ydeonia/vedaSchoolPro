@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}My Timetable{% endblock %}
+{% block page_title %}My Weekly Timetable{% endblock %}
+{% block page_subtitle %}{{ teacher.full_name }} · {{ total_periods_week }} periods per week{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tt-grid { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .tt-grid th { padding: 10px 8px; background: var(--bg-sidebar); color: white; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; }
+    .tt-grid th:first-child { border-radius: var(--radius-sm) 0 0 0; text-align: left; min-width: 90px; }
+    .tt-grid th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .tt-grid td { padding: 4px; vertical-align: top; border: 1px solid var(--border-light); }
+    .tt-grid td:first-child { padding: 10px 8px; font-weight: 700; font-size: 0.78rem; background: var(--bg); vertical-align: middle; }
+    .tt-grid th.today-col { background: var(--primary); }
+
+    .tt-cell { min-height: 50px; padding: 8px; border-radius: var(--radius-sm); font-size: 0.78rem; }
+    .tt-cell.filled { background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border: 1px solid var(--primary-light); }
+    .tt-cell.break-cell { background: var(--warning-light); text-align: center; color: var(--warning); font-weight: 700; font-size: 0.72rem; display: flex; align-items: center; justify-content: center; }
+    .tt-cell.free-cell { background: #F9FAFB; text-align: center; color: var(--text-light); font-size: 0.72rem; display: flex; align-items: center; justify-content: center; }
+    .tt-subject { font-weight: 700; color: var(--primary-dark); }
+    .tt-class { color: var(--text-secondary); font-size: 0.72rem; margin-top: 2px; }
+    .tt-room { color: var(--text-light); font-size: 0.68rem; margin-top: 1px; }
+
+    .weekly-summary { display: flex; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+    .ws-card { padding: 16px 20px; background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); flex: 1; min-width: 160px; text-align: center; }
+    .ws-card .ws-val { font-size: 1.8rem; font-weight: 800; }
+    .ws-card .ws-label { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body" style="padding: 0; overflow-x: auto;">
+        <table class="tt-grid">
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    {% set day_labels = {'monday':'Mon','tuesday':'Tue','wednesday':'Wed','thursday':'Thu','friday':'Fri','saturday':'Sat'} %}
+                    {% set weekday_map = {0:'monday',1:'tuesday',2:'wednesday',3:'thursday',4:'friday',5:'saturday'} %}
+                    {% set today_day = weekday_map.get(today_weekday, '') %}
+                    {% for d in days %}
+                    <th class="{{ 'today-col' if d == today_day else '' }}">{{ day_labels[d] }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in periods %}
+                {% set is_break = p.period_type.value in ['break', 'lunch'] %}
+                <tr>
+                    <td>
+                        <div style="font-size: 0.78rem;">
+                            <strong>{{ p.label }}</strong><br>
+                            <span class="text-xs text-muted">{{ p.start_time.strftime('%H:%M') }} - {{ p.end_time.strftime('%H:%M') }}</span>
+                        </div>
+                    </td>
+                    {% for d in days %}
+                    <td>
+                        {% if is_break %}
+                        <div class="tt-cell break-cell">{{ '🍽' if p.period_type.value == 'lunch' else '☕' }}</div>
+                        {% else %}
+                            {% set slot = timetable.get(d, {}).get(p.id|string, none) %}
+                            {% if slot %}
+                            <div class="tt-cell filled">
+                                <div class="tt-subject">{{ slot.subject }}</div>
+                                <div class="tt-class">{{ slot.class }}{{ ' — ' + slot.section if slot.section else '' }}</div>
+                                {% if slot.room %}<div class="tt-room">{{ slot.room }}</div>{% endif %}
+                            </div>
+                            {% else %}
+                            <div class="tt-cell free-cell">Free</div>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="weekly-summary">
+    <div class="ws-card">
+        <div class="ws-val" style="color: var(--primary);">{{ total_periods_week }}</div>
+        <div class="ws-label">Periods / Week</div>
+    </div>
+    <div class="ws-card">
+        <div class="ws-val" style="color: var(--success);">
+            {% set unique_subjects = [] %}
+            {% for day_data in timetable.values() %}
+                {% for slot in day_data.values() %}
+                    {% if slot.subject and slot.subject not in unique_subjects %}
+                        {% if unique_subjects.append(slot.subject) %}{% endif %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            {{ unique_subjects|length }}
+        </div>
+        <div class="ws-label">Subjects</div>
+    </div>
+    <div class="ws-card">
+        <div class="ws-val" style="color: #2563EB;">
+            {% set unique_classes = [] %}
+            {% for day_data in timetable.values() %}
+                {% for slot in day_data.values() %}
+                    {% set cls_sec = slot.class ~ slot.section %}
+                    {% if cls_sec and cls_sec not in unique_classes %}
+                        {% if unique_classes.append(cls_sec) %}{% endif %}
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            {{ unique_classes|length }}
+        </div>
+        <div class="ws-label">Classes</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// No JS needed — pure server-rendered
+</script>
+{% endblock %}

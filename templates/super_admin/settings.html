@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Platform Settings{% endblock %}
+{% block page_title %}⚙️ Platform Settings{% endblock %}
+{% block page_subtitle %}Configure platform-wide settings, security, and integrations{% endblock %}
+{% block extra_css %}
+<style>
+.set-nav{display:flex;gap:0;border-bottom:2px solid var(--border-light);margin-bottom:18px;overflow-x:auto;}
+.set-tab{padding:10px 18px;font-size:0.72rem;font-weight:800;color:var(--text-light);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all 0.15s;}
+.set-tab:hover{color:var(--text);}.set-tab.active{color:#4338CA;border-bottom-color:#4338CA;}
+.set-panel{display:none;}.set-panel.active{display:block;}
+.set-section{background:var(--bg-card,white);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.04);}
+.set-section h3{font-size:0.88rem;font-weight:900;margin:0 0 4px 0;}.set-section p{font-size:0.68rem;color:var(--text-light);margin:0 0 14px 0;}
+.set-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;}
+.set-field{margin-bottom:10px;}
+.set-field label{font-size:0.6rem;font-weight:800;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:3px;letter-spacing:0.04em;}
+.set-field input,.set-field select,.set-field textarea{width:100%;padding:8px 12px;border-radius:9px;border:1.5px solid var(--border);font-size:0.82rem;background:var(--bg-card);color:var(--text);box-sizing:border-box;}
+.set-field textarea{height:60px;resize:vertical;}
+.set-toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-light);}
+.set-toggle:last-child{border-bottom:none;}
+.set-toggle-info h4{font-size:0.78rem;font-weight:800;margin:0;}.set-toggle-info p{font-size:0.62rem;color:var(--text-light);margin:2px 0 0 0;}
+.toggle-sw{width:44px;height:24px;border-radius:12px;background:var(--border);position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0;}
+.toggle-sw.on{background:#4338CA;}
+.toggle-sw::after{content:'';position:absolute;width:20px;height:20px;border-radius:50%;background:white;top:2px;left:2px;transition:transform 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);}
+.toggle-sw.on::after{transform:translateX(20px);}
+.set-btn{padding:10px 22px;border-radius:10px;border:none;font-weight:800;font-size:0.78rem;cursor:pointer;transition:all 0.15s;}
+.set-btn-primary{background:#4338CA;color:white;}.set-btn-primary:hover{background:#3730A3;}
+.set-btn-danger{background:#DC2626;color:white;}.set-btn-danger:hover{background:#B91C1C;}
+.set-btn-outline{background:transparent;border:1.5px solid var(--border);color:var(--text);}.set-btn-outline:hover{background:var(--bg);}
+.info-banner{padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:0.72rem;display:flex;align-items:center;gap:8px;}
+.info-blue{background:#DBEAFE;color:#1D4ED8;}.info-yellow{background:#FEF3C7;color:#92400E;}.info-red{background:#FEE2E2;color:#991B1B;}
+.about-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+.about-item{padding:12px;border-radius:10px;background:var(--bg,#f8fafc);}
+.about-item .lbl{font-size:0.58rem;text-transform:uppercase;font-weight:800;color:var(--text-light);}.about-item .val{font-size:0.88rem;font-weight:900;margin-top:2px;}
+@media(max-width:768px){.set-row{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="set-nav">
+    <div class="set-tab active" onclick="switchTab(this,'general')">General</div>
+    <div class="set-tab" onclick="switchTab(this,'security')">Security</div>
+    <div class="set-tab" onclick="switchTab(this,'email')">Email & SMS</div>
+    <div class="set-tab" onclick="switchTab(this,'storage')">Storage</div>
+    <div class="set-tab" onclick="switchTab(this,'defaults')">Defaults</div>
+    <div class="set-tab" onclick="switchTab(this,'maintenance')">Maintenance</div>
+    <div class="set-tab" onclick="switchTab(this,'about')">About</div>
+</div>
+
+<!-- GENERAL -->
+<div class="set-panel active" id="panel-general">
+    <div class="set-section">
+        <h3>🏢 Platform Identity</h3>
+        <p>Brand name and contact information displayed across the platform</p>
+        <div class="set-row">
+            <div class="set-field"><label>Platform Name</label><input id="sAppName" value="{{ app_name or 'EduFlow' }}"></div>
+            <div class="set-field"><label>Version</label><input id="sVersion" value="{{ app_version or '1.0.0' }}" disabled style="opacity:0.6;"></div>
+        </div>
+        <div class="set-row">
+            <div class="set-field"><label>Support Email</label><input id="sSupportEmail" value="{{ support_email or '' }}" placeholder="support@eduflow.in"></div>
+            <div class="set-field"><label>Support Phone</label><input id="sSupportPhone" value="{{ support_phone or '' }}" placeholder="+91 9876543210"></div>
+        </div>
+        <div class="set-field"><label>Platform URL</label><input id="sUrl" value="{{ platform_url or '' }}" placeholder="https://app.eduflow.in"></div>
+    </div>
+
+    <div class="set-section">
+        <h3>🌐 Regional Settings</h3>
+        <p>Timezone, currency, and language defaults for new schools</p>
+        <div class="set-row">
+            <div class="set-field"><label>Default Timezone</label><select id="sTimezone"><option value="Asia/Kolkata" selected>Asia/Kolkata (IST)</option><option value="UTC">UTC</option></select></div>
+            <div class="set-field"><label>Currency</label><select id="sCurrency"><option value="INR" selected>₹ INR — Indian Rupee</option><option value="USD">$ USD</option></select></div>
+        </div>
+        <div class="set-field"><label>Date Format</label><select id="sDateFmt"><option value="DD/MM/YYYY" selected>DD/MM/YYYY</option><option value="MM/DD/YYYY">MM/DD/YYYY</option><option value="YYYY-MM-DD">YYYY-MM-DD</option></select></div>
+    </div>
+    <button class="set-btn set-btn-primary" onclick="saveSettings('general')"><i class="fas fa-save"></i> Save General Settings</button>
+</div>
+
+<!-- SECURITY -->
+<div class="set-panel" id="panel-security">
+    <div class="set-section">
+        <h3>🔐 Authentication</h3>
+        <p>Configure login security and session policies</p>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Two-Factor Authentication (2FA)</h4><p>Require 2FA for all super admin logins</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Force Password Reset on First Login</h4><p>New school admins must change their temporary password</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Session Timeout</h4><p>Auto-logout after inactivity</p></div><select style="width:120px;padding:6px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;background:var(--bg-card);color:var(--text);"><option>30 minutes</option><option selected>2 hours</option><option>8 hours</option><option>24 hours</option></select></div>
+    </div>
+    <div class="set-section">
+        <h3>🛡️ Password Policy</h3>
+        <div class="set-row">
+            <div class="set-field"><label>Minimum Length</label><select><option>6</option><option selected>8</option><option>10</option><option>12</option></select></div>
+            <div class="set-field"><label>Password Expiry</label><select><option>Never</option><option selected>90 days</option><option>60 days</option><option>30 days</option></select></div>
+        </div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Require Uppercase + Numbers</h4><p>Passwords must contain at least one uppercase letter and one number</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Block Common Passwords</h4><p>Reject passwords like "password123", "admin@123" etc.</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <div class="set-section">
+        <h3>📋 IP Restrictions</h3>
+        <p>Whitelist IP addresses for super admin access (leave blank to allow all)</p>
+        <div class="set-field"><label>Allowed IPs (one per line)</label><textarea placeholder="e.g. 203.0.113.50&#10;192.168.1.0/24"></textarea></div>
+    </div>
+    <button class="set-btn set-btn-primary" onclick="saveSettings('security')"><i class="fas fa-save"></i> Save Security Settings</button>
+</div>
+
+<!-- EMAIL & SMS -->
+<div class="set-panel" id="panel-email">
+    <div class="set-section">
+        <h3>📧 Email Configuration (SMTP)</h3>
+        <p>Used for sending password resets, notifications, and reports</p>
+        <div class="set-row">
+            <div class="set-field"><label>SMTP Host</label><input placeholder="smtp-relay.brevo.com"></div>
+            <div class="set-field"><label>SMTP Port</label><input placeholder="587"></div>
+        </div>
+        <div class="set-row">
+            <div class="set-field"><label>Username / API Key</label><input placeholder="your-smtp-username"></div>
+            <div class="set-field"><label>Password</label><input type="password" placeholder="••••••••"></div>
+        </div>
+        <div class="set-field"><label>From Email</label><input placeholder="noreply@eduflow.in"></div>
+        <div class="set-field"><label>From Name</label><input placeholder="EduFlow Notifications"></div>
+        <button class="set-btn set-btn-outline" onclick="showToast('info','Test email sent!')"><i class="fas fa-paper-plane"></i> Send Test Email</button>
+    </div>
+    <div class="set-section">
+        <h3>📱 SMS Configuration</h3>
+        <p>SMS gateway for OTP, attendance alerts, and fee reminders</p>
+        <div class="set-row">
+            <div class="set-field"><label>SMS Provider</label><select><option value="">— Select Provider —</option><option>MSG91</option><option>Textlocal</option><option>Twilio</option><option>Custom API</option></select></div>
+            <div class="set-field"><label>API Key</label><input type="password" placeholder="Your SMS API key"></div>
+        </div>
+        <div class="set-field"><label>Sender ID</label><input placeholder="EDUFLW" maxlength="6"></div>
+        <div class="info-banner info-yellow"><i class="fas fa-exclamation-triangle"></i> SMS credits are per-plan. Schools on Starter get 100/month, Growth gets 500/month.</div>
+    </div>
+    <button class="set-btn set-btn-primary" onclick="saveSettings('email')"><i class="fas fa-save"></i> Save Email & SMS Settings</button>
+</div>
+
+<!-- STORAGE -->
+<div class="set-panel" id="panel-storage">
+    <div class="set-section">
+        <h3>💾 File Storage</h3>
+        <p>Where student documents, photos, and reports are stored</p>
+        <div class="set-field"><label>Storage Provider</label><select><option selected>Local (Server Disk)</option><option>AWS S3</option><option>Google Cloud Storage</option><option>Azure Blob</option></select></div>
+        <div class="set-row">
+            <div class="set-field"><label>Max File Size (MB)</label><input type="number" value="10"></div>
+            <div class="set-field"><label>Allowed Extensions</label><input value="pdf,jpg,png,docx,xlsx"></div>
+        </div>
+    </div>
+    <div class="set-section">
+        <h3>🔄 Backup Configuration</h3>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Automatic Backups</h4><p>Backup database and files on schedule</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-row">
+            <div class="set-field"><label>Backup Frequency</label><select><option selected>Daily at 2 AM</option><option>Every 12 hours</option><option>Weekly (Sunday)</option></select></div>
+            <div class="set-field"><label>Retention (days)</label><input type="number" value="30"></div>
+        </div>
+        <div class="set-field"><label>Backup Location</label><input placeholder="/backups or s3://my-bucket/backups"></div>
+        <button class="set-btn set-btn-outline" onclick="showToast('info','Backup triggered!')"><i class="fas fa-download"></i> Backup Now</button>
+    </div>
+    <button class="set-btn set-btn-primary" onclick="saveSettings('storage')"><i class="fas fa-save"></i> Save Storage Settings</button>
+</div>
+
+<!-- DEFAULTS -->
+<div class="set-panel" id="panel-defaults">
+    <div class="set-section">
+        <h3>🏫 Default School Settings</h3>
+        <p>Applied to every new school created on the platform</p>
+        <div class="set-row">
+            <div class="set-field"><label>Default Academic Year</label><input value="2025-26"></div>
+            <div class="set-field"><label>Default Board</label><select><option selected>CBSE</option><option>ICSE</option><option>State Board</option></select></div>
+        </div>
+        <div class="set-row">
+            <div class="set-field"><label>Trial Duration (days)</label><input type="number" value="14"></div>
+            <div class="set-field"><label>Grace Period After Expiry (days)</label><input type="number" value="7"></div>
+        </div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Auto-Create Sample Data</h4><p>Create demo classes, sections when a new school signs up</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Parent App by Default</h4><p>Allow parents to access their child's data from day one</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Teacher App by Default</h4><p>Allow teachers to mark attendance, enter marks from mobile</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+    </div>
+    <button class="set-btn set-btn-primary" onclick="saveSettings('defaults')"><i class="fas fa-save"></i> Save Default Settings</button>
+</div>
+
+<!-- MAINTENANCE -->
+<div class="set-panel" id="panel-maintenance">
+    <div class="set-section">
+        <h3>🔧 Maintenance Mode</h3>
+        <p>When enabled, only super admins can access the platform</p>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Maintenance Mode</h4><p>Shows "Under Maintenance" page to all non-super-admin users</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-field"><label>Maintenance Message</label><textarea placeholder="We're upgrading our systems. Back in 30 minutes!"></textarea></div>
+    </div>
+    <div class="set-section">
+        <h3>🗑️ Data Management</h3>
+        <div class="info-banner info-red"><i class="fas fa-exclamation-triangle"></i> These actions are irreversible. Use with extreme caution.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="set-btn set-btn-outline" onclick="showConfirm('Clear Logs','Delete all audit logs older than 90 days?',()=>showToast('success','Logs cleared'),{icon:'🗑️',danger:true,yesText:'Clear'})"><i class="fas fa-broom"></i> Clear Old Logs</button>
+            <button class="set-btn set-btn-outline" onclick="showConfirm('Clear Cache','Clear all cached data and sessions?',()=>showToast('success','Cache cleared'),{icon:'♻️'})"><i class="fas fa-sync"></i> Clear Cache</button>
+            <button class="set-btn set-btn-danger" onclick="showConfirm('Reset Demo Data','⚠️ This will delete ALL demo/test data. Are you absolutely sure?',()=>showToast('success','Demo data cleared'),{icon:'💀',danger:true,yesText:'Delete Everything'})"><i class="fas fa-trash-alt"></i> Reset Demo Data</button>
+        </div>
+    </div>
+    <div class="set-section">
+        <h3>📊 Database Optimization</h3>
+        <p>Run periodic optimization to keep the database fast</p>
+        <div style="display:flex;gap:8px;">
+            <button class="set-btn set-btn-outline" onclick="showToast('info','VACUUM started...')"><i class="fas fa-database"></i> Vacuum Database</button>
+            <button class="set-btn set-btn-outline" onclick="showToast('info','Reindex started...')"><i class="fas fa-sort-amount-up"></i> Reindex Tables</button>
+        </div>
+    </div>
+</div>
+
+<!-- ABOUT -->
+<div class="set-panel" id="panel-about">
+    <div class="set-section">
+        <h3>ℹ️ Platform Information</h3>
+        <div class="about-grid">
+            <div class="about-item"><div class="lbl">Application</div><div class="val">{{ app_name or 'EduFlow' }}</div></div>
+            <div class="about-item"><div class="lbl">Version</div><div class="val">{{ app_version or '1.0.0' }}</div></div>
+            <div class="about-item"><div class="lbl">Framework</div><div class="val">FastAPI + PostgreSQL</div></div>
+            <div class="about-item"><div class="lbl">Organizations</div><div class="val">{{ org_count }}</div></div>
+            <div class="about-item"><div class="lbl">Branches</div><div class="val">{{ branch_count }}</div></div>
+            <div class="about-item"><div class="lbl">Admin</div><div class="val">{{ user.first_name }} {{ user.last_name or '' }}</div></div>
+            <div class="about-item"><div class="lbl">Admin Email</div><div class="val">{{ user.email }}</div></div>
+            <div class="about-item"><div class="lbl">Role</div><div class="val" style="color:#D97706;">Super Admin</div></div>
+        </div>
+    </div>
+    <div class="set-section">
+        <h3>📋 License</h3>
+        <p>EduFlow — School Management System<br>© {{ "2026" }} All rights reserved.<br>Licensed to: {{ user.first_name }} {{ user.last_name or '' }} ({{ user.email }})</p>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function switchTab(el,panel){
+    document.querySelectorAll('.set-tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.set-panel').forEach(p=>p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-'+panel).classList.add('active');
+}
+function saveSettings(section){
+    showToast('success',section.charAt(0).toUpperCase()+section.slice(1)+' settings saved!');
+}
+</script>
+{% endblock %}

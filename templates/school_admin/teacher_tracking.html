@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Teacher Tracking{% endblock %}
+{% block page_title %}Teacher Period Tracking{% endblock %}
+{% block page_subtitle %}Monitor teacher performance — periods completed today and this month{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tracking-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .teacher-track-card {
+        background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm);
+        padding: 20px; transition: all 0.2s; border-left: 4px solid transparent;
+    }
+    .teacher-track-card:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
+    .teacher-track-card.active-today { border-left-color: var(--success); }
+    .teacher-track-card.inactive-today { border-left-color: var(--border); }
+
+    .ttc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .ttc-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--primary-50); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; }
+    .ttc-name { font-weight: 700; font-size: 0.95rem; }
+    .ttc-role { font-size: 0.75rem; color: var(--text-secondary); }
+
+    .ttc-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .ttc-stat { text-align: center; padding: 8px; background: var(--bg); border-radius: var(--radius-sm); }
+    .ttc-stat-val { font-size: 1.3rem; font-weight: 800; }
+    .ttc-stat-label { font-size: 0.65rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+    .summary-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .sb-item { background: white; padding: 16px 24px; border-radius: var(--radius); box-shadow: var(--shadow-sm); flex: 1; min-width: 160px; text-align: center; }
+    .sb-item .sb-val { font-size: 2rem; font-weight: 800; }
+    .sb-item .sb-label { font-size: 0.78rem; color: var(--text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Summary -->
+<div class="summary-bar">
+    <div class="sb-item">
+        <div class="sb-val" style="color: var(--primary);">{{ teacher_stats|length }}</div>
+        <div class="sb-label">Total Teachers</div>
+    </div>
+    <div class="sb-item">
+        <div class="sb-val" style="color: var(--success);">{{ teacher_stats|selectattr('today_done', 'gt', 0)|list|length }}</div>
+        <div class="sb-label">Active Today</div>
+    </div>
+    <div class="sb-item">
+        <div class="sb-val" style="color: #2563EB;">{{ teacher_stats|sum(attribute='today_done') }}</div>
+        <div class="sb-label">Periods Completed Today</div>
+    </div>
+    <div class="sb-item">
+        <div class="sb-val" style="color: var(--warning);">{{ teacher_stats|sum(attribute='month_done') }}</div>
+        <div class="sb-label">This Month Total</div>
+    </div>
+</div>
+
+<!-- Teacher Cards -->
+<div class="tracking-grid">
+    {% for t in teacher_stats %}
+    <div class="teacher-track-card {{ 'active-today' if t.today_done > 0 else 'inactive-today' }}">
+        <div class="ttc-header">
+            <div class="ttc-avatar">{{ t.name[0] }}</div>
+            <div>
+                <div class="ttc-name">{{ t.name }}</div>
+                <div class="ttc-role">{{ t.designation or 'Teacher' }}</div>
+            </div>
+        </div>
+        <div class="ttc-stats">
+            <div class="ttc-stat">
+                <div class="ttc-stat-val" style="color: var(--primary);">{{ t.weekly_assigned }}</div>
+                <div class="ttc-stat-label">/ Week</div>
+            </div>
+            <div class="ttc-stat">
+                <div class="ttc-stat-val" style="color: var(--success);">{{ t.today_done }}</div>
+                <div class="ttc-stat-label">Today</div>
+            </div>
+            <div class="ttc-stat">
+                <div class="ttc-stat-val" style="color: #2563EB;">{{ t.month_done }}</div>
+                <div class="ttc-stat-label">Month</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if teacher_stats|length == 0 %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-state">
+            <i class="fas fa-user-clock"></i>
+            <h3>No Teachers Found</h3>
+            <p>Add teachers and configure the timetable to start tracking</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

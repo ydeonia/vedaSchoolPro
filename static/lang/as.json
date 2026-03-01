@@ -1,0 +1,59 @@
+{
+    "_meta": {
+        "name": "Assamese",
+        "native": "অসমীয়া",
+        "direction": "ltr",
+        "version": "1.0"
+    },
+    "common": {
+        "save": "সংৰক্ষণ",
+        "cancel": "বাতিল",
+        "delete": "মচি পেলাওক",
+        "edit": "সম্পাদনা",
+        "search": "সন্ধান কৰক...",
+        "loading": "লোড হৈ আছে...",
+        "no_data": "তথ্য পোৱা নগ'ল",
+        "success": "সফল",
+        "error": "ত্ৰুটি",
+        "back": "পিছলৈ",
+        "next": "পৰৱৰ্তী",
+        "submit": "দাখিল কৰক",
+        "close": "বন্ধ",
+        "yes": "হয়",
+        "no": "নহয়",
+        "ok": "ঠিক আছে",
+        "all": "সকলো",
+        "name": "নাম",
+        "email": "ইমেইল",
+        "phone": "ফোন",
+        "address": "ঠিকনা",
+        "amount": "পৰিমাণ",
+        "total": "মুঠ",
+        "date": "তাৰিখ",
+        "male": "পুৰুষ",
+        "female": "মহিলা",
+        "other": "অন্যান্য"
+    },
+    "nav": {
+        "dashboard": "ডেশ্ববোৰ্ড",
+        "students": "ছাত্ৰ-ছাত্ৰী",
+        "teachers": "শিক্ষক",
+        "attendance": "উপস্থিতি",
+        "exams": "পৰীক্ষা",
+        "results": "ফলাফল",
+        "fees": "মাচুল",
+        "settings": "ছেটিংছ",
+        "logout": "লগ আউট",
+        "login": "লগ ইন"
+    },
+    "dashboard": {
+        "welcome": "স্বাগতম",
+        "total_students": "মুঠ ছাত্ৰ-ছাত্ৰী",
+        "today_attendance": "আজিৰ উপস্থিতি"
+    },
+    "attendance": {
+        "mark_attendance": "উপস্থিতি চিহ্নিত কৰক",
+        "present": "উপস্থিত",
+        "absent": "অনুপস্থিত"
+    }
+}

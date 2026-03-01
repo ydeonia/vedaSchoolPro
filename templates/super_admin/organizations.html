@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Organizations{% endblock %}
+{% block page_title %}Organizations{% endblock %}
+{% block page_subtitle %}Manage all school organizations on the platform{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>All Organizations ({{ organizations | length }})</h2>
+        <button class="btn btn-primary" onclick="openModal('addOrgModal')">
+            <i class="fas fa-plus"></i> New Organization
+        </button>
+    </div>
+    <div class="card-body">
+        {% if organizations %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Organization</th>
+                        <th>Location</th>
+                        <th>Plan</th>
+                        <th>Branches</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for org in organizations %}
+                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not org.is_active else '' }}">
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="user-avatar" style="width: 38px; height: 38px; font-size: 0.75rem;">
+                                    {{ org.name[0] }}{{ org.name.split(' ')[1][0] if org.name.split(' ') | length > 1 else '' }}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">{{ org.name }}</div>
+                                    <div class="text-xs text-muted">{{ org.email or 'No email' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="text-sm">{{ org.city or '—' }}</div>
+                            <div class="text-xs text-muted">{{ org.state or '' }}</div>
+                        </td>
+                        <td><span class="badge badge-purple">{{ org.plan_type.value | title }}</span></td>
+                        <td><strong>{{ org.branches | length }}</strong></td>
+                        <td>
+                            {% if org.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-gray">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-sm text-muted">{{ org.created_at.strftime('%d %b %Y') }}</td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <a href="/super-admin/organizations/{{ org.id }}" class="btn btn-secondary btn-sm" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                {% if org.is_active %}
+                                <button class="btn btn-sm" style="background:#FEF3C7;color:#92400E;border:none;font-size:0.65rem;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700;" onclick="toggleOrg('{{ org.id }}','{{ org.name }}',false)" title="Deactivate">
+                                    <i class="fas fa-power-off"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm" style="background:#D1FAE5;color:#065F46;border:none;font-size:0.65rem;padding:4px 8px;border-radius:6px;cursor:pointer;font-weight:700;" onclick="toggleOrg('{{ org.id }}','{{ org.name }}',true)" title="Activate">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-building"></i>
+            <h3>No organizations yet</h3>
+            <p>Create your first organization to get started</p>
+            <button class="btn btn-primary" onclick="openModal('addOrgModal')">
+                <i class="fas fa-plus"></i> Create Organization
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Organization Modal -->
+<div class="modal-overlay" id="addOrgModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2>Create New Organization</h2>
+            <button class="modal-close" onclick="closeModal('addOrgModal')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="addOrgForm" method="POST" action="/api/super-admin/organizations">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Organization Name <span class="required">*</span></label>
+                        <input type="text" name="name" class="form-input" placeholder="e.g., Delhi Public School Group" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Plan</label>
+                        <select name="plan_type" class="form-select">
+                            <option value="basic">Basic — ₹499/mo</option>
+                            <option value="standard">Standard — ₹999/mo</option>
+                            <option value="premium">Premium — ₹1,999/mo</option>
+                            <option value="enterprise">Enterprise — ₹4,999/mo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-input" placeholder="contact@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" name="phone" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-textarea" rows="2" placeholder="Full address"></textarea>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">City</label>
+                        <input type="text" name="city" class="form-input" placeholder="City">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">State</label>
+                        <input type="text" name="state" class="form-input" placeholder="State">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pincode</label>
+                        <input type="text" name="pincode" class="form-input" placeholder="110001" maxlength="6">
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addOrgModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitOrgForm()">
+                <i class="fas fa-plus"></i> Create Organization
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function submitOrgForm() {
+    const data = getFormData('addOrgForm');
+    if (!data.name) {
+        showToast('error', 'Organization name is required');
+        return;
+    }
+    try {
+        const r = await apiCall('/api/super-admin/organizations', 'POST', data);
+        if(r.error){showToast('error',r.error);return;}
+        showToast('success', 'Organization created successfully');
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {showToast('error',e.message);}
+}
+async function toggleOrg(id,name,activate){
+    showConfirm(
+        activate?'Reactivate '+name:'Deactivate '+name,
+        activate?'All branches and users will be re-enabled.':'<strong>All branches and users will be locked out.</strong><br>They cannot login until reactivated.',
+        async()=>{
+            const d=await apiCall(`/api/super-admin/organizations/${id}/toggle`,'PUT');
+            if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1200);}else showToast('error',d.error||'Failed');
+        },
+        {icon:activate?'🟢':'🔴',yesText:activate?'Reactivate':'Deactivate',danger:!activate}
+    );
+}
+</script>
+{% endblock %}

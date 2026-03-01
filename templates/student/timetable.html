@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}My Timetable{% endblock %}
+{% block page_title %}My Timetable{% endblock %}
+{% block page_subtitle %}{{ student.class_.name if student.class_ else '' }} {{ student.section.name if student.section else '' }} — Weekly Schedule{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tt-grid { display: grid; grid-template-columns: 80px repeat(6, 1fr); gap: 2px; background: var(--border-light); border-radius: var(--radius); overflow: hidden; }
+    .tt-cell { background: white; padding: 10px 8px; font-size: 0.78rem; text-align: center; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .tt-cell.header { background: var(--bg-sidebar); color: white; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; min-height: auto; padding: 10px; }
+    .tt-cell.period-label { background: var(--bg-secondary); font-weight: 700; font-size: 0.72rem; color: var(--text-secondary); }
+    .tt-cell.today { background: #EFF6FF; }
+    .tt-cell.today.header { background: var(--primary); }
+    .tt-cell .subject { font-weight: 700; color: var(--primary); font-size: 0.82rem; }
+    .tt-cell .teacher { font-size: 0.68rem; color: var(--text-light); margin-top: 2px; }
+    .tt-cell.break { background: #FFFBEB; font-size: 0.72rem; color: var(--warning); }
+    .tt-cell.free { background: var(--bg-secondary); color: var(--text-light); font-size: 0.72rem; }
+    @media (max-width: 768px) { .tt-grid { grid-template-columns: 60px repeat(6, 1fr); } .tt-cell { padding: 6px 4px; font-size: 0.68rem; } .tt-cell .subject { font-size: 0.72rem; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body" style="overflow-x:auto;">
+        <div class="tt-grid" id="ttGrid"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const timetable = {{ timetable_json | safe }};
+const periods = {{ periods | tojson }};
+const DAYS = ['monday','tuesday','wednesday','thursday','friday','saturday'];
+const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+const todayIdx = new Date().getDay(); // 0=Sun, 1=Mon...
+const todayDay = todayIdx >= 1 && todayIdx <= 6 ? DAYS[todayIdx - 1] : '';
+
+function render() {
+    let html = '<div class="tt-cell header"></div>';
+    DAYS.forEach((d, i) => {
+        const isToday = d === todayDay;
+        html += `<div class="tt-cell header ${isToday ? 'today' : ''}">${DAY_LABELS[i]}${isToday ? ' 📍' : ''}</div>`;
+    });
+
+    periods.forEach(p => {
+        const pType = p.period_type || 'regular';
+        const timeStr = p.start_time ? p.start_time.substring(0, 5) : '';
+        html += `<div class="tt-cell period-label">${p.label}<br><span style="font-size:0.62rem;">${timeStr}</span></div>`;
+
+        DAYS.forEach(day => {
+            const isToday = day === todayDay;
+            if (pType === 'break' || pType === 'lunch') {
+                html += `<div class="tt-cell break ${isToday ? 'today' : ''}">${pType === 'lunch' ? '🍽 Lunch' : '☕ Break'}</div>`;
+            } else {
+                const slot = timetable[day] && timetable[day][p.id];
+                if (slot) {
+                    html += `<div class="tt-cell ${isToday ? 'today' : ''}"><div class="subject">${slot.subject}</div><div class="teacher">${slot.teacher}</div>${slot.room ? `<div class="teacher">${slot.room}</div>` : ''}</div>`;
+                } else {
+                    html += `<div class="tt-cell free ${isToday ? 'today' : ''}">—</div>`;
+                }
+            }
+        });
+    });
+
+    document.getElementById('ttGrid').innerHTML = html;
+}
+render();
+</script>
+{% endblock %}

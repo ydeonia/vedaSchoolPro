@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Audit Logs{% endblock %}
+{% block page_title %}System Audit Logs{% endblock %}
+{% block page_subtitle %}Complete activity trail — every action is tracked{% endblock %}
+
+{% block extra_css %}
+<style>
+    .log-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .log-item { display: grid; grid-template-columns: 140px 1fr 100px 100px; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border-light); font-size: 0.82rem; align-items: center; }
+    .log-item:hover { background: var(--bg-secondary, #F8FAFC); }
+    .log-item.header { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-light); background: var(--bg-secondary, #F1F5F9); }
+    .action-pill { padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; }
+    .action-pill.create { background: #D1FAE5; color: #059669; }
+    .action-pill.update { background: #DBEAFE; color: #2563EB; }
+    .action-pill.delete { background: #FEE2E2; color: #DC2626; }
+    .action-pill.login { background: #EDE9FE; color: #7C3AED; }
+    .action-pill.payment { background: #FEF3C7; color: #D97706; }
+    .action-pill.export { background: var(--bg-secondary); color: var(--text-secondary); }
+    @media (max-width: 768px) { .log-item { grid-template-columns: 1fr; gap: 4px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="log-filters">
+    <select id="filterAction" class="form-select" style="min-width:120px;" onchange="filterLogs()">
+        <option value="">All Actions</option>
+        <option value="create">Create</option>
+        <option value="update">Update</option>
+        <option value="delete">Delete</option>
+        <option value="login">Login</option>
+        <option value="payment">Payment</option>
+        <option value="export">Export</option>
+    </select>
+    <select id="filterEntity" class="form-select" style="min-width:120px;" onchange="filterLogs()">
+        <option value="">All Entities</option>
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+        <option value="fee">Fee</option>
+        <option value="attendance">Attendance</option>
+        <option value="exam">Exam</option>
+        <option value="user">User</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" onclick="exportAuditCSV()"><i class="fas fa-download"></i> Export CSV</button>
+</div>
+
+<div class="card">
+    <div class="card-body" style="padding:0; overflow-x:auto;">
+        <div class="log-item header">
+            <div>Timestamp</div><div>Description</div><div>User</div><div>Action</div>
+        </div>
+        <div id="logList">
+            {% for log in logs %}
+            <div class="log-item" data-action="{{ log.action.value }}" data-entity="{{ log.entity_type }}">
+                <div style="font-size:0.75rem; color:var(--text-light);">{{ log.created_at.strftime('%d %b %Y %H:%M') if log.created_at else '' }}</div>
+                <div>{{ log.description }}<br><span style="font-size:0.68rem; color:var(--text-light);">{{ log.entity_type }} {% if log.entity_id %}· {{ log.entity_id[:8] }}...{% endif %}</span></div>
+                <div style="font-size:0.75rem;">{{ log.user_name or 'System' }}<br><span style="color:var(--text-light);">{{ log.user_role or '' }}</span></div>
+                <div><span class="action-pill {{ log.action.value }}">{{ log.action.value|upper }}</span></div>
+            </div>
+            {% endfor %}
+            {% if not logs %}
+            <div style="padding:40px; text-align:center; color:var(--text-light);">No audit logs yet. Actions will be tracked automatically.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:12px;">
+    <i class="fas fa-shield-alt"></i> Audit logs are immutable and cannot be deleted. Every action is permanently recorded.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function filterLogs() {
+    const action = document.getElementById('filterAction').value;
+    const entity = document.getElementById('filterEntity').value;
+    document.querySelectorAll('#logList .log-item').forEach(row => {
+        const matchAction = !action || row.dataset.action === action;
+        const matchEntity = !entity || row.dataset.entity === entity;
+        row.style.display = (matchAction && matchEntity) ? '' : 'none';
+    });
+}
+function exportAuditCSV() {
+    window.open('/api/super-admin/export/audit-csv', '_blank');
+}
+</script>
+{% endblock %}

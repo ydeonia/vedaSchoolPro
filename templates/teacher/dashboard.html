@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+
+{% block title %}Teacher Dashboard{% endblock %}
+{% block page_title %}Good {{ 'Morning' if today.strftime('%H')|int < 12 else ('Afternoon' if today.strftime('%H')|int < 17 else 'Evening') }}, {{ teacher.first_name }}!{% endblock %}
+{% block page_subtitle %}{{ day_name }}, {{ today.strftime('%d %B %Y') }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Stats */
+    .teacher-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .t-stat { background: white; border-radius: var(--radius); padding: 20px; text-align: center; box-shadow: var(--shadow-sm); }
+    .t-stat-value { font-size: 2rem; font-weight: 800; }
+    .t-stat-label { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; font-weight: 600; }
+    .t-stat.purple .t-stat-value { color: var(--primary); }
+    .t-stat.green .t-stat-value { color: var(--success); }
+    .t-stat.blue .t-stat-value { color: #2563EB; }
+    .t-stat.orange .t-stat-value { color: var(--warning); }
+
+    /* Progress ring */
+    .progress-ring { position: relative; width: 72px; height: 72px; margin: 0 auto 8px; }
+    .progress-ring svg { transform: rotate(-90deg); }
+    .progress-ring .ring-bg { stroke: #E5E7EB; }
+    .progress-ring .ring-fill { stroke: var(--success); transition: stroke-dashoffset 1s ease; }
+    .progress-ring .ring-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.1rem; font-weight: 800; }
+
+    /* Schedule timeline */
+    .schedule { display: flex; flex-direction: column; gap: 0; }
+    .period-card {
+        display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 16px;
+        padding: 16px 20px; background: white; border-bottom: 1px solid var(--border-light);
+        transition: all 0.2s; position: relative; cursor: pointer;
+    }
+    .period-card:first-child { border-radius: var(--radius) var(--radius) 0 0; }
+    .period-card:last-child { border-radius: 0 0 var(--radius) var(--radius); border-bottom: none; }
+    .period-card:hover { background: #FAFBFF; }
+    .period-card.completed { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); }
+    .period-card.completed .period-time { color: var(--success); }
+    .period-card.current { background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border-left: 4px solid var(--primary); }
+    .period-card.break-card { background: #FEF9F0; cursor: default; }
+    .period-card.break-card:hover { background: #FEF9F0; }
+    .period-card.free-card { background: #F9FAFB; cursor: default; }
+
+    .period-time { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; text-align: center; }
+    .period-time .time-label { font-size: 0.68rem; color: var(--text-light); margin-top: 2px; }
+
+    .period-info { flex: 1; }
+    .period-subject { font-weight: 700; font-size: 1rem; color: var(--text); }
+    .period-class { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
+    .period-topic { font-size: 0.72rem; color: var(--success); margin-top: 4px; font-style: italic; }
+
+    .period-status { text-align: right; }
+    .status-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+    .status-pill.done { background: var(--success-light); color: var(--success); }
+    .status-pill.pending { background: var(--border-light); color: var(--text-secondary); }
+    .status-pill.current { background: var(--primary-50); color: var(--primary); animation: pulse 2s infinite; }
+    .status-pill.break { background: var(--warning-light); color: var(--warning); }
+    .status-pill.free { background: #F3F4F6; color: var(--text-light); }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+    /* Complete modal */
+    .topic-input { width: 100%; padding: 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; resize: vertical; min-height: 60px; }
+    .topic-input:focus { border-color: var(--primary); outline: none; }
+    .chapter-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border-light); border-radius: var(--radius-sm); }
+    .chapter-item { padding: 10px 14px; border-bottom: 1px solid var(--border-light); font-size: 0.82rem; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 8px; }
+    .chapter-item:hover { background: var(--primary-50); }
+    .chapter-item.selected { background: var(--success-light); }
+    .chapter-item.done { color: var(--text-light); text-decoration: line-through; }
+    .chapter-item i { color: var(--success); }
+
+    /* Confetti */
+    .confetti-piece { position: fixed; top: -10px; width: 10px; height: 10px; border-radius: 2px; animation: confettiFall 3s ease-out forwards; z-index: 10000; }
+    @keyframes confettiFall { 0% { opacity: 1; transform: translateY(0) rotate(0deg); } 100% { opacity: 0; transform: translateY(100vh) rotate(720deg); } }
+
+    /* Sunday */
+    .sunday-card { text-align: center; padding: 60px 20px; }
+    .sunday-card i { font-size: 4rem; color: var(--warning); margin-bottom: 16px; }
+    .sunday-card h3 { font-size: 1.5rem; margin-bottom: 8px; }
+
+    @media (max-width: 768px) {
+        .period-card { grid-template-columns: 60px 1fr auto; padding: 12px; }
+        .teacher-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Bar -->
+<div class="teacher-stats">
+    <div class="t-stat purple">
+        <div class="t-stat-value">{{ total_assigned }}</div>
+        <div class="t-stat-label">Today's Periods</div>
+    </div>
+    <div class="t-stat green">
+        <div class="progress-ring">
+            <svg width="72" height="72">
+                <circle class="ring-bg" cx="36" cy="36" r="30" fill="none" stroke-width="6"/>
+                <circle class="ring-fill" cx="36" cy="36" r="30" fill="none" stroke-width="6"
+                    stroke-dasharray="{{ 188.5 }}"
+                    stroke-dashoffset="{{ 188.5 - (188.5 * (total_completed / total_assigned if total_assigned > 0 else 0)) }}"
+                    stroke-linecap="round"/>
+            </svg>
+            <div class="ring-text" style="color: var(--success);">{{ total_completed }}/{{ total_assigned }}</div>
+        </div>
+        <div class="t-stat-label">Completed Today</div>
+    </div>
+    <div class="t-stat blue">
+        <div class="t-stat-value">{{ week_completed }}</div>
+        <div class="t-stat-label">This Week</div>
+    </div>
+    <div class="t-stat orange">
+        <div class="t-stat-value" id="syllabusStatVal">—</div>
+        <div class="t-stat-label">Syllabus Done</div>
+    </div>
+</div>
+
+<!-- Today's Schedule -->
+<div class="card">
+    <div class="card-header">
+        <h2><i class="fas fa-calendar-day" style="color: var(--primary); margin-right: 8px;"></i> Today's Schedule</h2>
+        {% if not is_sunday %}
+        <span class="badge badge-primary">{{ total_completed }}/{{ total_assigned }} done</span>
+        {% endif %}
+    </div>
+    <div class="card-body" style="padding: 0;">
+        {% if is_sunday %}
+        <div class="sunday-card">
+            <i class="fas fa-sun"></i>
+            <h3>It's Sunday! 🎉</h3>
+            <p class="text-muted">No classes today. Enjoy your day off!</p>
+        </div>
+        {% elif schedule|length == 0 %}
+        <div class="empty-state">
+            <i class="fas fa-calendar-times"></i>
+            <h3>No Schedule Found</h3>
+            <p>Your timetable hasn't been configured yet. Ask your school admin to set it up.</p>
+        </div>
+        {% else %}
+        <div class="schedule">
+            {% for s in schedule %}
+            <div class="period-card {{ 'break-card' if s.is_break else ('completed' if s.completed else ('free-card' if not s.has_class else '')) }}"
+                 {% if s.has_class and not s.completed %}onclick="openCompleteModal({{ loop.index0 }})"{% endif %}
+                 {% if s.has_class and s.completed %}onclick="viewCompleted({{ loop.index0 }})"{% endif %}
+                 data-idx="{{ loop.index0 }}">
+                <div class="period-time">
+                    <div>{{ s.start }}</div>
+                    <div class="time-label">{{ s.end }}</div>
+                </div>
+                <div class="period-info">
+                    {% if s.is_break %}
+                        <div class="period-subject">{{ '🍽 Lunch Break' if s.type == 'lunch' else ('🏫 Assembly' if s.type == 'assembly' else '☕ Break') }}</div>
+                    {% elif s.has_class %}
+                        <div class="period-subject">{{ s.subject_name }}</div>
+                        <div class="period-class">{{ s.class_name }}{{ ' — ' + s.section_name if s.section_name else '' }}{{ ' · Room ' + s.room if s.room else '' }}</div>
+                        {% if s.completed and s.topic_covered %}
+                        <div class="period-topic">📝 {{ s.topic_covered }}</div>
+                        {% endif %}
+                    {% else %}
+                        <div class="period-subject" style="color: var(--text-light);">Free Period</div>
+                    {% endif %}
+                </div>
+                <div class="period-status">
+                    {% if s.is_break %}
+                        <span class="status-pill break">{{ s.label }}</span>
+                    {% elif s.completed %}
+                        <span class="status-pill done"><i class="fas fa-check"></i> Done</span>
+                    {% elif s.has_class %}
+                        <span class="status-pill pending">Tap to Complete</span>
+                    {% else %}
+                        <span class="status-pill free">Free</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Complete Period Modal -->
+<div class="modal-overlay" id="completeModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="completeModalTitle">Complete Period</h2>
+            <button class="modal-close" onclick="closeModal('completeModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="modalSubjectInfo" style="padding: 10px 14px; background: var(--primary-50); border-radius: var(--radius-sm); margin-bottom: 16px; font-weight: 600;"></div>
+
+            <div class="form-group">
+                <label class="form-label">What did you teach?</label>
+                <textarea class="topic-input" id="topicCovered" placeholder="e.g. Introduction to Quadratic Equations, solved examples 1-5..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Link to Syllabus Chapter (optional)</label>
+                <div class="chapter-list" id="chapterList">
+                    <div style="padding: 20px; text-align: center; color: var(--text-light);">Loading chapters...</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Homework Assigned (optional)</label>
+                <textarea class="topic-input" id="homeworkInput" placeholder="e.g. Complete Exercise 3.2, Q1-Q10" style="min-height: 40px;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('completeModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="completePeriod()" id="completeBtn">
+                <i class="fas fa-check-circle"></i> Mark Complete
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- View Completed Modal -->
+<div class="modal-overlay" id="viewModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="viewModalTitle">Period Details</h2>
+            <button class="modal-close" onclick="closeModal('viewModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="viewModalBody"></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="undoPeriod()" id="undoBtn"><i class="fas fa-undo"></i> Undo</button>
+            <button class="btn btn-primary" onclick="closeModal('viewModal')">Close</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const schedule = {{ schedule_json | safe }};
+let currentIdx = -1;
+let selectedChapterId = null;
+
+// Load syllabus stat on page load
+(async function() {
+    try {
+        const stats = await apiCall('/api/teacher/stats');
+        document.getElementById('syllabusStatVal').textContent = stats.syllabus_pct + '%';
+    } catch(e) {}
+})();
+
+function openCompleteModal(idx) {
+    currentIdx = idx;
+    const s = schedule[idx];
+    selectedChapterId = null;
+
+    document.getElementById('completeModalTitle').textContent = `${s.label} — ${s.subject_name}`;
+    document.getElementById('modalSubjectInfo').innerHTML = `
+        <i class="fas fa-book" style="color: var(--primary);"></i>
+        ${s.subject_name} · ${s.class_name}${s.section_name ? ' — ' + s.section_name : ''}
+    `;
+    document.getElementById('topicCovered').value = '';
+    document.getElementById('homeworkInput').value = '';
+
+    // Load chapters
+    loadChapters(s.class_id, s.subject_id);
+    openModal('completeModal');
+}
+
+async function loadChapters(classId, subjectId) {
+    const list = document.getElementById('chapterList');
+    try {
+        const result = await apiCall(`/api/teacher/syllabus/chapters?class_id=${classId}&subject_id=${subjectId}`);
+        if (result.chapters.length === 0) {
+            list.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-light); font-size: 0.82rem;">No syllabus chapters defined yet</div>';
+            return;
+        }
+        list.innerHTML = result.chapters.map(c => `
+            <div class="chapter-item ${c.completed ? 'done' : ''}" onclick="selectChapter('${c.id}', this)" data-id="${c.id}">
+                ${c.completed ? '<i class="fas fa-check-circle"></i>' : '<i class="far fa-circle" style="color: var(--text-light);"></i>'}
+                <span>${c.number ? 'Ch ' + c.number + ': ' : ''}${c.name}</span>
+            </div>
+        `).join('');
+    } catch(e) {
+        list.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--text-light);">Could not load chapters</div>';
+    }
+}
+
+function selectChapter(id, el) {
+    document.querySelectorAll('.chapter-item').forEach(c => c.classList.remove('selected'));
+    if (selectedChapterId === id) {
+        selectedChapterId = null;
+    } else {
+        selectedChapterId = id;
+        el.classList.add('selected');
+    }
+}
+
+async function completePeriod() {
+    const s = schedule[currentIdx];
+    const topic = document.getElementById('topicCovered').value.trim();
+    const homework = document.getElementById('homeworkInput').value.trim();
+
+    const btn = document.getElementById('completeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const result = await apiCall('/api/teacher/period/complete', 'POST', {
+            period_id: s.period_id,
+            class_id: s.class_id,
+            subject_id: s.subject_id,
+            section_id: s.section_id || null,
+            slot_id: s.slot_id || null,
+            topic_covered: topic || null,
+            syllabus_id: selectedChapterId || null,
+            homework: homework || null,
+        });
+
+        // Update local state
+        schedule[currentIdx].completed = true;
+        schedule[currentIdx].topic_covered = topic;
+        schedule[currentIdx].log_id = result.log_id;
+
+        // Update card visually
+        const card = document.querySelector(`.period-card[data-idx="${currentIdx}"]`);
+        card.classList.add('completed');
+        card.onclick = () => viewCompleted(currentIdx);
+        const statusEl = card.querySelector('.period-status');
+        statusEl.innerHTML = '<span class="status-pill done"><i class="fas fa-check"></i> Done</span>';
+        if (topic) {
+            const infoEl = card.querySelector('.period-info');
+            const topicDiv = document.createElement('div');
+            topicDiv.className = 'period-topic';
+            topicDiv.textContent = '📝 ' + topic;
+            infoEl.appendChild(topicDiv);
+        }
+
+        // Update stats
+        const completedCount = schedule.filter(s => s.completed).length;
+        const assignedCount = schedule.filter(s => s.has_class).length;
+        document.querySelector('.badge.badge-primary').textContent = `${completedCount}/${assignedCount} done`;
+
+        closeModal('completeModal');
+        fireConfetti();
+        showToast('success', 'Period Completed! 🎉', result.message);
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check-circle"></i> Mark Complete';
+}
+
+function viewCompleted(idx) {
+    currentIdx = idx;
+    const s = schedule[idx];
+    document.getElementById('viewModalTitle').textContent = `${s.label} — ${s.subject_name}`;
+    document.getElementById('viewModalBody').innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="padding: 12px; background: var(--success-light); border-radius: var(--radius-sm);">
+                <div style="font-weight: 700; color: var(--success); margin-bottom: 4px;"><i class="fas fa-check-circle"></i> Completed</div>
+                <div style="font-size: 0.85rem;">${s.class_name}${s.section_name ? ' — ' + s.section_name : ''}</div>
+            </div>
+            ${s.topic_covered ? `<div><strong>Topic Covered:</strong><br>${s.topic_covered}</div>` : '<div class="text-muted">No topic recorded</div>'}
+        </div>
+    `;
+    openModal('viewModal');
+}
+
+async function undoPeriod() {
+    const s = schedule[currentIdx];
+    if (!s.log_id) return;
+
+    try {
+        await apiCall(`/api/teacher/period/undo/${s.log_id}`, 'DELETE');
+        schedule[currentIdx].completed = false;
+        schedule[currentIdx].topic_covered = '';
+        schedule[currentIdx].log_id = '';
+
+        const card = document.querySelector(`.period-card[data-idx="${currentIdx}"]`);
+        card.classList.remove('completed');
+        card.onclick = () => openCompleteModal(currentIdx);
+        card.querySelector('.period-status').innerHTML = '<span class="status-pill pending">Tap to Complete</span>';
+        const topicEl = card.querySelector('.period-topic');
+        if (topicEl) topicEl.remove();
+
+        closeModal('viewModal');
+        showToast('info', 'Period Unmarked', 'You can re-complete it anytime');
+    } catch(e) {}
+}
+
+function fireConfetti() {
+    const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#EC4899'];
+    for (let i = 0; i < 30; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + 'vw';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.animationDelay = Math.random() * 0.5 + 's';
+        piece.style.width = (Math.random() * 8 + 6) + 'px';
+        piece.style.height = (Math.random() * 8 + 6) + 'px';
+        document.body.appendChild(piece);
+        setTimeout(() => piece.remove(), 3500);
+    }
+}
+</script>
+{% endblock %}

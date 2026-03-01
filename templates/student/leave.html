@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Leave Application{% endblock %}
+{% block page_title %}🗓️ Leave Application{% endblock %}
+{% block page_subtitle %}Apply for leave — your parent and teacher will be notified{% endblock %}
+
+{% block extra_css %}
+<style>
+.leave-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.leave-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:20px; }
+.leave-card h3 { font-size:0.95rem; font-weight:800; margin:0 0 16px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:0.78rem; font-weight:700; margin-bottom:4px; color:var(--text-secondary); }
+.form-input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.85rem; font-family:inherit; }
+.form-input:focus { outline:none; border-color:#6366F1; }
+.form-select { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:0.85rem; background:white; font-family:inherit; }
+.reason-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.reason-chip { padding:6px 14px; border-radius:20px; font-size:0.75rem; font-weight:700; border:1.5px solid var(--border); cursor:pointer; transition:all 0.2s; }
+.reason-chip.active { background:#312E81; color:white; border-color:#312E81; }
+.reason-chip:hover:not(.active) { background:var(--bg); }
+.submit-btn { padding:12px 28px; background:linear-gradient(135deg,#6366F1,#4F46E5); color:white; border:none; border-radius:10px; font-weight:700; font-size:0.88rem; cursor:pointer; width:100%; margin-top:8px; transition:all 0.2s; }
+.submit-btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(99,102,241,0.3); }
+.submit-btn:disabled { opacity:0.5; }
+.warning-box { background:#FEF3C7; border:1px solid #FDE68A; border-radius:10px; padding:10px 14px; font-size:0.78rem; color:#92400E; margin-top:10px; display:none; }
+.warning-box i { margin-right:4px; }
+.success-msg { background:#ECFDF5; border:1px solid #A7F3D0; border-radius:10px; padding:12px; font-size:0.82rem; color:#065F46; text-align:center; display:none; }
+
+/* Leave history */
+.leave-item { padding:12px; border-radius:10px; background:var(--bg); margin-bottom:8px; }
+.leave-item .dates { font-weight:800; font-size:0.85rem; }
+.leave-item .reason { font-size:0.75rem; color:var(--text-secondary); margin-top:2px; }
+.leave-item .status-row { display:flex; gap:12px; margin-top:6px; }
+.status-badge { padding:3px 10px; border-radius:12px; font-size:0.68rem; font-weight:700; }
+.status-badge.pending { background:#FEF3C7; color:#92400E; }
+.status-badge.approved { background:#ECFDF5; color:#065F46; }
+.status-badge.rejected { background:#FEE2E2; color:#991B1B; }
+.conflict-tag { display:inline-block; padding:2px 8px; border-radius:8px; font-size:0.65rem; font-weight:700; background:#FEE2E2; color:#DC2626; margin-top:4px; }
+
+@media(max-width:768px) { .leave-layout { grid-template-columns:1fr; } }
+[data-theme="dark"] .leave-card { background:var(--card-bg); }
+[data-theme="dark"] .leave-item { background:var(--bg-secondary); }
+[data-theme="dark"] .form-input, [data-theme="dark"] .form-select { background:var(--bg-secondary); border-color:var(--border); color:var(--text); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="leave-layout">
+    <!-- LEFT: Apply -->
+    <div class="leave-card">
+        <h3>📝 Apply for Leave</h3>
+        <div class="form-group">
+            <label>Reason</label>
+            <div class="reason-chips" id="reasonChips">
+                <span class="reason-chip active" data-val="medical" onclick="selectReason(this)">🏥 Medical</span>
+                <span class="reason-chip" data-val="family" onclick="selectReason(this)">👨‍👩‍👧 Family</span>
+                <span class="reason-chip" data-val="personal" onclick="selectReason(this)">🙋 Personal</span>
+                <span class="reason-chip" data-val="religious" onclick="selectReason(this)">🙏 Religious</span>
+                <span class="reason-chip" data-val="emergency" onclick="selectReason(this)">🚨 Emergency</span>
+                <span class="reason-chip" data-val="other" onclick="selectReason(this)">📋 Other</span>
+            </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="form-group"><label>From Date</label><input type="date" class="form-input" id="startDate"></div>
+            <div class="form-group"><label>To Date</label><input type="date" class="form-input" id="endDate"></div>
+        </div>
+        <div class="form-group">
+            <label>Details (optional)</label>
+            <textarea class="form-input" id="reasonText" rows="2" placeholder="e.g., Doctor appointment at 10 AM..."></textarea>
+        </div>
+        <div class="warning-box" id="warningBox"><i class="fas fa-exclamation-triangle"></i> <span id="warningText"></span></div>
+        <div class="success-msg" id="successMsg"></div>
+        <button class="submit-btn" id="submitBtn" onclick="applyLeave()">📨 Submit Leave Application</button>
+        <div style="font-size:0.68rem;color:var(--text-light);text-align:center;margin-top:8px;">Your parent will be asked to approve → then class teacher will confirm</div>
+    </div>
+
+    <!-- RIGHT: History -->
+    <div class="leave-card">
+        <h3>📜 Leave History</h3>
+        <div id="leaveHistory"><div style="color:var(--text-light);font-size:0.82rem;">Loading...</div></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedReason = 'medical';
+
+function selectReason(el) {
+    document.querySelectorAll('.reason-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    selectedReason = el.dataset.val;
+}
+
+// Set default dates
+document.getElementById('startDate').value = new Date().toISOString().split('T')[0];
+document.getElementById('endDate').value = new Date().toISOString().split('T')[0];
+
+async function applyLeave() {
+    const btn = document.getElementById('submitBtn');
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const reasonText = document.getElementById('reasonText').value;
+
+    if (!startDate || !endDate) return;
+    if (endDate < startDate) { alert('End date must be after start date'); return; }
+
+    btn.disabled = true; btn.textContent = '⏳ Submitting...';
+    document.getElementById('warningBox').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/sprint21/leave/apply', {
+            method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
+            body: JSON.stringify({ start_date: startDate, end_date: endDate, reason_type: selectedReason, reason_text: reasonText })
+        });
+        const data = await resp.json();
+
+        if (data.warnings && data.warnings.length > 0) {
+            document.getElementById('warningText').textContent = data.warnings.join(' | ');
+            document.getElementById('warningBox').style.display = 'block';
+        }
+
+        if (data.success) {
+            document.getElementById('successMsg').textContent = `✅ Leave applied for ${data.total_days} day(s)! Waiting for parent approval.`;
+            document.getElementById('successMsg').style.display = 'block';
+            document.getElementById('reasonText').value = '';
+            loadHistory();
+        } else if (data.error) {
+            alert(data.error);
+        }
+    } catch(e) { alert('Failed to submit'); }
+
+    btn.disabled = false; btn.textContent = '📨 Submit Leave Application';
+}
+
+async function loadHistory() {
+    try {
+        const resp = await fetch('/api/sprint21/leave/my', {credentials:'same-origin'});
+        const data = await resp.json();
+        const container = document.getElementById('leaveHistory');
+
+        if (!data.leaves || data.leaves.length === 0) {
+            container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-light);font-size:0.82rem;">No leave applications yet.</div>';
+            return;
+        }
+
+        container.innerHTML = data.leaves.map(l => `
+            <div class="leave-item">
+                <div class="dates">${l.start_date} → ${l.end_date} (${l.total_days} day${l.total_days>1?'s':''})</div>
+                <div class="reason">${l.reason_type.toUpperCase()} ${l.reason_text ? '— ' + l.reason_text : ''}</div>
+                <div class="status-row">
+                    <span class="status-badge ${l.parent_status}">👨‍👩‍👧 Parent: ${l.parent_status}</span>
+                    <span class="status-badge ${l.teacher_status}">👩‍🏫 Teacher: ${l.teacher_status}</span>
+                </div>
+                ${l.has_exam_conflict ? `<div class="conflict-tag">⚠️ Exam: ${l.conflict_details}</div>` : ''}
+                ${l.has_event_conflict ? `<div class="conflict-tag">⚠️ Event: ${l.event_conflict_details}</div>` : ''}
+            </div>
+        `).join('');
+    } catch(e) { console.error(e); }
+}
+
+document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+{% endblock %}

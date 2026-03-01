@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard{% endblock %}
+{% block page_title %}Welcome, {{ student.first_name }}! 👋{% endblock %}
+{% block page_subtitle %}Here's your personal school overview — only you can see this.{% endblock %}
+
+{% block extra_css %}
+<style>
+    .profile-bar { display: flex; align-items: center; gap: 16px; padding: 20px; background: linear-gradient(135deg, #667EEA, #764BA2); border-radius: var(--radius); color: white; margin-bottom: 20px; }
+    .profile-avatar { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 800; }
+    .profile-info { flex: 1; }
+    .profile-name { font-size: 1.1rem; font-weight: 800; }
+    .profile-meta { font-size: 0.78rem; opacity: 0.8; }
+    .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+    .dash-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; text-align: center; }
+    .dash-icon { font-size: 2rem; margin-bottom: 8px; }
+    .dash-value { font-size: 1.8rem; font-weight: 800; }
+    .dash-label { font-size: 0.75rem; color: var(--text-light); margin-top: 4px; }
+    .today-status { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.82rem; }
+    .today-status.present { background: #D1FAE5; color: #059669; }
+    .today-status.absent { background: #FEE2E2; color: #DC2626; }
+    .today-status.none { background: var(--bg-secondary); color: var(--text-light); }
+    .ann-item { padding: 12px 16px; border-left: 3px solid var(--primary); margin-bottom: 6px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: white; }
+    .ann-item.pinned { border-left-color: #F59E0B; background: #FFFBEB; }
+    .privacy-note { font-size: 0.72rem; color: var(--text-light); text-align: center; padding: 8px; }
+    .privacy-note i { margin-right: 4px; }
+    @media (max-width: 640px) { .dash-grid { grid-template-columns: 1fr; } .profile-bar { flex-direction: column; text-align: center; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-bar">
+    <div class="profile-avatar">{{ student.first_name[0] }}</div>
+    <div class="profile-info">
+        <div class="profile-name">{{ student.full_name }}</div>
+        <div class="profile-meta">{{ student.class_.name if student.class_ else '' }} {{ student.section.name if student.section else '' }} · Roll: {{ student.roll_number or '—' }} · Adm: {{ student.admission_number or '—' }}</div>
+    </div>
+    <div>
+        <span class="today-status {{ today_status or 'none' }}">
+            {% if today_status == 'present' %}✅ Present Today
+            {% elif today_status == 'absent' %}❌ Absent Today
+            {% elif today_status == 'late' %}⏰ Late Today
+            {% else %}📋 Not Marked Yet
+            {% endif %}
+        </span>
+    </div>
+</div>
+
+<div class="dash-grid">
+    <div class="dash-card">
+        <div class="dash-icon">📊</div>
+        <div class="dash-value" style="color:{% if att_pct >= 85 %}var(--success){% elif att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ att_pct }}%</div>
+        <div class="dash-label">Attendance</div>
+        <div style="font-size:0.72rem; color:var(--text-light); margin-top:4px;">{{ present_days }} of {{ total_days }} days present</div>
+        {% if att_pct >= 95 %}<div class="achievement-badge gold" style="margin-top:6px;">🏆 Star Attender</div>
+        {% elif att_pct >= 90 %}<div class="achievement-badge green" style="margin-top:6px;">🌟 Excellent!</div>
+        {% elif att_pct >= 75 %}<div style="font-size:0.72rem; color:var(--primary); margin-top:4px;">👍 Good, keep it up!</div>
+        {% elif att_pct > 0 %}<div style="font-size:0.72rem; color:var(--warning); margin-top:4px;">💪 Let's improve together</div>{% endif %}
+    </div>
+    <div class="dash-card">
+        <div class="dash-icon">💰</div>
+        <div class="dash-value" style="color:{% if pending_fees > 0 %}var(--danger){% else %}var(--success){% endif %};">
+            {% if pending_fees > 0 %}₹{{ "{:,.0f}".format(pending_fees) }}{% else %}All Clear{% endif %}
+        </div>
+        <div class="dash-label">{% if pending_fees > 0 %}Fee Pending{% else %}No Pending Fees{% endif %}</div>
+        {% if pending_fees > 0 %}<a href="/student/fees" style="font-size:0.72rem; color:var(--primary); font-weight:600;">View Details →</a>{% endif %}
+    </div>
+    <div class="dash-card">
+        <div class="dash-icon">📢</div>
+        <div class="dash-value" style="color:var(--primary);">{{ announcements|length }}</div>
+        <div class="dash-label">Recent Announcements</div>
+    </div>
+</div>
+
+<!-- Recent Announcements -->
+{% if announcements %}
+<div class="card">
+    <div class="card-header"><h2><i class="fas fa-bullhorn" style="color:var(--primary);"></i> Recent Announcements</h2></div>
+    <div class="card-body">
+        {% for a in announcements %}
+        <div class="ann-item {{ 'pinned' if a.is_pinned }}">
+            <div style="display:flex; align-items:center; gap:8px;">
+                {% if a.is_pinned %}<span>📌</span>{% endif %}
+                {% if a.is_emergency %}<span>🚨</span>{% endif %}
+                <strong style="font-size:0.88rem;">{{ a.title }}</strong>
+                <span style="margin-left:auto; font-size:0.68rem; color:var(--text-light);">{{ a.created_at.strftime('%d %b') if a.created_at else '' }}</span>
+            </div>
+            <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:4px;">{{ a.content[:200] }}{% if a.content|length > 200 %}...{% endif %}</div>
+        </div>
+        {% endfor %}
+        <div style="text-align:center; margin-top:8px;"><a href="/student/announcements" style="font-size:0.82rem; color:var(--primary); font-weight:600;">View All →</a></div>
+    </div>
+</div>
+{% endif %}
+
+<div class="privacy-note"><i class="fas fa-lock"></i> Your data is private. Only you and your school admin can see your personal details.</div>
+{% endblock %}

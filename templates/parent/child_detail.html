@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}{{ child.full_name }}{% endblock %}
+{% block page_title %}{{ child.full_name }}{% endblock %}
+{% block page_subtitle %}{{ child.class_.name if child.class_ else '' }} {{ child.section.name if child.section else '' }} · Roll: {{ child.roll_number or '—' }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .sec-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+    .sec-stat { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; text-align: center; }
+    .sec-stat .val { font-size: 1.4rem; font-weight: 800; }
+    .sec-stat .lbl { font-size: 0.72rem; color: var(--text-light); }
+    .fee-row { display: grid; grid-template-columns: 1fr 80px 70px; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border-light); font-size: 0.82rem; }
+    .exam-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border-light); }
+    .exam-pct { font-weight: 800; font-size: 1rem; }
+    @media (max-width: 640px) { .sec-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sec-grid">
+    <div class="sec-stat"><div class="val" style="color:{% if att_pct >= 85 %}var(--success){% elif att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ att_pct }}%</div><div class="lbl">Attendance ({{ present_days }}/{{ total_days }})</div></div>
+    <div class="sec-stat"><div class="val" style="color:{% if balance > 0 %}var(--danger){% else %}var(--success){% endif %};">{% if balance > 0 %}₹{{ "{:,.0f}".format(balance) }}{% else %}✅{% endif %}</div><div class="lbl">{% if balance > 0 %}Fee Pending{% else %}All Clear{% endif %}</div></div>
+    <div class="sec-stat"><div class="val" style="color:var(--primary);">{{ exam_results|length }}</div><div class="lbl">Exams Published</div></div>
+</div>
+
+<!-- Results -->
+{% if exam_results %}
+<div class="card mb-3">
+    <div class="card-header"><h2><i class="fas fa-trophy" style="color:var(--warning);"></i> Exam Results</h2></div>
+    <div class="card-body">
+        {% for e in exam_results %}
+        <div class="exam-row">
+            <div><strong>{{ e.name }}</strong><br><span style="font-size:0.75rem; color:var(--text-light);">{{ e.total }}/{{ e.max }}</span></div>
+            <div class="exam-pct" style="color:{% if e.pct >= 80 %}var(--success){% elif e.pct >= 50 %}var(--warning){% else %}var(--danger){% endif %};">{{ e.pct }}%</div>
+        </div>
+        {% endfor %}
+        <div style="font-size:0.72rem; color:var(--text-light); text-align:center; margin-top:8px;"><i class="fas fa-lock"></i> No class rankings shown — only your child's progress.</div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Fees -->
+<div class="card mb-3">
+    <div class="card-header"><h2><i class="fas fa-indian-rupee-sign" style="color:var(--warning);"></i> Fee Status</h2></div>
+    <div class="card-body">
+        {% if fees %}
+        <div class="fee-row" style="font-weight:700; font-size:0.72rem; color:var(--text-light); text-transform:uppercase;">
+            <div>Fee Type</div><div>Amount</div><div>Status</div>
+        </div>
+        {% for f in fees %}
+        <div class="fee-row">
+            <div>{{ f.fee_structure.fee_name if f.fee_structure else 'Fee' }}{% if f.receipt_number %}<br><span style="font-size:0.68rem; color:var(--text-light);">Receipt: {{ f.receipt_number }}</span>{% endif %}</div>
+            <div>₹{{ "{:,.0f}".format(f.amount_due) }}</div>
+            <div><span style="padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:700;
+                {% if f.status.value == 'paid' %}background:#D1FAE5; color:#059669;
+                {% elif f.status.value == 'overdue' %}background:#FEE2E2; color:#DC2626;
+                {% else %}background:#FEF3C7; color:#D97706;{% endif %}">{{ f.status.value|title }}</span></div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state"><i class="fas fa-indian-rupee-sign"></i><p>No fees generated yet.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="text-align:center; padding:8px;">
+    <a href="/parent/complaints" class="btn btn-secondary"><i class="fas fa-comment-alt"></i> File a Complaint</a>
+    <a href="/parent/messages" class="btn btn-ghost"><i class="fas fa-envelope"></i> Message Teacher</a>
+</div>
+{% endblock %}

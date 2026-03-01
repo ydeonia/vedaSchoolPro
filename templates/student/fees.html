@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Fee Status{% endblock %}
+{% block page_title %}Fee Status{% endblock %}
+{% block page_subtitle %}Your fee records — clear and transparent{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fee-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .fee-stat { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; text-align: center; }
+    .fee-stat .val { font-size: 1.4rem; font-weight: 800; }
+    .fee-stat .lbl { font-size: 0.72rem; color: var(--text-light); }
+    .fee-item { display: grid; grid-template-columns: 1fr 100px 100px 80px 100px; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; align-items: center; }
+    .fee-item:hover { background: #FAFBFF; }
+    .fee-item.header { background: var(--bg-secondary); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+    .fee-item.overdue { background: #FEF2F2; }
+    .status-pill { padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+    .status-pill.paid { background: #D1FAE5; color: #059669; }
+    .status-pill.pending { background: #FEF3C7; color: #D97706; }
+    .status-pill.overdue { background: #FEE2E2; color: #DC2626; }
+    .status-pill.partial { background: #DBEAFE; color: #2563EB; }
+    .status-pill.waived { background: var(--bg-secondary); color: var(--text-light); }
+    @media (max-width: 768px) { .fee-summary { grid-template-columns: repeat(2, 1fr); } .fee-item { grid-template-columns: 1fr 80px 60px; font-size: 0.78rem; } .fee-item .hide-mobile { display: none; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fee-summary">
+    <div class="fee-stat"><div class="val" style="color:var(--text-primary);">₹{{ "{:,.0f}".format(total_due) }}</div><div class="lbl">Total Fee</div></div>
+    <div class="fee-stat"><div class="val" style="color:var(--success);">₹{{ "{:,.0f}".format(total_paid) }}</div><div class="lbl">Total Paid</div></div>
+    <div class="fee-stat"><div class="val" style="color:var(--warning);">₹{{ "{:,.0f}".format(total_discount) }}</div><div class="lbl">Discount</div></div>
+    <div class="fee-stat"><div class="val" style="color:{% if balance > 0 %}var(--danger){% else %}var(--success){% endif %};">{% if balance > 0 %}₹{{ "{:,.0f}".format(balance) }}{% else %}₹0{% endif %}</div><div class="lbl">{% if balance > 0 %}Balance Due{% else %}All Clear ✅{% endif %}</div></div>
+</div>
+
+{% if balance > 0 %}
+<div style="padding:14px 18px; background:linear-gradient(135deg,#EEF2FF,#E0E7FF); border:1px solid #C7D2FE; border-radius:12px; margin-bottom:16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+    <div style="flex:1;">
+        <div style="font-weight:800;font-size:0.92rem;color:#312E81;">Pending Balance: ₹{{ "{:,.0f}".format(balance) }}</div>
+        <div style="font-size:0.75rem;color:#4338CA;margin-top:2px;">Pay online securely or visit the school fee counter</div>
+    </div>
+    <button onclick="payOnline()" id="payBtn" style="padding:12px 24px;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#6366F1);color:white;border:none;font-weight:800;cursor:pointer;font-size:0.88rem;display:flex;align-items:center;gap:8px;box-shadow:0 4px 12px rgba(99,102,241,0.3);">
+        <i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now
+    </button>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="card-header"><h2>Fee Ledger</h2></div>
+    <div class="card-body" style="padding:0;">
+        {% if fees %}
+        <div class="fee-item header">
+            <div>Fee Type</div><div>Due Date</div><div>Amount</div><div class="hide-mobile">Paid</div><div>Status</div>
+        </div>
+        {% for f in fees %}
+        <div class="fee-item {{ 'overdue' if f.status.value == 'overdue' }}">
+            <div>
+                <strong>{{ f.fee_structure.fee_name if f.fee_structure else 'Fee' }}</strong>
+                {% if f.receipt_number %}<div style="font-size:0.68rem; color:var(--text-light);">Receipt: {{ f.receipt_number }}</div>{% endif %}
+            </div>
+            <div style="font-size:0.78rem;">{{ f.due_date.strftime('%d %b %Y') if f.due_date else '—' }}</div>
+            <div style="font-weight:700;">₹{{ "{:,.0f}".format(f.amount_due) }}</div>
+            <div class="hide-mobile" style="color:var(--success);">₹{{ "{:,.0f}".format(f.amount_paid) }}</div>
+            <div><span class="status-pill {{ f.status.value }}">{{ f.status.value | title }}</span>
+            {% if f.status.value == 'paid' %}<a href="/student/fees/receipt-pdf/{{ f.id }}" target="_blank" class="btn btn-ghost btn-sm" style="margin-left:4px;" title="Download Receipt"><i class="fas fa-file-pdf" style="color:var(--danger);"></i></a>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="padding:40px; text-align:center;">
+            <div class="empty-state"><i class="fas fa-indian-rupee-sign"></i><h3>No Fee Records</h3><p>Fee records will appear once generated by your school.</p></div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:12px;">
+    <i class="fas fa-shield-alt"></i> All payments are recorded with receipt numbers. If you notice any discrepancy, contact your school office.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+async function payOnline() {
+    const btn = document.getElementById('payBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    try {
+        // Create order on server
+        const res = await fetch('/api/student/fees/create-order', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({amount: {{ balance }}})});
+        if (!res.ok) { const err = await res.json(); alert(err.detail || err.error || 'Payment not configured. Contact school admin.'); btn.disabled=false; btn.innerHTML='<i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now'; return; }
+        const order = await res.json();
+
+        if (order.gateway === 'razorpay') {
+            const options = {
+                key: order.key_id,
+                amount: order.amount,
+                currency: 'INR',
+                name: order.school_name || 'School Fee',
+                description: 'Fee Payment',
+                order_id: order.order_id,
+                prefill: {name: order.student_name || '', email: order.email || '', contact: order.phone || ''},
+                handler: async function(response) {
+                    // Verify payment
+                    const vRes = await fetch('/api/student/fees/verify-payment', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+                        body: JSON.stringify({razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature})});
+                    if (vRes.ok) { alert('✅ Payment successful! Receipt will be generated shortly.'); location.reload(); }
+                    else { alert('Payment verification failed. Contact school admin with payment ID: ' + response.razorpay_payment_id); }
+                },
+                theme: {color: '#4F46E5'},
+            };
+            const rzp = new Razorpay(options);
+            rzp.on('payment.failed', function(resp) { alert('Payment failed: ' + resp.error.description); });
+            rzp.open();
+        } else {
+            alert('Online payment is not configured for your school yet. Please contact the school admin or pay at the fee counter.');
+        }
+    } catch(e) { alert('Could not initiate payment. Please try again or pay at the fee counter.'); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now';
+}
+</script>
+{% endblock %}

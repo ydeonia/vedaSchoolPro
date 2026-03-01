@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Daily Diary{% endblock %}
+{% block page_title %}📋 Daily Diary{% endblock %}
+{% block page_subtitle %}Write daily remarks for students — replaces physical diary{% endblock %}
+
+{% block extra_css %}
+<style>
+.diary-controls { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+.diary-controls select { padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:white; font-size:0.85rem; font-weight:600; }
+.diary-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:20px; margin-bottom:16px; }
+.diary-card h3 { font-size:0.92rem; margin-bottom:14px; }
+.type-chips { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+.type-chip { padding:6px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; cursor:pointer; border:2px solid var(--border); background:white; transition:all 0.15s; }
+.type-chip.active { color:white; border-color:transparent; }
+.type-chip.positive.active { background:#10B981; } .type-chip.concern.active { background:#EF4444; }
+.type-chip.informational.active { background:#3B82F6; } .type-chip.homework_note.active { background:#F59E0B; }
+.student-select { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.student-pill { padding:6px 12px; border-radius:20px; font-size:0.75rem; font-weight:600; cursor:pointer; border:1px solid var(--border); background:white; transition:all 0.15s; }
+.student-pill.active { background:var(--primary); color:white; border-color:var(--primary); }
+.student-pill.class-wide { background:#FFFBEB; border-color:#F59E0B; color:#D97706; }
+.student-pill.class-wide.active { background:#F59E0B; color:white; }
+.diary-textarea { width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); font-size:0.85rem; min-height:80px; resize:vertical; font-family:inherit; }
+.diary-textarea:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+.btn-row { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+.btn-primary:hover { background:#4F46E5; }
+/* History */
+.diary-entry { padding:12px 0; border-bottom:1px solid var(--border-light); }
+.diary-entry:last-child { border:none; }
+.diary-entry .entry-header { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.entry-type-badge { padding:2px 8px; border-radius:8px; font-size:0.68rem; font-weight:700; }
+.entry-type-badge.positive { background:#D1FAE5; color:#059669; }
+.entry-type-badge.concern { background:#FEE2E2; color:#DC2626; }
+.entry-type-badge.informational { background:#DBEAFE; color:#2563EB; }
+.entry-type-badge.homework_note { background:#FEF3C7; color:#D97706; }
+.entry-student { font-weight:700; font-size:0.82rem; }
+.entry-content { font-size:0.82rem; color:var(--text-secondary); line-height:1.5; }
+.entry-meta { font-size:0.68rem; color:var(--text-light); margin-top:4px; }
+.ack-badge { display:inline-block; padding:2px 8px; border-radius:8px; font-size:0.65rem; font-weight:700; }
+.ack-badge.seen { background:#D1FAE5; color:#059669; } .ack-badge.unseen { background:#F1F5F9; color:#94A3B8; }
+.empty-state { text-align:center; padding:40px; color:var(--text-light); }
+.toast { position:fixed; bottom:20px; right:20px; padding:12px 24px; border-radius:10px; color:white; font-weight:700; z-index:999; animation:slideIn 0.3s; }
+.toast.success { background:#059669; } .toast.error { background:#DC2626; }
+@keyframes slideIn { from { opacity:0; transform:translateY(20px); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="diary-controls">
+    <select id="dClassSelect" onchange="loadDiarySections()"><option value="">Select Class</option></select>
+    <select id="dSectionSelect" onchange="loadDiaryStudents()"><option value="">Select Section</option></select>
+    <input type="date" id="diaryDate" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);font-size:0.85rem;" value="{{ today }}">
+</div>
+
+<!-- Write Entry -->
+<div class="diary-card">
+    <h3>✏️ Write Diary Entry</h3>
+    <div class="type-chips">
+        <div class="type-chip positive" onclick="selectType('positive',this)">😊 Positive</div>
+        <div class="type-chip concern" onclick="selectType('concern',this)">⚠️ Concern</div>
+        <div class="type-chip informational" onclick="selectType('informational',this)">ℹ️ Informational</div>
+        <div class="type-chip homework_note" onclick="selectType('homework_note',this)">📝 Homework Note</div>
+    </div>
+    <div style="margin-bottom:8px;font-size:0.75rem;font-weight:700;color:var(--text-secondary);">Select Students (or send to entire class):</div>
+    <div class="student-select" id="diaryStudents">
+        <div class="student-pill class-wide" onclick="selectClassWide(this)">📢 Entire Class</div>
+    </div>
+    <textarea class="diary-textarea" id="diaryContent" placeholder="Write your diary entry here..."></textarea>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <label style="font-size:0.75rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="visibleToParent" checked> <span>Visible to parents</span></label>
+    </div>
+    <div class="btn-row">
+        <button class="btn-primary" onclick="saveDiaryEntry()"><i class="fas fa-paper-plane"></i> Save Entry</button>
+    </div>
+</div>
+
+<!-- History -->
+<div class="diary-card">
+    <h3>📖 Recent Entries <span id="entryCount" style="font-size:0.72rem;color:var(--text-light);font-weight:400;"></span></h3>
+    <div id="diaryHistory"><div class="empty-state">Select a class to see diary entries</div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedType = '', selectedStudents = new Set(), isClassWide = false;
+
+async function init() {
+    const res = await fetch('/api/teacher/my-classes', {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    window._classData = data.classes;
+    const cs = document.getElementById('dClassSelect');
+    [...new Map(data.classes.map(c=>[c.class_id,c])).values()].forEach(c => { cs.innerHTML += `<option value="${c.class_id}">${c.class_name}</option>`; });
+}
+
+function loadDiarySections() {
+    const cid = document.getElementById('dClassSelect').value;
+    const ss = document.getElementById('dSectionSelect');
+    ss.innerHTML = '<option value="">Select Section</option>';
+    if (!cid) return;
+    [...new Map(window._classData.filter(c=>c.class_id===cid).map(c=>[c.section_id,c])).values()].forEach(s => { ss.innerHTML += `<option value="${s.section_id}">${s.section_name}</option>`; });
+}
+
+async function loadDiaryStudents() {
+    const classId = document.getElementById('dClassSelect').value;
+    const sectionId = document.getElementById('dSectionSelect').value;
+    if (!classId || !sectionId) return;
+
+    const res = await fetch(`/api/teacher/class-students?class_id=${classId}&section_id=${sectionId}`, {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    const container = document.getElementById('diaryStudents');
+    container.innerHTML = '<div class="student-pill class-wide" onclick="selectClassWide(this)">📢 Entire Class</div>';
+    data.students.forEach(s => { container.innerHTML += `<div class="student-pill" data-id="${s.id}" onclick="toggleStudent('${s.id}',this)">${s.name}</div>`; });
+    selectedStudents.clear(); isClassWide = false;
+    loadDiaryHistory();
+}
+
+function selectType(type, el) { document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); selectedType = type; }
+function selectClassWide(el) {
+    isClassWide = !isClassWide;
+    el.classList.toggle('active');
+    if (isClassWide) { selectedStudents.clear(); document.querySelectorAll('.student-pill:not(.class-wide)').forEach(p=>p.classList.remove('active')); }
+}
+function toggleStudent(id, el) {
+    isClassWide = false;
+    document.querySelector('.student-pill.class-wide').classList.remove('active');
+    if (selectedStudents.has(id)) { selectedStudents.delete(id); el.classList.remove('active'); }
+    else { selectedStudents.add(id); el.classList.add('active'); }
+}
+
+async function saveDiaryEntry() {
+    const content = document.getElementById('diaryContent').value.trim();
+    if (!content || !selectedType) { showToast('Select type and write content','error'); return; }
+    const classId = document.getElementById('dClassSelect').value;
+    const sectionId = document.getElementById('dSectionSelect').value;
+    const dateVal = document.getElementById('diaryDate').value;
+    const visible = document.getElementById('visibleToParent').checked;
+    if (!classId || !sectionId) { showToast('Select class and section','error'); return; }
+
+    const body = {class_id:classId, entry_date:dateVal, entry_type:selectedType, content:content, is_visible_to_parent:visible, is_class_wide:isClassWide, student_ids:isClassWide?[]:Array.from(selectedStudents)};
+    try {
+        const res = await fetch('/api/sprint21/diary/write', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        if (!res.ok) throw new Error();
+        showToast('✅ Diary entry saved!','success');
+        document.getElementById('diaryContent').value = '';
+        loadDiaryHistory();
+    } catch(e) { showToast('❌ Failed','error'); }
+}
+
+async function loadDiaryHistory() {
+    const classId = document.getElementById('dClassSelect').value;
+    const sectionId = document.getElementById('dSectionSelect').value;
+    if (!classId || !sectionId) return;
+    const res = await fetch(`/api/teacher/diary-history?class_id=${classId}&section_id=${sectionId}`, {credentials:'same-origin'});
+    const container = document.getElementById('diaryHistory');
+    if (!res.ok) { container.innerHTML = '<div class="empty-state">No entries yet</div>'; return; }
+    const data = await res.json();
+    if (!data.entries.length) { container.innerHTML = '<div class="empty-state">No diary entries yet. Write one above!</div>'; return; }
+    document.getElementById('entryCount').textContent = `(${data.entries.length} entries)`;
+    container.innerHTML = data.entries.map(e => `<div class="diary-entry">
+        <div class="entry-header"><span class="entry-type-badge ${e.entry_type}">${e.entry_type==='positive'?'😊':e.entry_type==='concern'?'⚠️':e.entry_type==='homework_note'?'📝':'ℹ️'} ${e.entry_type}</span>
+        <span class="entry-student">${e.student_name||'Entire Class'}</span>
+        ${e.parent_acknowledged?'<span class="ack-badge seen">✅ Parent Seen</span>':'<span class="ack-badge unseen">👁️ Not Seen</span>'}</div>
+        <div class="entry-content">${e.content}</div>
+        <div class="entry-meta">${e.entry_date} · ${e.is_visible_to_parent?'Visible to parent':'Internal only'}</div>
+    </div>`).join('');
+}
+
+function showToast(msg,type) { const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

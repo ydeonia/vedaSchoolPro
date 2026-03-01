@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Data Export{% endblock %}
+{% block page_title %}Data Export{% endblock %}
+{% block page_subtitle %}Download your school data anytime — it belongs to you{% endblock %}
+
+{% block extra_css %}
+<style>
+    .export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .export-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; border-left: 4px solid var(--primary); }
+    .export-card h3 { font-size: 0.95rem; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .export-card p { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4; }
+    .export-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    .export-form select, .export-form input { padding: 8px 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); font-size: 0.82rem; min-height: 38px; }
+    .export-form .btn { min-height: 38px; white-space: nowrap; }
+    .data-note { background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--radius-sm); padding: 12px 16px; font-size: 0.82rem; color: #1E40AF; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="data-note">
+    <i class="fas fa-shield-alt"></i>
+    <span><strong>Your data, your control.</strong> All exports are generated on-demand and downloaded directly to your device. No data is shared with third parties.</span>
+</div>
+
+<div class="export-grid">
+    <!-- Attendance CSV -->
+    <div class="export-card">
+        <h3><i class="fas fa-clipboard-check" style="color:var(--success);"></i> Attendance Report</h3>
+        <p>Day-wise attendance for all students in a class. Includes present/absent/late counts and percentage.</p>
+        <div class="export-form">
+            <select id="expAttClass">
+                <option value="">Select Class</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <select id="expAttMonth">
+                {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m == current_month }}>{{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m] }}</option>{% endfor %}
+            </select>
+            <input type="number" id="expAttYear" value="{{ current_year }}" style="width:80px;">
+            <button class="btn btn-primary btn-sm" onclick="exportAttCSV()"><i class="fas fa-download"></i> CSV</button>
+        </div>
+    </div>
+
+    <!-- Fee Records CSV -->
+    <div class="export-card">
+        <h3><i class="fas fa-indian-rupee-sign" style="color:var(--warning);"></i> Fee Records</h3>
+        <p>Complete fee ledger — all students with amount due, paid, discount, balance, receipt numbers, and payment mode.</p>
+        <div class="export-form">
+            <button class="btn btn-primary btn-sm" onclick="window.open('/api/school/export/fees-csv','_blank')"><i class="fas fa-download"></i> Export All Fees CSV</button>
+        </div>
+    </div>
+
+    <!-- Results CSV -->
+    <div class="export-card">
+        <h3><i class="fas fa-trophy" style="color:var(--primary);"></i> Exam Results</h3>
+        <p>Subject-wise marks, total, percentage, and pass/fail for all students in a class for a specific exam.</p>
+        <div class="export-form">
+            <select id="expResExam">
+                <option value="">Select Exam</option>
+                {% for e in exams %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+            </select>
+            <select id="expResClass">
+                <option value="">Select Class</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="exportResCSV()"><i class="fas fa-download"></i> CSV</button>
+        </div>
+    </div>
+
+    <!-- Report Card PDF -->
+    <div class="export-card" style="border-left-color: var(--danger);">
+        <h3><i class="fas fa-file-pdf" style="color:var(--danger);"></i> Report Card PDF</h3>
+        <p>Generate a professional PDF report card for any student, with all published exam results and grades.</p>
+        <div class="export-form">
+            <select id="expRCStudent">
+                <option value="">Select Student</option>
+                {% for s in students %}<option value="{{ s.id }}">{{ s.full_name }} ({{ s.roll_number or '' }})</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="exportReportCard()"><i class="fas fa-file-pdf"></i> PDF</button>
+        </div>
+    </div>
+
+    <!-- Fee Receipt PDF -->
+    <div class="export-card" style="border-left-color: var(--success);">
+        <h3><i class="fas fa-receipt" style="color:var(--success);"></i> Fee Receipt PDF</h3>
+        <p>Receipts are auto-generated when collecting fees. You can also re-download from the Fee Collection page.</p>
+        <div class="export-form">
+            <a href="/school/fee-collection" class="btn btn-secondary btn-sm"><i class="fas fa-arrow-right"></i> Go to Fee Collection</a>
+        </div>
+    </div>
+
+    <!-- Student List CSV -->
+    <div class="export-card" style="border-left-color: #8B5CF6;">
+        <h3><i class="fas fa-users" style="color:#8B5CF6;"></i> Student List</h3>
+        <p>Full student directory with name, class, section, roll number, admission number, contact details.</p>
+        <div class="export-form">
+            <select id="expStuClass">
+                <option value="">All Classes</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="exportStudentCSV()"><i class="fas fa-download"></i> CSV</button>
+        </div>
+    </div>
+</div>
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:16px;">
+    <i class="fas fa-info-circle"></i> Exports are generated in real-time. Large datasets may take a few seconds.
+    ✏️ You can export data anytime — there are no limits.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function exportAttCSV() {
+    const cls = document.getElementById('expAttClass').value;
+    const month = document.getElementById('expAttMonth').value;
+    const year = document.getElementById('expAttYear').value;
+    if (!cls) { showToast('error', 'Select a class'); return; }
+    window.open(`/api/school/export/attendance-csv?class_id=${cls}&month=${month}&year=${year}`, '_blank');
+}
+
+function exportResCSV() {
+    const exam = document.getElementById('expResExam').value;
+    const cls = document.getElementById('expResClass').value;
+    if (!exam || !cls) { showToast('error', 'Select exam and class'); return; }
+    window.open(`/api/school/export/results-csv?exam_id=${exam}&class_id=${cls}`, '_blank');
+}
+
+function exportReportCard() {
+    const sid = document.getElementById('expRCStudent').value;
+    if (!sid) { showToast('error', 'Select a student'); return; }
+    window.open(`/api/school/results/report-card-pdf?student_id=${sid}`, '_blank');
+}
+
+function exportStudentCSV() {
+    const cls = document.getElementById('expStuClass').value;
+    let url = '/api/school/export/students-csv';
+    if (cls) url += `?class_id=${cls}`;
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

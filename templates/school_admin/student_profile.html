@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Student Profile{% endblock %}
+{% block page_title %}👤 Student Profile{% endblock %}
+{% block page_subtitle %}View and edit student details{% endblock %}
+{% block extra_css %}
+<style>
+.profile-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;}
+.profile-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;text-align:center;}
+.profile-photo{width:120px;height:140px;border-radius:12px;background:var(--bg,#f1f5f9);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;}
+.profile-photo img{width:100%;height:100%;object-fit:cover;}
+.p-name{font-weight:900;font-size:1.2rem;}.p-class{font-size:0.82rem;color:var(--primary);font-weight:700;}
+.p-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.62rem;font-weight:700;margin-top:4px;}
+.p-house{margin-top:6px;padding:4px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;color:white;display:inline-block;}
+.role-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;background:var(--bg,#f1f5f9);margin:2px;}
+.sec-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
+.sec-card h3{font-size:0.88rem;margin-bottom:12px;}
+.d-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.d-lbl{font-size:0.58rem;text-transform:uppercase;font-weight:700;color:var(--text-light);}.d-val{font-size:0.85rem;font-weight:700;}
+.f-grp{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
+.f-grp label{font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);}
+.f-grp input,.f-grp select{padding:7px 9px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:8px 16px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;font-size:0.78rem;}
+.btn-sm{padding:5px 10px;font-size:0.70rem;}
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;}
+.doc-card{border:1px solid var(--border-light);border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;}
+.doc-icon{font-size:1.5rem;}.doc-info{flex:1;overflow:hidden;}.doc-name{font-weight:700;font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.doc-meta{font-size:0.62rem;color:var(--text-light);}
+@media(max-width:768px){.profile-layout{grid-template-columns:1fr;}.d-grid{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="profile-layout">
+<div>
+    <div class="profile-card">
+        <div class="profile-photo" id="photoBox">👤</div>
+        <div class="p-name" id="pName">Loading...</div>
+        <div class="p-class" id="pClass"></div>
+        <div id="pBadge"></div><div id="pHouse"></div>
+        <div id="pRoles" style="margin-top:6px;"></div>
+        <div style="margin-top:12px;"><button class="btn-primary btn-sm" onclick="toggleEdit()"><i class="fas fa-edit"></i> Edit</button></div>
+    </div>
+</div>
+<div>
+    <!-- View -->
+    <div id="viewMode">
+        <div class="sec-card"><h3>📋 Personal</h3><div class="d-grid">
+            <div><div class="d-lbl">Roll No</div><div class="d-val" id="vRoll">-</div></div>
+            <div><div class="d-lbl">Admission No</div><div class="d-val" id="vAdm">-</div></div>
+            <div><div class="d-lbl">DOB</div><div class="d-val" id="vDOB">-</div></div>
+            <div><div class="d-lbl">Gender</div><div class="d-val" id="vGender">-</div></div>
+            <div><div class="d-lbl">Blood Group</div><div class="d-val" id="vBlood">-</div></div>
+            <div><div class="d-lbl">Status</div><div class="d-val" id="vStatus">-</div></div>
+        </div></div>
+        <div class="sec-card"><h3>👨‍👩‍👧 Family</h3><div class="d-grid">
+            <div><div class="d-lbl">Father</div><div class="d-val" id="vFather">-</div></div>
+            <div><div class="d-lbl">Mother</div><div class="d-val" id="vMother">-</div></div>
+            <div><div class="d-lbl">Father Phone</div><div class="d-val" id="vFPhone">-</div></div>
+            <div><div class="d-lbl">Mother Phone</div><div class="d-val" id="vMPhone">-</div></div>
+            <div style="grid-column:span 2;"><div class="d-lbl">Address</div><div class="d-val" id="vAddr">-</div></div>
+        </div></div>
+    </div>
+    <!-- Edit -->
+    <div id="editMode" style="display:none;">
+        <div class="sec-card"><h3>✏️ Edit Student</h3><div class="d-grid">
+            <div class="f-grp"><label>First Name</label><input id="eFname"></div>
+            <div class="f-grp"><label>Last Name</label><input id="eLname"></div>
+            <div class="f-grp"><label>Roll Number</label><input id="eRoll" type="number"></div>
+            <div class="f-grp"><label>DOB</label><input id="eDOB" type="date"></div>
+            <div class="f-grp"><label>Gender</label><select id="eGender"><option value="">-</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Blood Group</label><select id="eBlood"><option value="">-</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+            <div class="f-grp"><label>Father</label><input id="eFather"></div>
+            <div class="f-grp"><label>Mother</label><input id="eMother"></div>
+            <div class="f-grp"><label>Father Phone</label><input id="eFPhone"></div>
+            <div class="f-grp"><label>Mother Phone</label><input id="eMPhone"></div>
+            <div class="f-grp"><label>Status</label><select id="eStatus"><option value="admitted">Admitted</option><option value="tc_issued">TC Issued</option><option value="left">Left</option><option value="withdrawn">Withdrawn</option></select></div>
+        </div>
+        <div class="f-grp"><label>Address</label><input id="eAddr" style="width:100%;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+            <button class="btn-primary" onclick="saveStudent()"><i class="fas fa-save"></i> Save</button>
+            <button class="btn-primary" style="background:var(--bg);color:var(--text);" onclick="toggleEdit()">Cancel</button>
+        </div></div>
+    </div>
+    <!-- Documents -->
+    <div class="sec-card">
+        <div style="display:flex;align-items:center;margin-bottom:10px;"><h3 style="flex:1;margin:0;">📎 Documents</h3>
+            <button class="btn-primary btn-sm" onclick="document.getElementById('docArea').style.display=document.getElementById('docArea').style.display==='none'?'block':'none'"><i class="fas fa-upload"></i> Upload</button></div>
+        <div id="docArea" style="display:none;margin-bottom:12px;padding:12px;border-radius:8px;background:var(--bg,#f1f5f9);">
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;">
+                <div class="f-grp"><label>Type</label><select id="docType"><option value="birth_certificate">Birth Certificate</option><option value="transfer_certificate">Transfer Certificate</option><option value="character_certificate">Character Certificate</option><option value="marksheet">Previous Marksheet</option><option value="aadhaar">Aadhaar</option><option value="medical">Medical</option><option value="photo">Photo</option><option value="caste_certificate">Caste Certificate</option><option value="income_certificate">Income Certificate</option><option value="other">Other</option></select></div>
+                <div class="f-grp"><label>File</label><input type="file" id="docFile" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"></div>
+                <button class="btn-primary btn-sm" onclick="uploadDoc()"><i class="fas fa-upload"></i></button>
+            </div>
+        </div>
+        <div class="doc-grid" id="docGrid"></div>
+    </div>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const sid='{{ student_id | default("") }}' || location.pathname.split('/students/')[1] || new URLSearchParams(location.search).get('id') || '';
+let S=null;
+async function load(){if(!sid)return;
+try{const r=await fetch('/api/school/students/'+sid+'/profile',{credentials:'same-origin'});const d=await r.json();S=d.student;if(!S)return;
+document.getElementById('pName').textContent=S.full_name;
+document.getElementById('pClass').textContent=`${S.class_name} ${S.section_name}`.trim();
+if(S.photo_url)document.getElementById('photoBox').innerHTML=`<img src="${S.photo_url}">`;
+const sc={admitted:'#D1FAE5',tc_issued:'#FEE2E2',left:'#FEF3C7',withdrawn:'#F3E8FF'};
+const st={admitted:'Active',tc_issued:'TC Issued',left:'Left',withdrawn:'Withdrawn'};
+const ss=S.admission_status||'admitted';
+document.getElementById('pBadge').innerHTML=`<div class="p-badge" style="background:${sc[ss]||'#E2E8F0'};">${st[ss]||ss}</div>`;
+if(S.house_name)document.getElementById('pHouse').innerHTML=`<div class="p-house" style="background:${S.house_color};">${S.house_name}</div>`;
+if(S.roles?.length)document.getElementById('pRoles').innerHTML=S.roles.map(r=>`<span class="role-tag">👑 ${r.title}</span>`).join('');
+document.getElementById('vRoll').textContent=S.roll_number||'-';
+document.getElementById('vAdm').textContent=S.admission_number||'-';
+document.getElementById('vDOB').textContent=S.date_of_birth||'-';
+document.getElementById('vGender').textContent=S.gender||'-';
+document.getElementById('vBlood').textContent=S.blood_group||'-';
+document.getElementById('vStatus').textContent=st[ss]||ss;
+document.getElementById('vFather').textContent=S.father_name||'-';
+document.getElementById('vMother').textContent=S.mother_name||'-';
+document.getElementById('vFPhone').textContent=S.father_phone||'-';
+document.getElementById('vMPhone').textContent=S.mother_phone||'-';
+document.getElementById('vAddr').textContent=S.address||'-';
+renderDocs(S.documents||[]);
+}catch(e){console.error(e);}}
+function renderDocs(docs){const ic={birth_certificate:'📜',transfer_certificate:'📋',character_certificate:'🎖️',marksheet:'📊',aadhaar:'🪪',medical:'🏥',photo:'📸',other:'📎'};
+document.getElementById('docGrid').innerHTML=docs.length?docs.map(d=>`<div class="doc-card"><div class="doc-icon">${ic[d.doc_type]||'📎'}</div><div class="doc-info"><div class="doc-name">${d.doc_name}</div><div class="doc-meta">${d.doc_type.replace(/_/g,' ')} · ${d.uploaded_at}</div></div><div><a href="${d.file_url}" target="_blank" style="margin-right:4px;">👁️</a><button onclick="delDoc('${d.id}')" style="border:none;background:none;cursor:pointer;">🗑️</button></div></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--text-light);grid-column:1/-1;">No documents yet</div>';}
+function toggleEdit(){const on=document.getElementById('editMode').style.display==='block';
+document.getElementById('editMode').style.display=on?'none':'block';document.getElementById('viewMode').style.display=on?'block':'none';
+if(!on&&S){['Fname','Lname','Roll','DOB','Gender','Blood','Father','Mother','FPhone','MPhone','Addr','Status'].forEach(f=>{
+const map={Fname:'first_name',Lname:'last_name',Roll:'roll_number',DOB:'date_of_birth',Gender:'gender',Blood:'blood_group',Father:'father_name',Mother:'mother_name',FPhone:'father_phone',MPhone:'mother_phone',Addr:'address',Status:'admission_status'};
+const el=document.getElementById('e'+f);if(el)el.value=S[map[f]]||'';});}}
+async function saveStudent(){const d={first_name:g('eFname'),last_name:g('eLname'),roll_number:g('eRoll'),date_of_birth:g('eDOB'),gender:g('eGender'),blood_group:g('eBlood'),father_name:g('eFather'),mother_name:g('eMother'),father_phone:g('eFPhone'),mother_phone:g('eMPhone'),address:g('eAddr'),admission_status:g('eStatus')};
+await apiCall('/api/school/students/'+sid,'PUT',d);showToast('success','Updated');toggleEdit();load();}
+async function uploadDoc(){const file=document.getElementById('docFile').files[0];if(!file){showToast('error','Select file');return;}
+const fd=new FormData();fd.append('file',file);fd.append('doc_type',g('docType'));fd.append('doc_name',file.name);
+try{await fetch('/api/school/students/'+sid+'/documents',{method:'POST',body:fd,credentials:'same-origin'});showToast('success','Uploaded');load();}catch(e){showToast('error','Failed');}}
+async function delDoc(id){if(!confirm('Delete?'))return;await apiCall('/api/school/students/'+sid+'/documents/'+id,'DELETE');showToast('success','Deleted');load();}
+function g(id){return document.getElementById(id).value.trim();}
+load();
+</script>
+{% endblock %}

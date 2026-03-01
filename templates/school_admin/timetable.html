@@ -1,0 +1,535 @@
+{% extends "base.html" %}
+
+{% block title %}Timetable{% endblock %}
+{% block page_title %}Timetable Management{% endblock %}
+{% block page_subtitle %}Configure periods, assign teachers, and manage schedules{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg); padding: 4px; border-radius: var(--radius); }
+    .tab-btn { padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); transition: all 0.2s; cursor: pointer; border: none; background: none; }
+    .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(79,70,229,0.3); }
+    .tab-btn:hover:not(.active) { background: var(--border-light); }
+
+    /* Period Setup */
+    .period-row { display: grid; grid-template-columns: 50px 1fr 120px 120px 140px 40px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-light); }
+    .period-row.header { font-weight: 700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.04em; border-bottom: 2px solid var(--border); }
+    .period-row input, .period-row select { padding: 8px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.85rem; }
+    .period-row input:focus, .period-row select:focus { border-color: var(--primary); outline: none; }
+    .period-num { width: 36px; height: 36px; border-radius: 50%; background: var(--primary-50); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; }
+    .period-num.break { background: var(--warning-light); color: var(--warning); }
+
+    /* Timetable Grid */
+    .tt-grid { width: 100%; border-collapse: separate; border-spacing: 0; }
+    .tt-grid th { padding: 10px 8px; background: var(--bg-sidebar); color: white; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; text-align: center; }
+    .tt-grid th:first-child { border-radius: var(--radius-sm) 0 0 0; text-align: left; min-width: 100px; }
+    .tt-grid th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+    .tt-grid td { padding: 4px; vertical-align: top; border: 1px solid var(--border-light); }
+    .tt-grid td:first-child { padding: 10px 8px; font-weight: 700; font-size: 0.82rem; background: var(--bg); vertical-align: middle; }
+
+    .tt-cell {
+        min-height: 60px; padding: 8px; border-radius: var(--radius-sm); cursor: pointer;
+        transition: all 0.15s; font-size: 0.78rem; position: relative;
+    }
+    .tt-cell:hover { background: var(--primary-50); }
+    .tt-cell.filled { background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border: 1px solid var(--primary-light); }
+    .tt-cell.break-cell { background: var(--warning-light); cursor: default; text-align: center; color: var(--warning); font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
+    .tt-subject { font-weight: 700; color: var(--primary-dark); font-size: 0.82rem; }
+    .tt-teacher { color: var(--text-secondary); font-size: 0.72rem; margin-top: 2px; }
+    .tt-cell .remove-btn { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: white; font-size: 0.6rem; display: none; align-items: center; justify-content: center; cursor: pointer; }
+    .tt-cell:hover .remove-btn { display: flex; }
+
+    /* Free Teachers Panel */
+    .free-panel { display: flex; gap: 8px; flex-wrap: wrap; }
+    .teacher-chip { padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .teacher-chip.free { background: var(--success-light); color: var(--success); }
+    .teacher-chip.busy { background: var(--danger-light); color: var(--danger); }
+
+    /* Quick Setup Templates */
+    .quick-period-btn { padding: 10px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: white; font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; }
+    .quick-period-btn:hover { border-color: var(--primary); background: var(--primary-50); }
+
+    @media (max-width: 768px) {
+        .period-row { grid-template-columns: 40px 1fr 90px 90px 100px 36px; }
+        .tt-grid { font-size: 0.72rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Tabs -->
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchView('periods')"><i class="fas fa-clock"></i> Period Setup</button>
+    <button class="tab-btn" onclick="switchView('timetable')"><i class="fas fa-table"></i> Class Timetable</button>
+    <button class="tab-btn" onclick="switchView('freeperiods')"><i class="fas fa-user-clock"></i> Free Teachers</button>
+</div>
+
+<!-- ═══ TAB 1: Period Setup ═══ -->
+<div id="view-periods">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-clock" style="color: var(--primary); margin-right: 8px;"></i> Define School Periods</h2>
+            <div style="display: flex; gap: 8px;">
+                <button class="quick-period-btn" onclick="quickSetup('standard')">
+                    <i class="fas fa-magic"></i> Standard (8 periods)
+                </button>
+                <button class="quick-period-btn" onclick="quickSetup('extended')">
+                    <i class="fas fa-magic"></i> Extended (10 periods)
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="period-row header">
+                <div>#</div>
+                <div>Label</div>
+                <div>Start Time</div>
+                <div>End Time</div>
+                <div>Type</div>
+                <div></div>
+            </div>
+            <div id="periodsContainer">
+                {% if periods %}
+                    {% for p in periods %}
+                    <div class="period-row" data-idx="{{ loop.index }}">
+                        <div class="period-num {{ 'break' if p.period_type.value != 'regular' else '' }}">{{ p.period_number }}</div>
+                        <input type="text" value="{{ p.label }}" class="p-label">
+                        <input type="time" value="{{ p.start_time.strftime('%H:%M') if p.start_time else '' }}" class="p-start">
+                        <input type="time" value="{{ p.end_time.strftime('%H:%M') if p.end_time else '' }}" class="p-end">
+                        <select class="p-type">
+                            <option value="regular" {{ 'selected' if p.period_type.value == 'regular' }}>Regular</option>
+                            <option value="break" {{ 'selected' if p.period_type.value == 'break' }}>Break</option>
+                            <option value="lunch" {{ 'selected' if p.period_type.value == 'lunch' }}>Lunch</option>
+                            <option value="assembly" {{ 'selected' if p.period_type.value == 'assembly' }}>Assembly</option>
+                        </select>
+                        <button onclick="removePeriodRow(this)" style="color: var(--danger); font-size: 0.9rem;"><i class="fas fa-trash"></i></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="addPeriodRow()">
+                    <i class="fas fa-plus"></i> Add Period
+                </button>
+            </div>
+        </div>
+        <div class="card-footer">
+            <button class="btn btn-primary" onclick="savePeriods()" id="savePeriodBtn">
+                <i class="fas fa-save"></i> Save Period Structure
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ TAB 2: Class Timetable ═══ -->
+<div id="view-timetable" style="display: none;">
+    <div class="card mb-3">
+        <div class="card-body" style="padding: 16px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <select id="ttClass" class="form-select" onchange="onTTClassChange(this.value)" style="flex: 1; min-width: 150px; padding: 10px;">
+                    <option value="">Select Class</option>
+                    {% for cls in classes %}
+                    <option value="{{ cls.id }}">{{ cls.name }}</option>
+                    {% endfor %}
+                </select>
+                <select id="ttSection" class="form-select" style="flex: 1; min-width: 150px; padding: 10px;">
+                    <option value="">All Sections</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadTimetable()">
+                    <i class="fas fa-table"></i> Load Timetable
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="timetableArea">
+        <div class="card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-calendar-week"></i>
+                    <h3>Select a Class</h3>
+                    <p>Choose a class and section to view/edit the timetable grid</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ TAB 3: Free Teachers ═══ -->
+<div id="view-freeperiods" style="display: none;">
+    <div class="card mb-3">
+        <div class="card-body" style="padding: 16px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <select id="fpDay" class="form-select" style="flex: 1; min-width: 150px; padding: 10px; font-weight: 600;">
+                    <option value="monday">Monday</option><option value="tuesday">Tuesday</option>
+                    <option value="wednesday">Wednesday</option><option value="thursday">Thursday</option>
+                    <option value="friday">Friday</option><option value="saturday">Saturday</option>
+                </select>
+                <select id="fpPeriod" class="form-select" style="flex: 1; min-width: 150px; padding: 10px; font-weight: 600;">
+                    <option value="">Select Period</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadFreeTeachers()">
+                    <i class="fas fa-user-clock"></i> Check Availability
+                </button>
+            </div>
+        </div>
+    </div>
+    <div id="freeTeachersArea">
+        <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-clock"></i><h3>Who is Free?</h3><p>Select a day and period to see which teachers are available</p></div></div></div>
+    </div>
+</div>
+
+<!-- Slot Edit Modal -->
+<div class="modal-overlay" id="slotModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="slotModalTitle">Edit Slot</h2>
+            <button class="modal-close" onclick="closeModal('slotModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Subject</label>
+                <select id="slotSubject" class="form-select">
+                    <option value="">-- No Subject --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teacher</label>
+                <select id="slotTeacher" class="form-select">
+                    <option value="">-- No Teacher --</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Room (optional)</label>
+                <input type="text" id="slotRoom" class="form-input" placeholder="e.g. Room 101">
+            </div>
+            <div id="slotConflictMsg" style="display: none; padding: 10px; background: var(--danger-light); color: var(--danger); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('slotModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveSlot()" id="saveSlotBtn"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classSections = {{ sections_json | safe }};
+const subjectsData = {{ subjects_json | safe }};
+const teachersData = {{ teachers_json | safe }};
+let periodsData = {{ periods_json | safe }};
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+const DAY_LABELS = {monday:'Mon', tuesday:'Tue', wednesday:'Wed', thursday:'Thu', friday:'Fri', saturday:'Sat'};
+let currentTimetable = {};
+let editingSlot = {};
+
+// ─── Tab Switching ───
+function switchView(view) {
+    ['periods', 'timetable', 'freeperiods'].forEach(v => {
+        document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
+    });
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.closest('.tab-btn').classList.add('active');
+    if (view === 'freeperiods') populateFPPeriods();
+}
+
+// Set today's day as default in free teacher view
+(function() {
+    const dayMap = [null,'monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    const today = dayMap[new Date().getDay()];
+    if (today && document.getElementById('fpDay')) {
+        const opt = document.querySelector(`#fpDay option[value="${today}"]`);
+        if (opt) opt.selected = true;
+    }
+})();
+
+// ─── PERIOD SETUP ───
+let periodCounter = document.querySelectorAll('#periodsContainer .period-row').length;
+
+function addPeriodRow(label='', start='', end='', type='regular') {
+    periodCounter++;
+    const container = document.getElementById('periodsContainer');
+    const isBreak = type !== 'regular';
+    const div = document.createElement('div');
+    div.className = 'period-row';
+    div.innerHTML = `
+        <div class="period-num ${isBreak ? 'break' : ''}">${periodCounter}</div>
+        <input type="text" value="${label || 'Period ' + periodCounter}" class="p-label">
+        <input type="time" value="${start}" class="p-start">
+        <input type="time" value="${end}" class="p-end">
+        <select class="p-type" onchange="this.closest('.period-row').querySelector('.period-num').className='period-num '+(this.value!=='regular'?'break':'')">
+            <option value="regular" ${type==='regular'?'selected':''}>Regular</option>
+            <option value="break" ${type==='break'?'selected':''}>Break</option>
+            <option value="lunch" ${type==='lunch'?'selected':''}>Lunch</option>
+            <option value="assembly" ${type==='assembly'?'selected':''}>Assembly</option>
+        </select>
+        <button onclick="removePeriodRow(this)" style="color: var(--danger);"><i class="fas fa-trash"></i></button>
+    `;
+    container.appendChild(div);
+}
+
+function removePeriodRow(btn) {
+    btn.closest('.period-row').remove();
+    reindexPeriods();
+}
+
+function reindexPeriods() {
+    const rows = document.querySelectorAll('#periodsContainer .period-row');
+    periodCounter = rows.length;
+    rows.forEach((row, i) => {
+        row.querySelector('.period-num').textContent = i + 1;
+    });
+}
+
+function quickSetup(template) {
+    document.getElementById('periodsContainer').innerHTML = '';
+    periodCounter = 0;
+
+    if (template === 'standard') {
+        addPeriodRow('Assembly', '07:30', '08:00', 'assembly');
+        addPeriodRow('Period 1', '08:00', '08:40', 'regular');
+        addPeriodRow('Period 2', '08:40', '09:20', 'regular');
+        addPeriodRow('Period 3', '09:20', '10:00', 'regular');
+        addPeriodRow('Break', '10:00', '10:20', 'break');
+        addPeriodRow('Period 4', '10:20', '11:00', 'regular');
+        addPeriodRow('Period 5', '11:00', '11:40', 'regular');
+        addPeriodRow('Lunch', '11:40', '12:20', 'lunch');
+        addPeriodRow('Period 6', '12:20', '01:00', 'regular');
+        addPeriodRow('Period 7', '01:00', '01:40', 'regular');
+        addPeriodRow('Period 8', '01:40', '02:20', 'regular');
+    } else {
+        addPeriodRow('Assembly', '07:30', '07:50', 'assembly');
+        addPeriodRow('Period 1', '07:50', '08:25', 'regular');
+        addPeriodRow('Period 2', '08:25', '09:00', 'regular');
+        addPeriodRow('Period 3', '09:00', '09:35', 'regular');
+        addPeriodRow('Short Break', '09:35', '09:50', 'break');
+        addPeriodRow('Period 4', '09:50', '10:25', 'regular');
+        addPeriodRow('Period 5', '10:25', '11:00', 'regular');
+        addPeriodRow('Period 6', '11:00', '11:35', 'regular');
+        addPeriodRow('Lunch', '11:35', '12:10', 'lunch');
+        addPeriodRow('Period 7', '12:10', '12:45', 'regular');
+        addPeriodRow('Period 8', '12:45', '01:20', 'regular');
+        addPeriodRow('Period 9', '01:20', '01:55', 'regular');
+        addPeriodRow('Period 10', '01:55', '02:30', 'regular');
+    }
+    showToast('info', 'Template Applied', `${template === 'standard' ? '8' : '10'} period template loaded`);
+}
+
+async function savePeriods() {
+    const rows = document.querySelectorAll('#periodsContainer .period-row');
+    const periods = [];
+    rows.forEach((row, i) => {
+        periods.push({
+            period_number: i + 1,
+            label: row.querySelector('.p-label').value,
+            start_time: row.querySelector('.p-start').value,
+            end_time: row.querySelector('.p-end').value,
+            period_type: row.querySelector('.p-type').value,
+        });
+    });
+
+    if (periods.length === 0) { showToast('warning', 'No Periods', 'Add at least one period'); return; }
+
+    const btn = document.getElementById('savePeriodBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const result = await apiCall('/api/school/timetable/periods/setup', 'POST', { periods });
+        showToast('success', 'Periods Saved! ✅', result.message);
+        // Refresh periods data
+        const fresh = await apiCall('/api/school/timetable/periods');
+        periodsData = fresh.periods;
+    } catch(e) {}
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Period Structure';
+}
+
+// ─── CLASS TIMETABLE ───
+function onTTClassChange(classId) {
+    const sec = document.getElementById('ttSection');
+    sec.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(s => { sec.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+        if (classSections[classId].length > 0) sec.value = classSections[classId][0].id;
+    }
+}
+
+async function loadTimetable() {
+    const classId = document.getElementById('ttClass').value;
+    const sectionId = document.getElementById('ttSection').value;
+    if (!classId) { showToast('warning', 'Select Class', ''); return; }
+
+    const area = document.getElementById('timetableArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
+
+    try {
+        const params = new URLSearchParams({ class_id: classId });
+        if (sectionId) params.append('section_id', sectionId);
+        const result = await apiCall(`/api/school/timetable/load?${params}`);
+        currentTimetable = result.timetable;
+        renderTimetable();
+    } catch(e) {
+        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error</h3></div></div></div>';
+    }
+}
+
+function renderTimetable() {
+    const regularPeriods = periodsData.filter(p => p.type === 'regular' || p.type === 'assembly');
+    const allPeriods = periodsData; // includes breaks
+
+    if (allPeriods.length === 0) {
+        document.getElementById('timetableArea').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-clock"></i><h3>No Periods Defined</h3><p>Go to Period Setup tab first to define your school periods</p></div></div></div>';
+        return;
+    }
+
+    // Build subject/teacher lookup
+    const subMap = {}; subjectsData.forEach(s => subMap[s.id] = s.name);
+    const tchMap = {}; teachersData.forEach(t => tchMap[t.id] = t.name);
+
+    let html = '<div class="card"><div class="card-body" style="padding: 0; overflow-x: auto;"><table class="tt-grid"><thead><tr><th>Period</th>';
+    DAYS.forEach(d => { html += `<th>${DAY_LABELS[d]}</th>`; });
+    html += '</tr></thead><tbody>';
+
+    allPeriods.forEach(p => {
+        const isBreak = p.type === 'break' || p.type === 'lunch';
+        html += `<tr><td><div style="font-size: 0.78rem;"><strong>${p.label}</strong><br><span class="text-xs text-muted">${p.start} - ${p.end}</span></div></td>`;
+
+        DAYS.forEach(day => {
+            if (isBreak) {
+                html += `<td><div class="tt-cell break-cell">${p.type === 'lunch' ? '🍽 Lunch' : '☕ Break'}</div></td>`;
+            } else {
+                const slot = currentTimetable[day]?.[p.id];
+                if (slot && slot.subject_id) {
+                    html += `<td><div class="tt-cell filled" onclick="editSlot('${p.id}','${day}')">
+                        <div class="tt-subject">${subMap[slot.subject_id] || '?'}</div>
+                        <div class="tt-teacher">${tchMap[slot.teacher_id] || ''}</div>
+                        ${slot.room ? '<div class="text-xs text-muted">' + slot.room + '</div>' : ''}
+                        <div class="remove-btn" onclick="event.stopPropagation(); removeSlot('${p.id}','${day}')"><i class="fas fa-times"></i></div>
+                    </div></td>`;
+                } else {
+                    html += `<td><div class="tt-cell" onclick="editSlot('${p.id}','${day}')" style="color: var(--text-light); font-size: 0.72rem; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-plus" style="opacity: 0.3;"></i>
+                    </div></td>`;
+                }
+            }
+        });
+        html += '</tr>';
+    });
+
+    html += '</tbody></table></div></div>';
+    document.getElementById('timetableArea').innerHTML = html;
+}
+
+function editSlot(periodId, day) {
+    editingSlot = { periodId, day };
+    const slot = currentTimetable[day]?.[periodId];
+
+    // Populate subject dropdown
+    const subSel = document.getElementById('slotSubject');
+    subSel.innerHTML = '<option value="">-- No Subject --</option>';
+    subjectsData.forEach(s => { subSel.innerHTML += `<option value="${s.id}" ${slot?.subject_id===s.id?'selected':''}>${s.name}</option>`; });
+
+    // Populate teacher dropdown
+    const tchSel = document.getElementById('slotTeacher');
+    tchSel.innerHTML = '<option value="">-- No Teacher --</option>';
+    teachersData.forEach(t => { tchSel.innerHTML += `<option value="${t.id}" ${slot?.teacher_id===t.id?'selected':''}>${t.name}</option>`; });
+
+    document.getElementById('slotRoom').value = slot?.room || '';
+    document.getElementById('slotConflictMsg').style.display = 'none';
+
+    const p = periodsData.find(pp => pp.id === periodId);
+    document.getElementById('slotModalTitle').textContent = `${p?.label || 'Period'} — ${DAY_LABELS[day] || day}`;
+    openModal('slotModal');
+}
+
+async function saveSlot() {
+    const classId = document.getElementById('ttClass').value;
+    const sectionId = document.getElementById('ttSection').value;
+    const subjectId = document.getElementById('slotSubject').value;
+    const teacherId = document.getElementById('slotTeacher').value;
+    const room = document.getElementById('slotRoom').value;
+
+    const btn = document.getElementById('saveSlotBtn');
+    btn.disabled = true;
+
+    try {
+        await apiCall('/api/school/timetable/slot', 'POST', {
+            class_id: classId, section_id: sectionId || null,
+            period_id: editingSlot.periodId, day: editingSlot.day,
+            subject_id: subjectId || null, teacher_id: teacherId || null, room: room || null,
+        });
+
+        // Update local data
+        if (!currentTimetable[editingSlot.day]) currentTimetable[editingSlot.day] = {};
+        currentTimetable[editingSlot.day][editingSlot.periodId] = {
+            subject_id: subjectId || null, teacher_id: teacherId || null, room,
+        };
+        renderTimetable();
+        closeModal('slotModal');
+        showToast('success', 'Slot Saved', '');
+    } catch(e) {
+        document.getElementById('slotConflictMsg').textContent = e.message;
+        document.getElementById('slotConflictMsg').style.display = 'block';
+    }
+    btn.disabled = false;
+}
+
+async function removeSlot(periodId, day) {
+    if (!confirm('Remove this timetable slot? You can always re-assign it later.')) return;
+    const classId = document.getElementById('ttClass').value;
+    const sectionId = document.getElementById('ttSection').value;
+    try {
+        await apiCall(`/api/school/timetable/slot?class_id=${classId}&section_id=${sectionId}&period_id=${periodId}&day=${day}`, 'DELETE');
+        if (currentTimetable[day]) delete currentTimetable[day][periodId];
+        renderTimetable();
+        showToast('info', 'Slot Removed', 'You can re-assign this slot anytime');
+    } catch(e) {}
+}
+
+// ─── FREE TEACHERS ───
+function populateFPPeriods() {
+    const sel = document.getElementById('fpPeriod');
+    sel.innerHTML = '<option value="">Select Period</option>';
+    periodsData.filter(p => p.type === 'regular').forEach(p => {
+        sel.innerHTML += `<option value="${p.id}">${p.label} (${p.start}-${p.end})</option>`;
+    });
+}
+
+async function loadFreeTeachers() {
+    const day = document.getElementById('fpDay').value;
+    const periodId = document.getElementById('fpPeriod').value;
+    if (!periodId) { showToast('warning', 'Select Period', ''); return; }
+
+    const area = document.getElementById('freeTeachersArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div></div>';
+
+    try {
+        const result = await apiCall(`/api/school/timetable/free-teachers?period_id=${periodId}&day=${day}`);
+        const pLabel = periodsData.find(p => p.id === periodId)?.label || 'Period';
+
+        area.innerHTML = `
+            <div class="stats-grid mb-3">
+                <div class="stat-card"><div class="stat-icon green"><i class="fas fa-user-check"></i></div><div class="stat-info"><div class="stat-value">${result.free.length}</div><div class="stat-label">Free Teachers</div></div></div>
+                <div class="stat-card"><div class="stat-icon red"><i class="fas fa-user-clock"></i></div><div class="stat-info"><div class="stat-value">${result.busy.length}</div><div class="stat-label">Busy Teachers</div></div></div>
+                <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><div class="stat-value">${result.total}</div><div class="stat-label">Total Teachers</div></div></div>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header"><h2 style="color: var(--success);"><i class="fas fa-check-circle"></i> Available (${result.free.length})</h2></div>
+                    <div class="card-body">
+                        <div class="free-panel">${result.free.length === 0 ? '<span class="text-muted">No free teachers</span>' : result.free.map(t => `<span class="teacher-chip free"><i class="fas fa-user"></i> ${t.name}</span>`).join('')}</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h2 style="color: var(--danger);"><i class="fas fa-times-circle"></i> Busy (${result.busy.length})</h2></div>
+                    <div class="card-body">
+                        <div class="free-panel">${result.busy.map(t => `<span class="teacher-chip busy"><i class="fas fa-user"></i> ${t.name}</span>`).join('')}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch(e) {}
+}
+</script>
+{% endblock %}

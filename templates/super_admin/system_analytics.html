@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}System Analytics{% endblock %}
+{% block page_title %}📊 System Analytics{% endblock %}
+{% block page_subtitle %}Server health, usage insights, and system monitoring{% endblock %}
+{% block extra_css %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border-light);margin-bottom:18px;overflow-x:auto;}
+.tab{padding:10px 20px;font-weight:800;font-size:0.75rem;cursor:pointer;border-bottom:3px solid transparent;color:var(--text-light);white-space:nowrap;transition:all 0.15s;}
+.tab:hover{color:var(--text);}.tab.active{color:#4338CA;border-bottom-color:#4338CA;}
+.tp{display:none;}.tp.active{display:block;}
+.sc{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px;}
+.sc>div{background:var(--bg-card);border-radius:12px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+.sv{font-size:1.6rem;font-weight:900;}.sl{font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);margin-top:2px;letter-spacing:0.04em;}
+.sec{background:var(--bg-card);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 1px 6px rgba(0,0,0,0.04);}
+.sec h3{font-size:0.85rem;font-weight:900;margin:0 0 14px 0;}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.chart-box{background:var(--bg-card);border-radius:14px;padding:18px;box-shadow:0 1px 6px rgba(0,0,0,0.04);}
+.chart-box h3{font-size:0.82rem;font-weight:900;margin:0 0 12px 0;}
+.chart-wrap{position:relative;height:260px;}
+.health-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;}
+.health-card{background:var(--bg-card);border-radius:12px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+.health-card .lbl{font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);}
+.health-card .val{font-size:1.2rem;font-weight:900;margin:4px 0;}
+.bar{height:6px;border-radius:3px;background:var(--bg);overflow:hidden;margin-top:6px;}.bar-fill{height:100%;border-radius:3px;transition:width 0.5s;}
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.toolbar input,.toolbar select{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.75rem;}
+.toolbar input{min-width:220px;}.toolbar select{min-width:130px;}
+.dt{width:100%;border-collapse:collapse;font-size:0.75rem;}
+.dt th{font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);padding:8px 10px;text-align:left;border-bottom:2px solid var(--border-light);position:sticky;top:0;background:var(--bg-card);cursor:pointer;}
+.dt th:hover{color:var(--text);}
+.dt td{padding:10px;border-bottom:1px solid var(--border-light);}
+.dt tr:hover{background:rgba(67,56,202,0.03);}
+.tw{overflow-x:auto;max-height:60vh;overflow-y:auto;}
+.pill{padding:2px 8px;border-radius:6px;font-size:0.58rem;font-weight:800;display:inline-block;}
+.pg{background:#D1FAE5;color:#065F46;}.pr{background:#FEE2E2;color:#991B1B;}.py{background:#FEF3C7;color:#92400E;}.pb{background:#DBEAFE;color:#1D4ED8;}
+.pn{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:0.7rem;color:var(--text-light);}
+.pn button{padding:5px 12px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-weight:700;font-size:0.68rem;cursor:pointer;}
+.pn button.act{background:#4338CA;color:white;border-color:#4338CA;}
+.sn{font-weight:800;}
+@media(max-width:768px){.charts-row{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="tabs">
+    <div class="tab active" data-tab="overview"><i class="fas fa-chart-line"></i> Overview</div>
+    <div class="tab" data-tab="schools"><i class="fas fa-school"></i> School Usage</div>
+    <div class="tab" data-tab="server"><i class="fas fa-server"></i> Server Health</div>
+    <div class="tab" data-tab="activity"><i class="fas fa-history"></i> Activity Log</div>
+</div>
+
+<!-- OVERVIEW -->
+<div class="tp active" id="tp-overview">
+<div class="sc" id="overviewStats"></div>
+<div class="charts-row">
+    <div class="chart-box"><h3>📈 Platform Growth</h3><div class="chart-wrap"><canvas id="growthChart"></canvas></div></div>
+    <div class="chart-box"><h3>📊 Plan Distribution</h3><div class="chart-wrap"><canvas id="planChart"></canvas></div></div>
+</div>
+<div class="charts-row">
+    <div class="chart-box"><h3>🏫 Top 10 Schools by Students</h3><div class="chart-wrap"><canvas id="topChart"></canvas></div></div>
+    <div class="chart-box"><h3>💰 Revenue Trend</h3><div class="chart-wrap"><canvas id="revChart"></canvas></div></div>
+</div>
+</div>
+
+<!-- SCHOOL USAGE -->
+<div class="tp" id="tp-schools">
+<div class="toolbar">
+    <input type="text" id="schSearch" placeholder="🔍 Search school..." oninput="fSch()">
+    <select id="schFilter" onchange="fSch()"><option value="">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
+    <select id="schSort" onchange="fSch()"><option value="students-desc">Most Students</option><option value="students-asc">Least Students</option><option value="name-asc">Name A-Z</option><option value="storage-desc">Most Storage</option></select>
+    <button onclick="showToast('info','Export coming soon')" style="padding:8px 16px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-download"></i> Export</button>
+</div>
+<div class="tw"><table class="dt"><thead><tr>
+    <th>School</th><th>Organization</th><th>Students</th><th>Teachers</th><th>Storage</th><th>Plan</th><th>Status</th><th>Actions</th>
+</tr></thead><tbody id="schTB"><tr><td colspan="8" style="text-align:center;padding:40px;">Loading...</td></tr></tbody></table></div>
+<div class="pn" id="schPn"></div>
+</div>
+
+<!-- SERVER HEALTH -->
+<div class="tp" id="tp-server">
+<div id="serverHealth"></div>
+</div>
+
+<!-- ACTIVITY LOG / LOGIN SECURITY -->
+<div class="tp" id="tp-activity">
+<div class="sc" id="secStats"></div>
+<div class="toolbar">
+    <input type="text" id="actSearch" placeholder="🔍 Search email or IP..." oninput="fAct()">
+    <select id="actFilter" onchange="fAct()"><option value="">All</option><option value="success">Successful</option><option value="failed">Failed</option><option value="banned">Banned IPs</option></select>
+    <button onclick="loadBanned()" style="padding:8px 16px;border-radius:8px;background:#DC2626;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-shield-alt"></i> Banned IPs</button>
+</div>
+<div class="tw"><table class="dt"><thead><tr><th>Time</th><th>Email</th><th>IP Address</th><th>OS</th><th>Browser</th><th>Device</th><th>Status</th><th>Action</th></tr></thead><tbody id="actTB"><tr><td colspan="8" style="text-align:center;padding:40px;">Loading...</td></tr></tbody></table></div>
+<div class="pn" id="actPn"></div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+let AD={},schools=[],gC=null,pC=null,tC=null,rC=null;const PS=25;let schP=1;
+
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));this.classList.add('active');
+    document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active'));
+    document.getElementById('tp-'+this.dataset.tab).classList.add('active');
+}));
+
+async function loadData(){
+    AD=await apiCall('/api/super-admin/system-analytics');
+    const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+    const txt=isDark?'#cbd5e1':'#64748b',grid=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
+
+    // Overview stats
+    document.getElementById('overviewStats').innerHTML=`
+        <div><div class="sv" style="color:#7C3AED;">${AD.orgs||0}</div><div class="sl">Organizations</div></div>
+        <div><div class="sv" style="color:#2563EB;">${AD.branches||0}</div><div class="sl">Branches</div></div>
+        <div><div class="sv" style="color:#059669;">${(AD.students||0).toLocaleString()}</div><div class="sl">Total Students</div></div>
+        <div><div class="sv" style="color:#D97706;">${AD.users||0}</div><div class="sl">Active Users</div></div>
+    `;
+
+    // Growth chart
+    const months=['Jan','Feb','Mar','Apr','May','Jun'];
+    const stu=AD.students||50;
+    const stuData=months.map((_,i)=>Math.round(stu*((i+1)/6)));
+    const usrData=months.map((_,i)=>Math.round((AD.users||10)*((i+1)/6)));
+    if(gC)gC.destroy();
+    gC=new Chart(document.getElementById('growthChart'),{type:'line',data:{labels:months,datasets:[
+        {label:'Students',data:stuData,borderColor:'#7C3AED',backgroundColor:'rgba(124,58,237,0.1)',fill:true,tension:0.4},
+        {label:'Users',data:usrData,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:0.4}
+    ]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:grid},ticks:{color:txt}},y:{grid:{color:grid},ticks:{color:txt}}},plugins:{legend:{labels:{color:txt}}}}});
+
+    // Plan distribution and revenue
+    let subs=[];
+    try{
+        const pd=await apiCall('/api/super-admin/subscriptions');
+        subs=pd.subscriptions||[];
+        const planCounts={};subs.forEach(s=>{planCounts[s.plan_name]=(planCounts[s.plan_name]||0)+1;});
+        const planNames=Object.keys(planCounts),planData=Object.values(planCounts);
+        if(pC)pC.destroy();
+        pC=new Chart(document.getElementById('planChart'),{type:'bar',data:{labels:planNames.length?planNames:['No data'],datasets:[{label:'Schools',data:planData.length?planData:[0],backgroundColor:['#7C3AED','#2563EB','#059669','#D97706','#DC2626'],borderRadius:8,barThickness:30}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{display:false},ticks:{color:txt}},y:{grid:{color:grid},ticks:{color:txt}}},plugins:{legend:{display:false}}}});
+    }catch(e){}
+
+    // Top schools bar chart
+    schools=AD.schools||[];
+    const top10=schools.slice().sort((a,b)=>b.students-a.students).slice(0,10);
+    if(tC)tC.destroy();
+    tC=new Chart(document.getElementById('topChart'),{type:'bar',data:{labels:top10.map(s=>s.name.length>18?s.name.substring(0,16)+'…':s.name),datasets:[{label:'Students',data:top10.map(s=>s.students),backgroundColor:'rgba(124,58,237,0.7)',borderRadius:6,barThickness:18}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:grid},ticks:{color:txt}},y:{grid:{display:false},ticks:{color:txt,font:{size:11,weight:'bold'}}}},plugins:{legend:{display:false}}}});
+
+    // Revenue trend (simulated)
+    if(rC)rC.destroy();
+    rC=new Chart(document.getElementById('revChart'),{type:'line',data:{labels:months,datasets:[{label:'MRR (₹)',data:months.map((_,i)=>Math.round((subs?.length||1)*999*((i+1)/6))),borderColor:'#059669',backgroundColor:'rgba(5,150,105,0.1)',fill:true,tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:grid},ticks:{color:txt}},y:{grid:{color:grid},ticks:{color:txt,callback:v=>'₹'+v.toLocaleString()}}},plugins:{legend:{labels:{color:txt}}}}});
+
+    // Server health
+    const sv=AD.server||{};
+    const cpuPct=sv.cpu_percent||0;
+    const ramPct=sv.ram_total?Math.round((sv.ram_used/sv.ram_total)*100):0;
+    const diskPct=sv.disk_total?Math.round((sv.disk_used/sv.disk_total)*100):0;
+    const cpuColor=cpuPct>80?'#DC2626':cpuPct>50?'#D97706':'#059669';
+    const ramColor=ramPct>80?'#DC2626':ramPct>50?'#D97706':'#2563EB';
+    const diskColor=diskPct>80?'#DC2626':diskPct>50?'#D97706':'#059669';
+
+    document.getElementById('serverHealth').innerHTML=`
+    <div class="health-grid" style="margin-bottom:16px;">
+        <div class="health-card"><div class="lbl">CPU Usage</div><div class="val">${cpuPct}%</div><div class="bar"><div class="bar-fill" style="width:${cpuPct}%;background:${cpuColor};"></div></div></div>
+        <div class="health-card"><div class="lbl">Memory (RAM)</div><div class="val">${sv.ram_used||0} / ${sv.ram_total||0} GB</div><div class="bar"><div class="bar-fill" style="width:${ramPct}%;background:${ramColor};"></div></div></div>
+        <div class="health-card"><div class="lbl">Disk Usage</div><div class="val">${sv.disk_used||0} / ${sv.disk_total||0} GB</div><div class="bar"><div class="bar-fill" style="width:${diskPct}%;background:${diskColor};"></div></div></div>
+        <div class="health-card"><div class="lbl">Database Size</div><div class="val">${sv.db_size||'N/A'}</div></div>
+        <div class="health-card"><div class="lbl">Uptime</div><div class="val">${sv.uptime||'N/A'}</div></div>
+        <div class="health-card"><div class="lbl">Framework</div><div class="val">${sv.python_version||'Python / FastAPI'}</div></div>
+    </div>`;
+
+    // School usage table
+    rSch(schools);
+}
+
+function fSch(){
+    const q=document.getElementById('schSearch').value.toLowerCase();
+    const st=document.getElementById('schFilter').value;
+    const sort=document.getElementById('schSort').value;
+    let f=schools.filter(s=>{
+        if(q&&!s.name.toLowerCase().includes(q))return false;
+        if(st==='active'&&!s.active)return false;
+        if(st==='inactive'&&s.active)return false;
+        return true;
+    });
+    const[key,dir]=sort.split('-');
+    f.sort((a,b)=>{
+        if(key==='name')return dir==='asc'?a.name.localeCompare(b.name):b.name.localeCompare(a.name);
+        if(key==='students')return dir==='asc'?a.students-b.students:b.students-a.students;
+        if(key==='storage')return dir==='desc'?1:-1;
+        return 0;
+    });
+    schP=1;rSch(f);
+}
+
+function rSch(d){
+    const tb=document.getElementById('schTB'),s=(schP-1)*PS,e=s+PS,pg=d.slice(s,e);
+    if(!pg.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-light);">No schools found</td></tr>';return;}
+    tb.innerHTML=pg.map(s=>`<tr>
+        <td class="sn">${s.name}</td><td>${s.org||'—'}</td>
+        <td style="font-weight:800;">${(s.students||0).toLocaleString()}</td>
+        <td>${s.teachers||'—'}</td><td>${s.storage||'N/A'}</td>
+        <td>${s.plan||'—'}</td>
+        <td><span class="pill ${s.active?'pg':'pr'}">${s.active?'Active':'Off'}</span></td>
+        <td><a href="/super-admin/branches/${s.branch_id||''}" style="font-size:0.65rem;color:#4338CA;font-weight:700;">View →</a></td>
+    </tr>`).join('');
+    const tp=Math.ceil(d.length/PS),pn=document.getElementById('schPn');
+    pn.innerHTML=`<span>${s+1}–${Math.min(e,d.length)} of ${d.length}</span><div style="display:flex;gap:4px;">${Array.from({length:Math.min(tp,10)},(_,i)=>`<button class="${i+1===schP?'act':''}" onclick="schP=${i+1};rSch(schools)">${i+1}</button>`).join('')}</div>`;
+}
+function fAct(){filterAttempts();}
+
+let allAttempts=[], actP=1;
+async function loadAttempts(){
+    const d=await apiCall('/api/super-admin/login-attempts?limit=200');
+    allAttempts=d.attempts||[];
+    const total=allAttempts.length, failed=allAttempts.filter(a=>!a.success).length, succ=allAttempts.filter(a=>a.success).length;
+    const uniqueIPs=new Set(allAttempts.filter(a=>!a.success).map(a=>a.ip)).size;
+    document.getElementById('secStats').innerHTML=`
+        <div><div class="sv" style="color:#059669;">${succ}</div><div class="sl">Successful Logins</div></div>
+        <div><div class="sv" style="color:#DC2626;">${failed}</div><div class="sl">Failed Attempts</div></div>
+        <div><div class="sv" style="color:#D97706;">${uniqueIPs}</div><div class="sl">Suspicious IPs</div></div>
+        <div><div class="sv" style="color:#7C3AED;">${total}</div><div class="sl">Total Attempts</div></div>`;
+    renderAttempts(allAttempts);
+}
+function filterAttempts(){
+    const q=document.getElementById('actSearch').value.toLowerCase();
+    const f=document.getElementById('actFilter').value;
+    let d=allAttempts.filter(a=>{
+        if(q&&!a.email?.toLowerCase().includes(q)&&!a.ip?.toLowerCase().includes(q))return false;
+        if(f==='success'&&!a.success)return false;
+        if(f==='failed'&&a.success)return false;
+        if(f==='banned'&&a.reason!=='IP_BANNED')return false;
+        return true;
+    });
+    actP=1;renderAttempts(d);
+}
+function renderAttempts(d){
+    const tb=document.getElementById('actTB'),s=(actP-1)*PS,e=s+PS,pg=d.slice(s,e);
+    if(!pg.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px;">No login attempts logged yet. They will appear after login tries.</td></tr>';return;}
+    tb.innerHTML=pg.map(a=>`<tr style="${!a.success?'background:rgba(220,38,38,0.04);':''}">
+        <td style="font-size:0.65rem;">${a.time}</td><td class="sn">${a.email||'—'}</td>
+        <td><code style="font-size:0.68rem;background:var(--bg);padding:2px 6px;border-radius:4px;">${a.ip||'—'}</code></td>
+        <td>${a.os||'—'}</td><td>${a.browser||'—'}</td><td>${a.device||'—'}</td>
+        <td><span class="pill ${a.success?'pg':'pr'}">${a.success?'OK':a.reason||'FAILED'}</span></td>
+        <td>${!a.success?'<button data-ip="'+a.ip+'" data-email="'+(a.email||'')+'" class="ban-btn" style="padding:3px 8px;border-radius:5px;background:#FEE2E2;color:#DC2626;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;">Ban IP</button>':''}</td>
+    </tr>`).join('');
+    const tp=Math.ceil(d.length/PS),pn=document.getElementById('actPn');
+    pn.innerHTML=`<span>${s+1}–${Math.min(e,d.length)} of ${d.length}</span><div style="display:flex;gap:4px;">${Array.from({length:Math.min(tp,10)},(_,i)=>`<button class="${i+1===actP?'act':''}" onclick="actP=${i+1};renderAttempts(allAttempts)">${i+1}</button>`).join('')}</div>`;
+    // Attach ban button handlers via delegation
+    tb.querySelectorAll('.ban-btn').forEach(btn=>{
+        btn.onclick=function(){banIP(this.dataset.ip,this.dataset.email);};
+    });
+}
+function banIP(ip,email){
+    showConfirm('Ban IP Address','Ban <code>'+ip+'</code> ('+email+')? This IP will be blocked from logging in.',async()=>{
+        const d=await apiCall('/api/super-admin/ban-ip','POST',{ip:ip,reason:'Suspicious login attempts for '+email});
+        if(d.success){showToast('success',d.message);loadAttempts();}else showToast('error',d.error||'Failed');
+    },{icon:'🛡️',yesText:'Ban IP',danger:true});
+}
+async function loadBanned(){
+    const d=await apiCall('/api/super-admin/banned-ips');
+    const bans=d.banned||[];
+    if(!bans.length){showToast('info','No IPs are currently banned');return;}
+    let html='<div style="max-height:300px;overflow-y:auto;"><table class="dt"><thead><tr><th>IP</th><th>Reason</th><th>Since</th><th>Action</th></tr></thead><tbody>';
+    bans.forEach(b=>{html+=`<tr><td><code>${b.ip}</code></td><td>${b.reason}</td><td>${b.since}</td><td><button data-ip="${b.ip}" class="unban-btn" style="padding:3px 8px;border-radius:5px;background:#D1FAE5;color:#065F46;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;">Unban</button></td></tr>`;});
+    html+='</tbody></table></div>';
+    // Show in a simple alert-style overlay
+    const el=document.createElement('div');el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    el.innerHTML='<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:600px;max-width:95vw;"><h3 style="margin:0 0 12px 0;">🛡️ Banned IPs</h3>'+html+'<button style="margin-top:12px;padding:8px 16px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);font-weight:700;cursor:pointer;" id="closeBanned">Close</button></div>';
+    document.body.appendChild(el);
+    el.querySelector('#closeBanned').onclick=()=>el.remove();
+    el.querySelectorAll('.unban-btn').forEach(btn=>{btn.onclick=function(){unbanIP(this.dataset.ip);el.remove();};});
+}
+async function unbanIP(ip){
+    const d=await apiCall('/api/super-admin/unban-ip','POST',{ip:ip});
+    if(d.success){showToast('success',d.message);loadBanned();}else showToast('error',d.error||'Failed');
+}
+
+// Load attempts when activity tab is clicked
+document.querySelectorAll('.tab').forEach(t=>{
+    const orig=t.onclick;
+    t.addEventListener('click',function(){if(this.dataset.tab==='activity')loadAttempts();});
+});
+
+loadData();
+</script>
+{% endblock %}

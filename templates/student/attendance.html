@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}My Attendance{% endblock %}
+{% block page_title %}My Attendance{% endblock %}
+{% block page_subtitle %}Your personal attendance record — private to you{% endblock %}
+
+{% block extra_css %}
+<style>
+    .att-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    .att-stat { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; text-align: center; }
+    .att-stat .val { font-size: 1.6rem; font-weight: 800; }
+    .att-stat .lbl { font-size: 0.72rem; color: var(--text-light); }
+    .progress-bar { height: 12px; border-radius: 6px; background: #E5E7EB; overflow: hidden; margin: 16px 0; }
+    .progress-fill { height: 100%; border-radius: 6px; transition: width 1s ease; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    .cal-header { text-align: center; font-size: 0.72rem; font-weight: 700; color: var(--text-light); padding: 8px 0; }
+    .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: default; }
+    .cal-day.present { background: #D1FAE5; color: #059669; }
+    .cal-day.absent { background: #FEE2E2; color: #DC2626; }
+    .cal-day.late { background: #FEF3C7; color: #D97706; }
+    .cal-day.empty { opacity: 0.3; }
+    .cal-day.today { box-shadow: 0 0 0 2px var(--primary); }
+    .cal-day.sunday { color: var(--text-light); background: var(--bg-secondary); }
+    .month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 12px; }
+    .month-nav h3 { min-width: 160px; text-align: center; }
+    .encourage { text-align: center; padding: 12px; font-size: 0.82rem; border-radius: var(--radius-sm); margin-top: 16px; }
+    @media (max-width: 640px) { .att-summary { grid-template-columns: repeat(2, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="att-summary">
+    <div class="att-stat"><div class="val" style="color:var(--success);">{{ present }}</div><div class="lbl">Present</div></div>
+    <div class="att-stat"><div class="val" style="color:var(--danger);">{{ absent }}</div><div class="lbl">Absent</div></div>
+    <div class="att-stat"><div class="val" style="color:var(--warning);">{{ late }}</div><div class="lbl">Late</div></div>
+    <div class="att-stat"><div class="val" style="color:{% if att_pct >= 85 %}var(--success){% elif att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ att_pct }}%</div><div class="lbl">Attendance</div></div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <div style="font-size:0.82rem; text-align:center; margin-bottom:8px; color:var(--text-secondary);">Your Progress</div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width:{{ att_pct }}%; background: linear-gradient(90deg, {% if att_pct >= 85 %}#22C55E, #4ADE80{% elif att_pct >= 75 %}#F59E0B, #FBBF24{% else %}#EF4444, #F87171{% endif %});"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-light);">
+            <span>0%</span><span>75% (Min Required)</span><span>100%</span>
+        </div>
+        <div class="encourage" style="background:{% if att_pct >= 90 %}#D1FAE5{% elif att_pct >= 75 %}#DBEAFE{% else %}#FEF3C7{% endif %}; color:{% if att_pct >= 90 %}#059669{% elif att_pct >= 75 %}#2563EB{% else %}#D97706{% endif %};">
+            {% if att_pct >= 90 %}🌟 Fantastic! You're doing amazing with {{ att_pct }}% attendance!
+            {% elif att_pct >= 85 %}👍 Great job! {{ att_pct }}% attendance — keep going!
+            {% elif att_pct >= 75 %}📈 {{ att_pct }}% — you're above the minimum. Let's push higher!
+            {% elif att_pct > 0 %}💪 {{ att_pct }}% — every day matters. You can improve this!
+            {% else %}📋 No attendance recorded yet. Your journey starts today!{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>Attendance Calendar</h2></div>
+    <div class="card-body">
+        <div class="month-nav">
+            <button class="btn btn-ghost btn-sm" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+            <h3 id="monthLabel"></h3>
+            <button class="btn btn-ghost btn-sm" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="cal-grid">
+            <div class="cal-header">Sun</div><div class="cal-header">Mon</div><div class="cal-header">Tue</div>
+            <div class="cal-header">Wed</div><div class="cal-header">Thu</div><div class="cal-header">Fri</div><div class="cal-header">Sat</div>
+        </div>
+        <div class="cal-grid" id="calBody"></div>
+        <div style="display:flex; gap:12px; justify-content:center; margin-top:12px; font-size:0.72rem;">
+            <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#D1FAE5; margin-right:4px;"></span>Present</span>
+            <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#FEE2E2; margin-right:4px;"></span>Absent</span>
+            <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#FEF3C7; margin-right:4px;"></span>Late</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const calData = {{ cal_data | safe }};
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+
+function renderCalendar() {
+    document.getElementById('monthLabel').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const today = new Date();
+    let html = '';
+    for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const status = calData[dateStr] || '';
+        const isToday = today.getDate() === d && today.getMonth() === currentMonth && today.getFullYear() === currentYear;
+        const isSunday = new Date(currentYear, currentMonth, d).getDay() === 0;
+        html += `<div class="cal-day ${status} ${isToday ? 'today' : ''} ${isSunday && !status ? 'sunday' : ''}">${d}</div>`;
+    }
+    document.getElementById('calBody').innerHTML = html;
+}
+
+function changeMonth(dir) {
+    currentMonth += dir;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderCalendar();
+}
+
+renderCalendar();
+</script>
+{% endblock %}

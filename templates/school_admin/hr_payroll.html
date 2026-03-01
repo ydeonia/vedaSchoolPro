@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Payroll{% endblock %}
+{% block page_title %}💰 Payroll Management{% endblock %}
+{% block page_subtitle %}Generate salaries and download pay slips{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Generate Payroll</h2></div>
+    <div class="card-body">
+        <div style="display:flex; gap:10px; align-items:center;">
+            <select id="pMonth" class="form-select" style="max-width:150px;">
+                {% for m in range(1,13) %}<option value="{{ m }}" {% if m == month %}selected{% endif %}>{{ ['','January','February','March','April','May','June','July','August','September','October','November','December'][m] }}</option>{% endfor %}
+            </select>
+            <input type="number" id="pYear" class="form-input" value="{{ year }}" style="max-width:100px;">
+            <button class="btn btn-primary" onclick="generatePayroll()"><i class="fas fa-calculator"></i> Generate All Slips</button>
+        </div>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Salary Slips — {{ ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][month] }} {{ year }} ({{ slips|length }})</h2></div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Employee</th><th>Designation</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+        {% for s in slips %}<tr>
+            <td><strong>{{ s.employee_id }}</strong></td><td>—</td>
+            <td>₹{{ "{:,.0f}".format(s.gross_salary) }}</td><td>₹{{ "{:,.0f}".format(s.total_deductions) }}</td>
+            <td style="font-weight:800; color:var(--success);">₹{{ "{:,.0f}".format(s.net_salary) }}</td>
+            <td><span style="padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:700; background:#D1FAE5; color:#059669;">{{ s.status|title }}</span></td>
+            <td><a href="/api/school/hr/salary-slip-pdf/{{ s.id }}" target="_blank" class="btn btn-ghost btn-sm"><i class="fas fa-file-pdf" style="color:var(--danger);"></i></a></td>
+        </tr>{% endfor %}
+        {% if not slips %}<tr><td colspan="7"><div class="empty-state"><i class="fas fa-money-bill-wave"></i><h3>No Slips Generated</h3><p>Click "Generate All Slips" above to create salary slips.</p></div></td></tr>{% endif %}
+        </tbody></table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function generatePayroll(){
+    const m=parseInt(document.getElementById('pMonth').value), y=parseInt(document.getElementById('pYear').value);
+    const r=await apiCall('/api/school/hr/payroll/generate','POST',{month:m,year:y});
+    showToast('success','Payroll Generated',`${r.count} salary slips created`);
+    setTimeout(()=>location.reload(),1000);
+}
+</script>
+{% endblock %}

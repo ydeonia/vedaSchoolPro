@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Parent Dashboard{% endblock %}
+{% block page_title %}Welcome! 👋{% endblock %}
+{% block page_subtitle %}Your children's school overview{% endblock %}
+
+{% block extra_css %}
+<style>
+    .child-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; margin-bottom: 12px; border-left: 4px solid var(--primary); cursor: pointer; transition: all 0.2s; }
+    .child-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .child-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .child-avatar { width: 48px; height: 48px; border-radius: 50%; background: var(--primary-50); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; color: var(--primary); }
+    .child-name { font-weight: 800; font-size: 1rem; }
+    .child-meta { font-size: 0.75rem; color: var(--text-light); }
+    .child-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .child-stat { text-align: center; padding: 8px; border-radius: var(--radius-sm); background: var(--bg, #F8FAFC); }
+    .child-stat .val { font-size: 1.2rem; font-weight: 800; }
+    .child-stat .lbl { font-size: 0.68rem; color: var(--text-light); }
+    .today-pill { padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+    .today-pill.present { background: #D1FAE5; color: #059669; }
+    .today-pill.absent { background: #FEE2E2; color: #DC2626; }
+    .today-pill.none { background: var(--bg-secondary, #F1F5F9); color: var(--text-light); }
+    .quick-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px; }
+    .qs-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; text-align: center; }
+    .qs-val { font-size: 1.4rem; font-weight: 800; }
+    .qs-lbl { font-size: 0.72rem; color: var(--text-light); }
+    @media (max-width: 640px) { .child-stats { grid-template-columns: 1fr 1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="quick-stats">
+    <div class="qs-card"><div class="qs-val" style="color:var(--primary);">{{ children|length }}</div><div class="qs-lbl">Children</div></div>
+    <div class="qs-card"><div class="qs-val" style="color:{% if open_complaints > 0 %}var(--warning){% else %}var(--success){% endif %};">{{ open_complaints }}</div><div class="qs-lbl">{% if open_complaints > 0 %}Open Complaints{% else %}No Open Issues{% endif %}</div></div>
+</div>
+
+{% for c in children %}
+<a href="/parent/child/{{ c.student.id }}" style="text-decoration:none; color:inherit;">
+<div class="child-card">
+    <div class="child-header">
+        <div class="child-avatar">{{ c.student.first_name[0] }}</div>
+        <div style="flex:1;">
+            <div class="child-name">{{ c.student.full_name }}</div>
+            <div class="child-meta">{{ c.student.class_.name if c.student.class_ else '' }} {{ c.student.section.name if c.student.section else '' }} · Roll: {{ c.student.roll_number or '—' }}</div>
+        </div>
+        <span class="today-pill {{ c.today or 'none' }}">
+            {% if c.today == 'present' %}✅ Present{% elif c.today == 'absent' %}❌ Absent{% else %}📋 Not Marked{% endif %}
+        </span>
+    </div>
+    <div class="child-stats">
+        <div class="child-stat"><div class="val" style="color:{% if c.att_pct >= 85 %}var(--success){% elif c.att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ c.att_pct }}%</div><div class="lbl">Attendance</div></div>
+        <div class="child-stat"><div class="val" style="color:{% if c.pending_fees > 0 %}var(--danger){% else %}var(--success){% endif %};">{% if c.pending_fees > 0 %}₹{{ "{:,.0f}".format(c.pending_fees) }}{% else %}✅{% endif %}</div><div class="lbl">{% if c.pending_fees > 0 %}Pending{% else %}Clear{% endif %}</div></div>
+        <div class="child-stat"><div class="val" style="color:var(--primary);"><i class="fas fa-arrow-right"></i></div><div class="lbl">View Details</div></div>
+    </div>
+    <div style="margin-top:10px;text-align:right;">
+        <a href="/parent/child/{{ c.student.id }}/analytics" style="font-size:0.75rem;color:#6366F1;font-weight:700;text-decoration:none;">📊 View Performance Analytics →</a>
+    </div>
+</div>
+</a>
+{% endfor %}
+
+{% if announcements %}
+<div class="card" style="margin-top:16px;">
+    <div class="card-header"><h2><i class="fas fa-bullhorn" style="color:var(--primary);"></i> Announcements</h2></div>
+    <div class="card-body">
+        {% for a in announcements %}
+        <div style="padding:10px 0; border-bottom:1px solid var(--border-light); font-size:0.85rem;">
+            {% if a.is_pinned %}📌{% endif %} {% if a.is_emergency %}🚨{% endif %}
+            <strong>{{ a.title }}</strong>
+            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">{{ a.content[:150] }}{% if a.content|length > 150 %}...{% endif %}</div>
+            <div style="font-size:0.68rem; color:var(--text-light);">{{ a.created_at.strftime('%d %b %Y') if a.created_at else '' }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div style="font-size:0.72rem; color:var(--text-light); text-align:center; padding:12px;">
+    <i class="fas fa-lock"></i> Only you can see your children's data. Privacy is our priority.
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Id Cards{% endblock %}
+{% block page_title %}🪪 ID Card Generation{% endblock %}
+{% block page_subtitle %}Generate student and employee ID cards with school branding{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Student ID Cards</h2></div>
+    <div class="card-body">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <select id="idClass" class="form-select" style="max-width:200px;">
+                <option value="">Select Class</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-primary" onclick="loadStudents()"><i class="fas fa-search"></i> Load Students</button>
+        </div>
+        <div id="studentList" style="margin-top:12px;"></div>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Employee ID Cards</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px;">
+        {% for e in employees %}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--bg-secondary,#F8FAFC); border-radius:var(--radius-sm);">
+                <span style="font-size:0.85rem;"><strong>{{ e.full_name }}</strong><br><span style="font-size:0.72rem; color:var(--text-light);">{{ e.designation or 'Staff' }}</span></span>
+                <a href="/api/school/hr/employee-id-card/{{ e.id }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> PDF</a>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function loadStudents(){const cid=document.getElementById('idClass').value;if(!cid)return;try{const r=await fetch('/api/school/students?class_id='+cid);const d=await r.json();let h='';(d.students||[]).forEach(s=>{h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border-light);"><span>'+s.name+'</span><a href="/api/school/hr/student-id-card/'+s.id+'" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> ID Card PDF</a></div>';});document.getElementById('studentList').innerHTML=h||'No students';}catch(e){showToast('error','Load failed');}}
+</script>
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Communication Settings{% endblock %}
+{% block page_title %}Communication Settings{% endblock %}
+{% block page_subtitle %}Configure messaging channels & protect everyone's personal time{% endblock %}
+
+{% block extra_css %}
+<style>
+    .section-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 20px; border: 1.5px solid var(--border-light); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
+    .section-header h3 { font-size: 0.95rem; }
+    .section-body { padding: 20px; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+    .toggle-row:last-child { border: none; }
+    .toggle-label { font-weight: 600; font-size: 0.85rem; }
+    .toggle-desc { font-size: 0.72rem; color: var(--text-light); margin-top: 2px; }
+    .toggle-switch { width: 48px; height: 26px; border-radius: 13px; background: var(--border); cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; }
+    .toggle-switch.on { background: var(--primary); }
+    .toggle-switch .toggle-dot { width: 22px; height: 22px; border-radius: 50%; background: white; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .toggle-switch.on .toggle-dot { transform: translateX(22px); }
+    .trust-banner { padding: 14px 18px; background: linear-gradient(135deg, #F0FDF4, #ECFDF5); border: 1px solid #86EFAC; border-radius: var(--radius); margin-bottom: 20px; }
+    .trust-banner h4 { color: #166534; font-size: 0.88rem; margin-bottom: 6px; }
+    .trust-banner p { font-size: 0.78rem; color: #166534; line-height: 1.5; }
+    .trust-banner ul { font-size: 0.78rem; color: #166534; margin: 8px 0 0 16px; line-height: 1.6; }
+    .quiet-time-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    .quiet-time-row input[type="time"] { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 0.88rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } .quiet-time-row { flex-wrap: wrap; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Trust Banner -->
+<div class="trust-banner">
+    <h4><i class="fas fa-shield-alt"></i> Trust-First Communication</h4>
+    <p>EduFlow protects everyone's personal time. These settings ensure:</p>
+    <ul>
+        <li>🌙 <strong>Quiet Hours:</strong> No notifications sent during off-hours (default 8 PM – 7 AM)</li>
+        <li>🛡️ <strong>Admin-Moderated:</strong> Parent messages go through admin by default</li>
+        <li>🚨 <strong>Emergency Override:</strong> Only truly urgent messages bypass quiet hours</li>
+        <li>📵 <strong>No Spam:</strong> Notifications grouped by importance, not volume</li>
+    </ul>
+</div>
+
+<!-- Quiet Hours & Boundaries -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-moon" style="color: #7C3AED;"></i> Quiet Hours & Boundaries</h3>
+    </div>
+    <div class="section-body">
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">🌙 Quiet Hours</div>
+                <div class="toggle-desc">Block non-emergency notifications during off-hours. Protects teachers' and parents' personal time.</div>
+                <div class="quiet-time-row" id="quietTimeRow">
+                    <span style="font-size:0.82rem;">From</span>
+                    <input type="time" id="quietStart" value="20:00">
+                    <span style="font-size:0.82rem;">to</span>
+                    <input type="time" id="quietEnd" value="07:00">
+                </div>
+            </div>
+            <div class="toggle-switch on" id="toggleQuiet" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+        </div>
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">🚨 Emergency Override</div>
+                <div class="toggle-desc">Allow emergency announcements to bypass quiet hours (rare — only for urgent school-wide alerts)</div>
+            </div>
+            <div class="toggle-switch on" id="toggleEmergency" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+        </div>
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">💬 Parent-Teacher Direct Chat</div>
+                <div class="toggle-desc">Allow parents to message teachers directly (OFF by default — prevents 24×7 disturbance)</div>
+            </div>
+            <div class="toggle-switch" id="toggleParentChat" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+        </div>
+        <div class="toggle-row">
+            <div>
+                <div class="toggle-label">👁️ Admin-Moderated Messages</div>
+                <div class="toggle-desc">Admin reviews parent messages before they reach teachers (recommended)</div>
+            </div>
+            <div class="toggle-switch on" id="toggleModerated" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Email SMTP -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-envelope" style="color: #2563EB;"></i> Email (SMTP)</h3>
+        <div class="toggle-switch" id="toggleEmail" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+    </div>
+    <div class="section-body" id="emailSection">
+        <div class="form-row">
+            <div class="form-group" style="margin:0;"><label class="form-label">SMTP Host</label>
+                <input type="text" id="smtpHost" class="form-input" placeholder="smtp.gmail.com"></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">SMTP Port</label>
+                <input type="number" id="smtpPort" class="form-input" value="587" placeholder="587"></div>
+        </div>
+        <div class="form-row" style="margin-top:12px;">
+            <div class="form-group" style="margin:0;"><label class="form-label">Username / Email</label>
+                <input type="text" id="smtpUser" class="form-input" placeholder="school@gmail.com"></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">Password (encrypted)</label>
+                <input type="password" id="smtpPass" class="form-input" placeholder="Leave blank to keep existing"></div>
+        </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">From Email</label>
+            <input type="text" id="fromEmail" class="form-input" placeholder="noreply@school.edu" style="max-width:400px;"></div>
+    </div>
+</div>
+
+<!-- SMS -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-sms" style="color: #059669;"></i> SMS</h3>
+        <div class="toggle-switch" id="toggleSms" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+    </div>
+    <div class="section-body">
+        <div class="form-row">
+            <div class="form-group" style="margin:0;"><label class="form-label">Provider</label>
+                <select id="smsProvider" class="form-select"><option value="msg91">MSG91</option><option value="twilio">Twilio</option><option value="textlocal">TextLocal</option></select></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">Sender ID</label>
+                <input type="text" id="smsSender" class="form-input" placeholder="SCHOOL"></div>
+        </div>
+        <div class="form-group" style="margin-top:12px;"><label class="form-label">API Key (encrypted)</label>
+            <input type="password" id="smsKey" class="form-input" placeholder="Leave blank to keep existing" style="max-width:400px;"></div>
+    </div>
+</div>
+
+<!-- WhatsApp -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fab fa-whatsapp" style="color: #25D366;"></i> WhatsApp Business API</h3>
+        <div class="toggle-switch" id="toggleWhatsapp" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div>
+    </div>
+    <div class="section-body">
+        <div class="form-row">
+            <div class="form-group" style="margin:0;"><label class="form-label">Phone Number ID</label>
+                <input type="text" id="waPhoneId" class="form-input" placeholder="From Meta Business Suite"></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">API Token (encrypted)</label>
+                <input type="password" id="waToken" class="form-input" placeholder="Leave blank to keep existing"></div>
+        </div>
+    </div>
+</div>
+
+<div style="text-align:center; margin-top:16px;">
+    <button class="btn btn-primary btn-lg" onclick="saveAll()" id="saveBtn"><i class="fas fa-save"></i> Save All Communication Settings</button>
+    <div style="font-size:0.72rem; color:var(--text-light); margin-top:8px;">✏️ You can change these settings anytime. Quiet hours protect everyone's personal time.</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function saveAll() {
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    try {
+        const data = {
+            quiet_hours_enabled: document.getElementById('toggleQuiet').classList.contains('on'),
+            quiet_start: document.getElementById('quietStart').value,
+            quiet_end: document.getElementById('quietEnd').value,
+            allow_emergency_override: document.getElementById('toggleEmergency').classList.contains('on'),
+            parent_teacher_chat_enabled: document.getElementById('toggleParentChat').classList.contains('on'),
+            admin_moderated_messages: document.getElementById('toggleModerated').classList.contains('on'),
+            email_enabled: document.getElementById('toggleEmail').classList.contains('on'),
+            smtp_host: document.getElementById('smtpHost').value || null,
+            smtp_port: parseInt(document.getElementById('smtpPort').value) || 587,
+            smtp_username: document.getElementById('smtpUser').value || null,
+            smtp_password: document.getElementById('smtpPass').value || null,
+            from_email: document.getElementById('fromEmail').value || null,
+            sms_enabled: document.getElementById('toggleSms').classList.contains('on'),
+            sms_provider: document.getElementById('smsProvider').value || null,
+            sms_api_key: document.getElementById('smsKey').value || null,
+            sms_sender_id: document.getElementById('smsSender').value || null,
+            whatsapp_enabled: document.getElementById('toggleWhatsapp').classList.contains('on'),
+            whatsapp_api_token: document.getElementById('waToken').value || null,
+            whatsapp_phone_id: document.getElementById('waPhoneId').value || null,
+        };
+        const result = await apiCall('/api/school/communication-settings/save', 'POST', data);
+        showToast('success', 'Settings Saved! ✅', result.message);
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save All Communication Settings';
+}
+
+// Load existing
+(async function() {
+    try {
+        const result = await apiCall('/api/school/communication-settings/load');
+        if (result.config) {
+            const c = result.config;
+            if (c.quiet_hours_enabled) document.getElementById('toggleQuiet').classList.add('on'); else document.getElementById('toggleQuiet').classList.remove('on');
+            document.getElementById('quietStart').value = c.quiet_start;
+            document.getElementById('quietEnd').value = c.quiet_end;
+            if (c.allow_emergency_override) document.getElementById('toggleEmergency').classList.add('on'); else document.getElementById('toggleEmergency').classList.remove('on');
+            if (c.parent_teacher_chat_enabled) document.getElementById('toggleParentChat').classList.add('on'); else document.getElementById('toggleParentChat').classList.remove('on');
+            if (c.admin_moderated_messages) document.getElementById('toggleModerated').classList.add('on'); else document.getElementById('toggleModerated').classList.remove('on');
+            if (c.email_enabled) document.getElementById('toggleEmail').classList.add('on');
+            document.getElementById('smtpHost').value = c.smtp_host;
+            document.getElementById('smtpPort').value = c.smtp_port;
+            document.getElementById('smtpUser').value = c.smtp_username;
+            document.getElementById('fromEmail').value = c.from_email;
+            if (c.sms_enabled) document.getElementById('toggleSms').classList.add('on');
+            document.getElementById('smsSender').value = c.sms_sender_id;
+            if (c.whatsapp_enabled) document.getElementById('toggleWhatsapp').classList.add('on');
+            document.getElementById('waPhoneId').value = c.whatsapp_phone_id;
+        }
+    } catch(e) {}
+})();
+</script>
+{% endblock %}

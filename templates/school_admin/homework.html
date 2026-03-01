@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Homework{% endblock %}
+{% block page_title %}📝 Homework & Assignments{% endblock %}
+{% block page_subtitle %}Assign and track homework across classes{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Assign Homework</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <select id="hwClass" class="form-select"><option value="">Class</option>{% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select>
+            <select id="hwSubject" class="form-select"><option value="">Subject</option>{% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}</select>
+            <input type="date" id="hwDue" class="form-input">
+        </div>
+        <input type="text" id="hwTitle" class="form-input mt-2" placeholder="Homework title *">
+        <textarea id="hwDesc" class="form-input mt-2" rows="2" placeholder="Description / Instructions"></textarea>
+        <button class="btn btn-primary mt-2" onclick="addHomework()"><i class="fas fa-paper-plane"></i> Assign</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Recent Homework ({{ homework_list|length }})</h2></div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Title</th><th>Due</th><th>Class</th><th>Subject</th></tr></thead>
+        <tbody>{% for h in homework_list %}<tr><td><strong>{{ h.title }}</strong></td><td>{{ h.due_date.strftime('%d %b') if h.due_date else '—' }}</td><td>{{ h.class_id }}</td><td>{{ h.subject_id }}</td></tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function addHomework(){const d={class_id:document.getElementById('hwClass').value,subject_id:document.getElementById('hwSubject').value,title:document.getElementById('hwTitle').value,description:document.getElementById('hwDesc').value,due_date:document.getElementById('hwDue').value};if(!d.title||!d.class_id||!d.subject_id||!d.due_date){showToast('error','Fill all required fields');return;}await apiCall('/api/school/homework/create','POST',d);showToast('success','Homework Assigned');setTimeout(()=>location.reload(),800);}
+</script>
+{% endblock %}

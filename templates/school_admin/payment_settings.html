@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+{% block title %}Payment Settings{% endblock %}
+{% block page_title %}Payment Gateway Settings{% endblock %}
+{% block page_subtitle %}Configure online payments, UPI & bank details for fee collection{% endblock %}
+
+{% block extra_css %}
+<style>
+    .section-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 20px; border: 1.5px solid var(--border-light); }
+    .section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
+    .section-header h3 { font-size: 0.95rem; }
+    .section-header h3 i { margin-right: 8px; }
+    .section-body { padding: 20px; }
+    .section-note { font-size: 0.75rem; color: var(--text-light); }
+
+    .info-banner { padding: 12px 16px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: var(--radius-sm); margin-bottom: 20px; font-size: 0.82rem; color: #1E40AF; }
+    .info-banner i { margin-right: 6px; }
+
+    /* Gateway Cards */
+    .gw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .gw-card { padding: 16px; border: 2px solid var(--border); border-radius: var(--radius); text-align: center; cursor: pointer; transition: all 0.2s; position: relative; }
+    .gw-card:hover { border-color: var(--primary-light); }
+    .gw-card.selected { border-color: var(--primary); background: var(--primary-50); }
+    .gw-card.selected::after { content: '✓'; position: absolute; top: 6px; right: 8px; color: var(--primary); font-weight: 800; font-size: 0.85rem; }
+    .gw-icon { width: 44px; height: 44px; border-radius: 10px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.82rem; color: white; }
+    .gw-icon.rzp { background: #2563EB; }
+    .gw-icon.payu { background: #EF4444; }
+    .gw-icon.cf { background: #7C3AED; }
+    .gw-icon.pp { background: #5B21B6; }
+    .gw-icon.stripe { background: #6366F1; }
+    .gw-icon.manual { background: #374151; }
+    .gw-name { font-weight: 700; font-size: 0.82rem; margin-top: 4px; }
+    .gw-desc { font-size: 0.68rem; color: var(--text-light); margin-top: 2px; }
+
+    /* Credentials */
+    .cred-box { padding: 16px 20px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: var(--radius-sm); margin-top: 16px; }
+    .cred-box h4 { font-size: 0.85rem; margin-bottom: 12px; }
+    .cred-link { font-size: 0.78rem; padding: 8px 12px; background: #FEF3C7; border-radius: var(--radius-sm); margin-bottom: 12px; display: inline-block; }
+    .cred-link a { color: var(--primary); font-weight: 600; }
+
+    /* Payment Method Pills */
+    .method-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .method-pill { padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.2s; user-select: none; }
+    .method-pill.active { border-color: var(--primary); background: var(--primary-50); color: var(--primary); }
+    .method-pill:hover { border-color: var(--primary-light); }
+    .method-pill i { margin-right: 4px; }
+
+    /* Toggle */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; }
+    .toggle-switch { width: 48px; height: 26px; border-radius: 13px; background: var(--border); cursor: pointer; position: relative; transition: background 0.2s; }
+    .toggle-switch.on { background: var(--primary); }
+    .toggle-switch .toggle-dot { width: 22px; height: 22px; border-radius: 50%; background: white; position: absolute; top: 2px; left: 2px; transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .toggle-switch.on .toggle-dot { transform: translateX(22px); }
+
+    /* UPI Section */
+    .upi-section { background: #F0FDF4; border: 1px solid #86EFAC; border-radius: var(--radius-sm); padding: 20px; }
+    .bank-section { background: #EFF6FF; border: 1px solid #93C5FD; border-radius: var(--radius-sm); padding: 20px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .qr-upload { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+    .qr-placeholder { width: 80px; height: 80px; border: 2px dashed var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: var(--text-light); font-size: 2rem; }
+
+    @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } .gw-grid { grid-template-columns: repeat(3, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Online Payment Gateway -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-credit-card" style="color: var(--primary);"></i> Online Payment Gateway</h3>
+        <span class="section-note">For online fee collection & payment links</span>
+    </div>
+    <div class="section-body">
+        <div class="info-banner">
+            <i class="fas fa-shield-alt"></i>
+            <strong>Direct settlement:</strong> Payments go directly to your bank account. EduFlow never holds your funds. Credentials are AES-256 encrypted.
+        </div>
+
+        <div class="toggle-row">
+            <div>
+                <strong>Enable Online Payments</strong>
+                <div style="font-size: 0.78rem; color: var(--text-secondary);">Allow parents to pay fees online</div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <label style="font-size: 0.78rem; display: flex; align-items: center; gap: 4px; color: var(--warning);">
+                    <input type="checkbox" id="testMode"> <i class="fas fa-flask"></i> Test Mode (sandbox)
+                </label>
+                <div class="toggle-switch" id="onlineToggle" onclick="toggleOnline()"><div class="toggle-dot"></div></div>
+            </div>
+        </div>
+
+        <h4 style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin: 16px 0 12px;">Select Gateway</h4>
+        <div class="gw-grid">
+            <div class="gw-card" onclick="selectGateway('razorpay')" id="gw-razorpay">
+                <div class="gw-icon rzp">Rzp</div>
+                <div class="gw-name">Razorpay</div>
+                <div class="gw-desc">Most popular · India</div>
+            </div>
+            <div class="gw-card" onclick="selectGateway('payu')" id="gw-payu">
+                <div class="gw-icon payu">PayU</div>
+                <div class="gw-name">PayU</div>
+                <div class="gw-desc">India · All banks</div>
+            </div>
+            <div class="gw-card" onclick="selectGateway('cashfree')" id="gw-cashfree">
+                <div class="gw-icon cf">CF</div>
+                <div class="gw-name">Cashfree</div>
+                <div class="gw-desc">Low fees · India</div>
+            </div>
+            <div class="gw-card" onclick="selectGateway('phonepe')" id="gw-phonepe">
+                <div class="gw-icon pp">PP</div>
+                <div class="gw-name">PhonePe PG</div>
+                <div class="gw-desc">UPI first · India</div>
+            </div>
+            <div class="gw-card" onclick="selectGateway('stripe')" id="gw-stripe">
+                <div class="gw-icon stripe">S</div>
+                <div class="gw-name">Stripe</div>
+                <div class="gw-desc">International</div>
+            </div>
+            <div class="gw-card" onclick="selectGateway('manual')" id="gw-manual">
+                <div class="gw-icon manual">✓</div>
+                <div class="gw-name">Manual</div>
+                <div class="gw-desc">UPI / Cash only</div>
+            </div>
+        </div>
+
+        <!-- Dynamic Credentials -->
+        <div id="credentialsArea"></div>
+
+        <!-- Accepted Methods -->
+        <h4 style="font-size: 0.82rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin: 20px 0 10px;">Accepted Payment Methods</h4>
+        <div class="method-pills">
+            <div class="method-pill active" onclick="toggleMethod(this, 'upi')" id="m-upi"><i class="fas fa-mobile-alt"></i> UPI</div>
+            <div class="method-pill active" onclick="toggleMethod(this, 'cards')" id="m-cards"><i class="fas fa-credit-card"></i> Card</div>
+            <div class="method-pill active" onclick="toggleMethod(this, 'netbanking')" id="m-netbanking"><i class="fas fa-university"></i> Net Banking</div>
+            <div class="method-pill" onclick="toggleMethod(this, 'wallets')" id="m-wallets"><i class="fas fa-wallet"></i> Wallets</div>
+            <div class="method-pill" onclick="toggleMethod(this, 'emi')" id="m-emi"><i class="fas fa-calendar-alt"></i> EMI</div>
+        </div>
+
+        <div style="margin-top: 20px; text-align: left;">
+            <button class="btn btn-primary" onclick="saveGatewaySettings()" id="saveGwBtn"><i class="fas fa-save"></i> Save Gateway Settings</button>
+            <button class="btn btn-secondary" onclick="testConnection()" style="margin-left: 8px;"><i class="fas fa-plug"></i> Test Connection</button>
+        </div>
+    </div>
+</div>
+
+<!-- UPI & Bank Details -->
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-qrcode" style="color: var(--success);"></i> UPI & Bank Details</h3>
+        <span class="section-note">Shown on invoices & receipts</span>
+    </div>
+    <div class="section-body">
+        <!-- UPI -->
+        <div class="upi-section" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="color: var(--success); font-size: 0.88rem;"><i class="fas fa-mobile-alt"></i> UPI Payment</h4>
+                <label style="font-size: 0.78rem; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="showUpiInvoice" checked> Show on invoice
+                </label>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="margin:0;">
+                    <label class="form-label">UPI ID *</label>
+                    <input type="text" id="upiId" class="form-input" placeholder="school@ybl / school@paytm">
+                    <div style="font-size:0.72rem; color:var(--success); margin-top:4px;">e.g. schoolname@ybl, schoolname@paytm, 9876543210@upi</div>
+                </div>
+                <div class="form-group" style="margin:0;">
+                    <label class="form-label">UPI Display Name</label>
+                    <input type="text" id="upiDisplayName" class="form-input" placeholder="School Name">
+                </div>
+            </div>
+            <div style="margin-top: 12px;">
+                <label class="form-label">UPI QR Code <span style="font-weight:400; color:var(--text-light);">(optional — upload custom QR image)</span></label>
+                <div class="qr-upload">
+                    <div class="qr-placeholder"><i class="fas fa-qrcode"></i></div>
+                    <div>
+                        <button class="btn btn-secondary btn-sm"><i class="fas fa-upload"></i> Upload QR Image</button>
+                        <div style="font-size:0.72rem; color:var(--text-light); margin-top:4px;">Or leave blank — QR is auto-generated from UPI ID above</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bank Account -->
+        <div class="bank-section">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <h4 style="color: #2563EB; font-size: 0.88rem;"><i class="fas fa-university"></i> Bank Account</h4>
+                <label style="font-size: 0.78rem; display: flex; align-items: center; gap: 6px;">
+                    <input type="checkbox" id="showBankInvoice" checked> Show on invoice
+                </label>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="margin:0;"><label class="form-label">Account Holder Name</label>
+                    <input type="text" id="bankHolder" class="form-input" placeholder="School Trust Name"></div>
+                <div class="form-group" style="margin:0;"><label class="form-label">Bank Name</label>
+                    <input type="text" id="bankName" class="form-input" placeholder="HDFC Bank, SBI, ICICI..."></div>
+            </div>
+            <div class="form-row" style="margin-top:12px;">
+                <div class="form-group" style="margin:0;"><label class="form-label">Account Number</label>
+                    <input type="text" id="bankAccount" class="form-input" placeholder="XXXXXXXXXXXX"></div>
+                <div class="form-group" style="margin:0;"><label class="form-label">IFSC Code</label>
+                    <input type="text" id="bankIfsc" class="form-input" placeholder="HDFC0001234"></div>
+            </div>
+            <div class="form-row" style="margin-top:12px;">
+                <div class="form-group" style="margin:0;"><label class="form-label">Branch</label>
+                    <input type="text" id="bankBranch" class="form-input" placeholder="Koramangala, Bengaluru"></div>
+                <div class="form-group" style="margin:0;"><label class="form-label">Account Type</label>
+                    <select id="bankType" class="form-select"><option value="current">Current</option><option value="savings">Savings</option></select></div>
+            </div>
+        </div>
+
+        <!-- WhatsApp -->
+        <div style="margin-top: 20px;">
+            <label class="form-label"><i class="fab fa-whatsapp" style="color: #25D366;"></i> WhatsApp Business Number</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="text" id="whatsappNum" class="form-input" placeholder="91XXXXXXXXXX (with country code, no +)" style="max-width: 300px;">
+                <span style="font-size: 0.78rem; color: var(--text-light);">Used for sending payment links via WhatsApp</span>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button class="btn btn-primary" onclick="saveAllSettings()" id="saveAllBtn"><i class="fas fa-save"></i> Save All Settings</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedGw = 'manual';
+let methods = { upi: true, cards: true, netbanking: true, wallets: false, emi: false };
+
+const GW_CREDS = {
+    razorpay: { title: 'Razorpay Credentials', link: 'Razorpay Dashboard → Settings → API Keys', linkUrl: 'https://dashboard.razorpay.com', fields: [
+        {id: 'rzpKeyId', label: 'KEY ID', placeholder: 'rzp_live_XXXXXXXXXXXXXXX'},
+        {id: 'rzpKeySecret', label: 'KEY SECRET (ENCRYPTED)', placeholder: 'Leave blank to keep existing', secret: true},
+        {id: 'rzpWebhook', label: 'WEBHOOK SECRET (OPTIONAL)', placeholder: 'Leave blank to keep existing', secret: true},
+    ]},
+    payu: { title: 'PayU Credentials', link: 'PayU Dashboard → Merchant Key', linkUrl: 'https://payu.in', fields: [
+        {id: 'payuKey', label: 'MERCHANT KEY', placeholder: 'Your PayU merchant key'},
+        {id: 'payuSalt', label: 'MERCHANT SALT (ENCRYPTED)', placeholder: 'Leave blank to keep existing', secret: true},
+    ]},
+    cashfree: { title: 'Cashfree Credentials', link: 'Cashfree Dashboard → API Keys', linkUrl: 'https://merchant.cashfree.com', fields: [
+        {id: 'cfAppId', label: 'APP ID', placeholder: 'Your Cashfree App ID'},
+        {id: 'cfSecret', label: 'SECRET KEY (ENCRYPTED)', placeholder: 'Leave blank to keep existing', secret: true},
+    ]},
+    phonepe: { title: 'PhonePe PG Credentials', link: 'PhonePe Business → API Keys', linkUrl: 'https://business.phonepe.com', fields: [
+        {id: 'ppMerchant', label: 'MERCHANT ID', placeholder: 'Your PhonePe Merchant ID'},
+        {id: 'ppSalt', label: 'SALT KEY (ENCRYPTED)', placeholder: 'Leave blank to keep existing', secret: true},
+    ]},
+    stripe: { title: 'Stripe Credentials', link: 'Stripe Dashboard → Developers → API Keys', linkUrl: 'https://dashboard.stripe.com/apikeys', fields: [
+        {id: 'stripePublic', label: 'PUBLISHABLE KEY', placeholder: 'pk_live_XXXXXXXXXXXXXXX'},
+        {id: 'stripeSecret', label: 'SECRET KEY (ENCRYPTED)', placeholder: 'Leave blank to keep existing', secret: true},
+    ]},
+    manual: { title: null, fields: [] },
+};
+
+function selectGateway(gw) {
+    selectedGw = gw;
+    document.querySelectorAll('.gw-card').forEach(c => c.classList.remove('selected'));
+    document.getElementById('gw-' + gw).classList.add('selected');
+    renderCredentials(gw);
+}
+
+function renderCredentials(gw) {
+    const config = GW_CREDS[gw];
+    const area = document.getElementById('credentialsArea');
+    if (!config.title) { area.innerHTML = ''; return; }
+    area.innerHTML = `<div class="cred-box">
+        <h4><i class="fas fa-key"></i> ${config.title}</h4>
+        <div class="cred-link"><i class="fas fa-external-link-alt"></i> Get keys from <a href="${config.linkUrl}" target="_blank">${config.link}</a></div>
+        <div class="form-row">${config.fields.map(f => `
+            <div class="form-group" style="margin:0;">
+                <label class="form-label">${f.label}</label>
+                <input type="${f.secret ? 'password' : 'text'}" id="${f.id}" class="form-input" placeholder="${f.placeholder}">
+            </div>
+        `).join('')}</div>
+    </div>`;
+}
+
+function toggleOnline() {
+    const el = document.getElementById('onlineToggle');
+    el.classList.toggle('on');
+}
+
+function toggleMethod(el, method) {
+    methods[method] = !methods[method];
+    el.classList.toggle('active');
+}
+
+async function saveAllSettings() {
+    const btn = document.getElementById('saveAllBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const data = {
+        online_payments_enabled: document.getElementById('onlineToggle').classList.contains('on'),
+        test_mode: document.getElementById('testMode').checked,
+        selected_gateway: selectedGw,
+        // Gateway creds
+        razorpay_key_id: document.getElementById('rzpKeyId')?.value || null,
+        razorpay_key_secret: document.getElementById('rzpKeySecret')?.value || null,
+        razorpay_webhook_secret: document.getElementById('rzpWebhook')?.value || null,
+        payu_merchant_key: document.getElementById('payuKey')?.value || null,
+        payu_merchant_salt: document.getElementById('payuSalt')?.value || null,
+        cashfree_app_id: document.getElementById('cfAppId')?.value || null,
+        cashfree_secret_key: document.getElementById('cfSecret')?.value || null,
+        phonepe_merchant_id: document.getElementById('ppMerchant')?.value || null,
+        phonepe_salt_key: document.getElementById('ppSalt')?.value || null,
+        stripe_publishable_key: document.getElementById('stripePublic')?.value || null,
+        stripe_secret_key: document.getElementById('stripeSecret')?.value || null,
+        // Methods
+        accept_upi: methods.upi, accept_cards: methods.cards,
+        accept_netbanking: methods.netbanking, accept_wallets: methods.wallets, accept_emi: methods.emi,
+        // UPI
+        upi_enabled: !!document.getElementById('upiId').value,
+        upi_id: document.getElementById('upiId').value || null,
+        upi_display_name: document.getElementById('upiDisplayName').value || null,
+        show_upi_on_invoice: document.getElementById('showUpiInvoice').checked,
+        // Bank
+        bank_transfer_enabled: !!document.getElementById('bankAccount').value,
+        bank_name: document.getElementById('bankName').value || null,
+        account_number: document.getElementById('bankAccount').value || null,
+        ifsc_code: document.getElementById('bankIfsc').value || null,
+        account_holder: document.getElementById('bankHolder').value || null,
+        bank_branch: document.getElementById('bankBranch').value || null,
+        account_type: document.getElementById('bankType').value,
+        show_bank_on_invoice: document.getElementById('showBankInvoice').checked,
+        whatsapp_number: document.getElementById('whatsappNum').value || null,
+    };
+
+    try {
+        const result = await apiCall('/api/school/payment-settings/save', 'POST', data);
+        showToast('success', 'Settings Saved! ✅', result.message);
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save All Settings';
+}
+
+function saveGatewaySettings() { saveAllSettings(); }
+function testConnection() { showToast('info', 'Test Connection', 'Gateway test will be available when online payments are enabled'); }
+
+// Load existing on page load
+(async function() {
+    try {
+        const result = await apiCall('/api/school/payment-settings/load');
+        if (result.config) {
+            const c = result.config;
+            if (c.online_payments_enabled) document.getElementById('onlineToggle').classList.add('on');
+            document.getElementById('testMode').checked = c.test_mode;
+            selectGateway(c.selected_gateway || 'manual');
+            // Load creds after rendering
+            setTimeout(() => {
+                if (c.razorpay_key_id && document.getElementById('rzpKeyId')) document.getElementById('rzpKeyId').value = c.razorpay_key_id;
+                if (c.payu_merchant_key && document.getElementById('payuKey')) document.getElementById('payuKey').value = c.payu_merchant_key;
+                if (c.cashfree_app_id && document.getElementById('cfAppId')) document.getElementById('cfAppId').value = c.cashfree_app_id;
+                if (c.phonepe_merchant_id && document.getElementById('ppMerchant')) document.getElementById('ppMerchant').value = c.phonepe_merchant_id;
+                if (c.stripe_publishable_key && document.getElementById('stripePublic')) document.getElementById('stripePublic').value = c.stripe_publishable_key;
+            }, 100);
+            // Methods
+            ['upi','cards','netbanking','wallets','emi'].forEach(m => {
+                methods[m] = c['accept_' + m];
+                document.getElementById('m-' + m).classList.toggle('active', c['accept_' + m]);
+            });
+            // UPI
+            document.getElementById('upiId').value = c.upi_id;
+            document.getElementById('upiDisplayName').value = c.upi_display_name;
+            document.getElementById('showUpiInvoice').checked = c.show_upi_on_invoice;
+            // Bank
+            document.getElementById('bankHolder').value = c.account_holder;
+            document.getElementById('bankName').value = c.bank_name;
+            document.getElementById('bankAccount').value = c.account_number;
+            document.getElementById('bankIfsc').value = c.ifsc_code;
+            document.getElementById('bankBranch').value = c.bank_branch;
+            document.getElementById('bankType').value = c.account_type;
+            document.getElementById('showBankInvoice').checked = c.show_bank_on_invoice;
+            document.getElementById('whatsappNum').value = c.whatsapp_number;
+        }
+    } catch(e) {}
+})();
+</script>
+{% endblock %}

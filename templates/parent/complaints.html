@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Complaints{% endblock %}
+{% block page_title %}My Complaints{% endblock %}
+{% block page_subtitle %}Voice your concerns — we take every feedback seriously{% endblock %}
+
+{% block extra_css %}
+<style>
+    .comp-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; margin-bottom: 8px; border-left: 4px solid var(--primary); }
+    .comp-card.escalated { border-left-color: #7C3AED; }
+    .comp-card.resolved { border-left-color: var(--success); }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+    .status-dot.open { background: var(--warning); }
+    .status-dot.in_progress { background: var(--info); }
+    .status-dot.escalated { background: #7C3AED; }
+    .status-dot.resolved { background: var(--success); }
+    .status-dot.closed { background: var(--text-light); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>File a New Complaint</h2></div>
+    <div class="card-body">
+        <div style="margin-bottom:10px;">
+            <label class="form-label">Subject</label>
+            <input type="text" id="compSubject" class="form-input" placeholder="Brief description of your concern">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px;">
+            <div>
+                <label class="form-label">Category</label>
+                <select id="compCategory" class="form-select">
+                    <option value="academic">📚 Academic</option>
+                    <option value="discipline">⚠️ Discipline</option>
+                    <option value="facility">🏫 Facility</option>
+                    <option value="fee">💰 Fee Related</option>
+                    <option value="transport">🚌 Transport</option>
+                    <option value="other">📋 Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Child (optional)</label>
+                <select id="compChild" class="form-select">
+                    <option value="">General</option>
+                    {% for c in children %}<option value="{{ c.id }}">{{ c.full_name }}</option>{% endfor %}
+                </select>
+            </div>
+        </div>
+        <div style="margin-bottom:10px;">
+            <label class="form-label">Description</label>
+            <textarea id="compDesc" class="form-input" rows="3" placeholder="Describe your concern in detail..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitComplaint()"><i class="fas fa-paper-plane"></i> Submit Complaint</button>
+        <div style="font-size:0.72rem; color:var(--text-light); margin-top:6px;">✏️ Your complaint will be reviewed by the school administration. You can escalate to the Principal if not resolved.</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2>My Complaints</h2></div>
+    <div class="card-body" id="complaintList">
+        {% if complaints %}
+        {% for c in complaints %}
+        <div class="comp-card {{ 'escalated' if c.is_escalated }} {{ 'resolved' if c.status.value == 'resolved' }}">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:0.88rem;">{{ c.subject }}</strong>
+                <span style="font-size:0.72rem;"><span class="status-dot {{ c.status.value }}"></span>{{ c.status.value|replace('_',' ')|title }}</span>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:4px;">{{ c.description[:200] }}{% if c.description|length > 200 %}...{% endif %}</div>
+            {% if c.resolution_notes %}<div style="font-size:0.78rem; color:var(--success); margin-top:6px; padding:6px 10px; background:#D1FAE5; border-radius:var(--radius-sm);"><strong>Resolution:</strong> {{ c.resolution_notes }}</div>{% endif %}
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                <span style="font-size:0.68rem; color:var(--text-light);">{{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }} · {{ c.category or 'general' }}</span>
+                {% if c.status.value in ['open', 'in_progress'] and not c.is_escalated %}
+                <button class="btn btn-ghost btn-sm" onclick="escalate('{{ c.id }}')" style="color:var(--danger); font-size:0.72rem;"><i class="fas fa-exclamation-triangle"></i> Escalate to Principal</button>
+                {% endif %}
+                {% if c.is_escalated %}<span style="font-size:0.72rem; color:#7C3AED; font-weight:700;">⬆️ Escalated to Principal</span>{% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state"><i class="fas fa-comment-alt"></i><h3>No Complaints</h3><p>File your first complaint above if you have any concerns.</p></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function submitComplaint() {
+    const subject = document.getElementById('compSubject').value.trim();
+    const desc = document.getElementById('compDesc').value.trim();
+    if (!subject || !desc) { showToast('error', 'Please fill subject and description'); return; }
+    try {
+        await apiCall('/api/parent/complaints/create', 'POST', {
+            subject, description: desc,
+            category: document.getElementById('compCategory').value,
+            student_id: document.getElementById('compChild').value || null,
+        });
+        showToast('success', 'Complaint Submitted', "We'll review it shortly.");
+        setTimeout(() => location.reload(), 1000);
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+
+async function escalate(id) {
+    if (!confirm('Escalate this complaint to the Principal? This will flag it as urgent.')) return;
+    try {
+        await apiCall(`/api/parent/complaints/${id}/escalate`, 'POST');
+        showToast('success', 'Escalated', 'Principal has been notified.');
+        setTimeout(() => location.reload(), 1000);
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+</script>
+{% endblock %}

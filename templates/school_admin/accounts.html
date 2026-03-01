@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Accounts{% endblock %}
+{% block page_title %}💰 Accounts{% endblock %}
+{% block page_subtitle %}Track school income and expenses{% endblock %}
+
+{% block extra_css %}
+<style>
+.acc-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.as-card { background:var(--bg-card,white); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:14px; text-align:center; }
+.as-val { font-size:1.4rem; font-weight:900; } .as-lbl { font-size:0.65rem; color:var(--text-light); text-transform:uppercase; font-weight:700; margin-top:2px; }
+.acc-tabs { display:flex; gap:4px; background:var(--bg-card,white); border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:16px; }
+.acc-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
+.acc-tab.active { background:var(--primary); color:white; }
+/* Add form */
+.add-card { background:var(--bg-card,white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:18px; margin-bottom:16px; }
+.f-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
+.f-grp { display:flex; flex-direction:column; gap:3px; }
+.f-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.f-grp input,.f-grp select,.f-grp textarea { padding:8px 10px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+/* Transaction list */
+.txn-list { background:var(--bg-card,white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; }
+.txn-item { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border-light); }
+.txn-item:hover { background:var(--bg); }
+.txn-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:0.9rem; flex-shrink:0; }
+.txn-icon.income { background:#D1FAE5; } .txn-icon.expense { background:#FEE2E2; }
+.txn-info { flex:1; }
+.txn-desc { font-weight:700; font-size:0.82rem; } .txn-meta { font-size:0.68rem; color:var(--text-light); }
+.txn-amount { font-weight:900; font-size:0.92rem; }
+.txn-amount.income { color:#059669; } .txn-amount.expense { color:#DC2626; }
+.type-chips { display:flex; gap:6px; margin-bottom:12px; }
+.tc { padding:8px 14px; border-radius:10px; font-size:0.78rem; font-weight:700; cursor:pointer; border:2px solid var(--border); }
+.tc.active { border-color:var(--primary); background:var(--primary-50); color:var(--primary); }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+@media(max-width:768px) { .acc-summary { grid-template-columns:1fr 1fr; } .f-row { grid-template-columns:1fr 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="acc-summary" id="accSummary"></div>
+
+<div class="acc-tabs">
+    <div class="acc-tab active" onclick="switchTab('ledger',this)">📋 Ledger</div>
+    <div class="acc-tab" onclick="switchTab('add',this)">➕ Add Entry</div>
+</div>
+
+<div id="ledgerTab">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <select id="filterType" onchange="loadTransactions()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;">
+            <option value="">All Types</option><option value="income">Income Only</option><option value="expense">Expense Only</option>
+        </select>
+        <select id="filterCat" onchange="loadTransactions()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;">
+            <option value="">All Categories</option><option value="fee_collection">Fee Collection</option><option value="salary">Salary</option><option value="utilities">Utilities</option><option value="maintenance">Maintenance</option><option value="transport">Transport</option><option value="stationery">Stationery</option><option value="misc">Miscellaneous</option>
+        </select>
+        <input type="month" id="filterMonth" onchange="loadTransactions()" style="padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;">
+    </div>
+    <div class="txn-list" id="txnList"><div style="padding:20px;text-align:center;color:var(--text-light);">Loading...</div></div>
+</div>
+
+<div id="addTab" style="display:none;">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">➕ Add Transaction</h3>
+        <div class="type-chips">
+            <div class="tc active" data-val="income" onclick="selTxnType(this)">💰 Income</div>
+            <div class="tc" data-val="expense" onclick="selTxnType(this)">💸 Expense</div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Category</label><select id="txnCat">
+                <option value="fee_collection">Fee Collection</option><option value="donation">Donation</option><option value="govt_grant">Govt Grant</option>
+                <option value="salary">Salary</option><option value="utilities">Utilities (Electricity/Water)</option>
+                <option value="maintenance">Maintenance/Repair</option><option value="transport">Transport</option>
+                <option value="stationery">Stationery/Supplies</option><option value="events">Events</option><option value="misc">Miscellaneous</option>
+            </select></div>
+            <div class="f-grp"><label>Amount (₹)</label><input type="number" id="txnAmt" placeholder="5000"></div>
+            <div class="f-grp"><label>Date</label><input type="date" id="txnDate"></div>
+            <div class="f-grp"><label>Payment Mode</label><select id="txnMode"><option value="cash">Cash</option><option value="bank">Bank Transfer</option><option value="upi">UPI</option><option value="cheque">Cheque</option></select></div>
+        </div>
+        <div class="f-row" style="grid-template-columns:2fr 1fr;">
+            <div class="f-grp"><label>Description</label><input id="txnDesc" placeholder="Payment details..."></div>
+            <div class="f-grp"><label>Reference / Receipt No</label><input id="txnRef" placeholder="INV-001"></div>
+        </div>
+        <button class="btn-primary" onclick="saveTransaction()"><i class="fas fa-save"></i> Save Entry</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let txnType = 'income';
+function switchTab(t, btn) { document.querySelectorAll('.acc-tab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); document.getElementById('ledgerTab').style.display=t==='ledger'?'block':'none'; document.getElementById('addTab').style.display=t==='add'?'block':'none'; }
+function selTxnType(el) { document.querySelectorAll('.tc').forEach(x=>x.classList.remove('active')); el.classList.add('active'); txnType = el.dataset.val; }
+
+// Set today
+document.getElementById('txnDate').value = new Date().toISOString().split('T')[0];
+
+async function loadTransactions() {
+    const type = document.getElementById('filterType').value;
+    const cat = document.getElementById('filterCat').value;
+    const month = document.getElementById('filterMonth').value;
+    let url = '/api/school/accounts?';
+    if (type) url += `type=${type}&`;
+    if (cat) url += `category=${cat}&`;
+    if (month) url += `month=${month}&`;
+    try {
+        const r = await fetch(url, {credentials:'same-origin'});
+        const d = await r.json();
+        renderSummary(d.summary||{});
+        renderTransactions(d.transactions||[]);
+    } catch(e) {}
+}
+
+function renderSummary(s) {
+    document.getElementById('accSummary').innerHTML = `
+        <div class="as-card"><div class="as-val" style="color:#059669;">₹${(s.total_income||0).toLocaleString()}</div><div class="as-lbl">Total Income</div></div>
+        <div class="as-card"><div class="as-val" style="color:#DC2626;">₹${(s.total_expense||0).toLocaleString()}</div><div class="as-lbl">Total Expense</div></div>
+        <div class="as-card"><div class="as-val" style="color:${(s.balance||0)>=0?'var(--primary)':'#DC2626'};">₹${(s.balance||0).toLocaleString()}</div><div class="as-lbl">Net Balance</div></div>
+        <div class="as-card"><div class="as-val">${s.count||0}</div><div class="as-lbl">Transactions</div></div>`;
+}
+
+function renderTransactions(txns) {
+    const el = document.getElementById('txnList');
+    if (!txns.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-light);">No transactions yet.</div>'; return; }
+    el.innerHTML = txns.map(t => `<div class="txn-item">
+        <div class="txn-icon ${t.transaction_type}">${t.transaction_type==='income'?'💰':'💸'}</div>
+        <div class="txn-info"><div class="txn-desc">${t.description||t.category}</div><div class="txn-meta">${t.transaction_date} · ${t.category} · ${t.payment_mode||''} ${t.reference_number?'· Ref: '+t.reference_number:''}</div></div>
+        <div class="txn-amount ${t.transaction_type}">${t.transaction_type==='income'?'+':'-'}₹${t.amount.toLocaleString()}</div>
+    </div>`).join('');
+}
+
+async function saveTransaction() {
+    const amt = parseFloat(document.getElementById('txnAmt').value);
+    if (!amt || amt <= 0) { alert('Enter valid amount'); return; }
+    try {
+        const res = await fetch('/api/school/accounts', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({transaction_type: txnType, category: document.getElementById('txnCat').value,
+                amount: amt, transaction_date: document.getElementById('txnDate').value,
+                payment_mode: document.getElementById('txnMode').value, description: document.getElementById('txnDesc').value.trim(),
+                reference_number: document.getElementById('txnRef').value.trim()})});
+        if (!res.ok) throw new Error();
+        alert('✅ Transaction saved!');
+        document.getElementById('txnAmt').value = ''; document.getElementById('txnDesc').value = ''; document.getElementById('txnRef').value = '';
+        loadTransactions(); switchTab('ledger', document.querySelectorAll('.acc-tab')[0]);
+    } catch(e) { alert('Failed to save'); }
+}
+
+loadTransactions();
+</script>
+{% endblock %}

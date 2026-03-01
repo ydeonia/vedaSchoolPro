@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block title %}Question Papers{% endblock %}
+{% block page_title %}📜 Question Papers{% endblock %}
+{% block page_subtitle %}Upload and manage question papers for your subjects{% endblock %}
+
+{% block extra_css %}
+<style>
+.qp-tabs { display:flex; gap:4px; margin-bottom:16px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.07); }
+.qp-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; transition:all 0.15s; color:var(--text-secondary); }
+.qp-tab.active { background:var(--primary); color:white; }
+.qp-tab:hover:not(.active) { background:var(--bg-secondary); }
+/* Upload form */
+.upload-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:20px; margin-bottom:16px; }
+.upload-card h3 { font-size:0.92rem; margin-bottom:14px; }
+.u-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
+.u-group { display:flex; flex-direction:column; gap:3px; }
+.u-group label { font-size:0.68rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.u-group input,.u-group select,.u-group textarea { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+.u-group textarea { resize:vertical; min-height:60px; }
+.u-group input:focus,.u-group select:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+/* Drop zone */
+.drop-zone { border:2px dashed var(--border); border-radius:12px; padding:30px; text-align:center; cursor:pointer; transition:all 0.2s; margin-bottom:12px; }
+.drop-zone:hover,.drop-zone.dragover { border-color:var(--primary); background:var(--primary-50); }
+.drop-zone i { font-size:1.8rem; color:var(--primary); opacity:0.4; margin-bottom:8px; }
+.drop-zone .dz-text { font-size:0.82rem; color:var(--text-secondary); font-weight:600; }
+.drop-zone .dz-sub { font-size:0.68rem; color:var(--text-light); margin-top:4px; }
+.file-preview { display:flex; align-items:center; gap:10px; padding:10px; background:var(--bg); border-radius:8px; margin-bottom:12px; }
+.file-preview i { font-size:1.2rem; color:var(--primary); }
+.file-preview .fp-name { flex:1; font-size:0.82rem; font-weight:600; }
+.file-preview .fp-size { font-size:0.68rem; color:var(--text-light); }
+.file-preview .fp-remove { color:var(--danger); cursor:pointer; font-size:0.82rem; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; font-size:0.85rem; }
+.btn-primary:hover { background:#4F46E5; }
+/* Paper list */
+.paper-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.paper-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:16px; transition:all 0.2s; border-left:4px solid var(--primary); }
+.paper-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.pc-header { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.pc-icon { width:40px; height:40px; border-radius:10px; background:var(--primary-50); display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.pc-title { font-weight:800; font-size:0.88rem; }
+.pc-meta { font-size:0.72rem; color:var(--text-light); margin-top:2px; }
+.pc-tags { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px; }
+.pc-tag { padding:2px 8px; border-radius:6px; font-size:0.65rem; font-weight:700; background:var(--bg); color:var(--text-secondary); }
+.pc-tag.exam { background:#EEF2FF; color:#6366F1; } .pc-tag.class { background:#ECFDF5; color:#059669; }
+.pc-tag.subject { background:#FEF3C7; color:#D97706; }
+.pc-actions { display:flex; gap:6px; }
+.pc-btn { padding:4px 10px; border-radius:6px; font-size:0.68rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:white; color:var(--text-secondary); transition:all 0.15s; }
+.pc-btn:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
+.pc-btn.danger:hover { background:#FEE2E2; border-color:#EF4444; color:#DC2626; }
+.empty-state { text-align:center; padding:60px; color:var(--text-light); }
+.empty-state i { font-size:2.5rem; opacity:0.15; margin-bottom:12px; display:block; }
+.filter-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.filter-chip { padding:6px 14px; border-radius:20px; font-size:0.75rem; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:white; transition:all 0.15s; }
+.filter-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+.filter-chip:hover:not(.active) { border-color:var(--primary); }
+.toast { position:fixed; bottom:20px; right:20px; padding:12px 24px; border-radius:10px; color:white; font-weight:700; z-index:999; animation:slideIn 0.3s; }
+.toast.success { background:#059669; } .toast.error { background:#DC2626; }
+@keyframes slideIn { from { opacity:0; transform:translateY(20px); } }
+@media(max-width:768px) { .u-row { grid-template-columns:1fr; } .paper-grid { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="qp-tabs">
+    <div class="qp-tab active" onclick="switchTab('library',this)">📚 My Papers</div>
+    <div class="qp-tab" onclick="switchTab('upload',this)">📤 Upload New</div>
+</div>
+
+<div id="libraryTab">
+    <div class="filter-row" id="filterRow">
+        <div class="filter-chip active" onclick="filterPapers('all',this)">All</div>
+    </div>
+    <div class="paper-grid" id="paperGrid">
+        <div class="empty-state"><i class="fas fa-scroll"></i>No question papers yet. Upload one to get started!</div>
+    </div>
+</div>
+
+<div id="uploadTab" style="display:none;">
+    <div class="upload-card">
+        <h3>📤 Upload Question Paper</h3>
+        <div class="u-row">
+            <div class="u-group"><label>Exam / Type</label>
+                <select id="qpExam">
+                    <option value="Unit Test 1">Unit Test 1</option>
+                    <option value="Unit Test 2">Unit Test 2</option>
+                    <option value="Mid Term">Mid Term</option>
+                    <option value="Pre Board">Pre Board</option>
+                    <option value="Final Exam">Final Exam</option>
+                    <option value="Practice Paper">Practice Paper</option>
+                    <option value="Worksheet">Worksheet</option>
+                    <option value="Sample Paper">Sample Paper</option>
+                </select>
+            </div>
+            <div class="u-group"><label>Class</label><select id="qpClass"></select></div>
+            <div class="u-group"><label>Subject</label><select id="qpSubject"></select></div>
+        </div>
+        <div class="u-row" style="grid-template-columns:1fr 1fr;">
+            <div class="u-group"><label>Title</label><input type="text" id="qpTitle" placeholder="e.g., Mathematics Unit Test 1 — 2025"></div>
+            <div class="u-group"><label>Year</label><input type="number" id="qpYear" value="2025" min="2020" max="2030"></div>
+        </div>
+        <div class="u-group" style="margin-bottom:12px;"><label>Description (optional)</label><textarea id="qpDesc" placeholder="Any notes about this paper..."></textarea></div>
+
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <div class="dz-text">Click or drop file here</div>
+            <div class="dz-sub">PDF, DOC, DOCX, JPG, PNG — Max 10MB</div>
+        </div>
+        <input type="file" id="fileInput" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" style="display:none" onchange="handleFile(this)">
+        <div id="filePreview"></div>
+
+        <div style="text-align:right;">
+            <button class="btn-primary" onclick="uploadPaper()"><i class="fas fa-upload"></i> Upload Paper</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let papers = JSON.parse(localStorage.getItem('qp_papers_{{teacher.id}}') || '[]');
+let selectedFile = null;
+
+function switchTab(tab, btn) {
+    document.querySelectorAll('.qp-tab').forEach(t=>t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('libraryTab').style.display = tab==='library'?'block':'none';
+    document.getElementById('uploadTab').style.display = tab==='upload'?'block':'none';
+}
+
+async function init() {
+    const res = await fetch('/api/teacher/my-classes', {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    const cs = document.getElementById('qpClass'), ss = document.getElementById('qpSubject');
+    const classes = [...new Map(data.classes.map(c=>[c.class_id, c])).values()];
+    const subjects = [...new Map(data.classes.map(c=>[c.subject_id, c])).values()];
+    classes.forEach(c => { cs.innerHTML += `<option value="${c.class_id}">${c.class_name}</option>`; });
+    subjects.forEach(s => { ss.innerHTML += `<option value="${s.subject_id}">${s.subject_name}</option>`; });
+
+    // Build filter chips
+    const fr = document.getElementById('filterRow');
+    subjects.forEach(s => { fr.innerHTML += `<div class="filter-chip" onclick="filterPapers('${s.subject_name}',this)">${s.subject_name}</div>`; });
+
+    renderPapers();
+}
+
+// Drag and drop
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); if(e.dataTransfer.files.length) handleFileObj(e.dataTransfer.files[0]); });
+
+function handleFile(input) { if(input.files.length) handleFileObj(input.files[0]); }
+function handleFileObj(file) {
+    if (file.size > 10*1024*1024) { alert('File too large — max 10MB'); return; }
+    selectedFile = file;
+    const ext = file.name.split('.').pop().toUpperCase();
+    const icons = {PDF:'fa-file-pdf',DOC:'fa-file-word',DOCX:'fa-file-word',JPG:'fa-file-image',JPEG:'fa-file-image',PNG:'fa-file-image'};
+    document.getElementById('filePreview').innerHTML = `<div class="file-preview"><i class="fas ${icons[ext]||'fa-file'}"></i><span class="fp-name">${file.name}</span><span class="fp-size">${(file.size/1024).toFixed(0)} KB</span><span class="fp-remove" onclick="removeFile()">✕</span></div>`;
+    // Auto-fill title
+    if (!document.getElementById('qpTitle').value) {
+        const subj = document.getElementById('qpSubject').selectedOptions[0]?.textContent || '';
+        const cls = document.getElementById('qpClass').selectedOptions[0]?.textContent || '';
+        const exam = document.getElementById('qpExam').value;
+        document.getElementById('qpTitle').value = `${subj} ${exam} — ${cls} (${document.getElementById('qpYear').value})`;
+    }
+}
+function removeFile() { selectedFile = null; document.getElementById('filePreview').innerHTML = ''; }
+
+function uploadPaper() {
+    const title = document.getElementById('qpTitle').value.trim();
+    const exam = document.getElementById('qpExam').value;
+    const cls = document.getElementById('qpClass').selectedOptions[0]?.textContent || '';
+    const subj = document.getElementById('qpSubject').selectedOptions[0]?.textContent || '';
+    const year = document.getElementById('qpYear').value;
+    const desc = document.getElementById('qpDesc').value.trim();
+
+    if (!title) { alert('Enter a title'); return; }
+
+    const paper = {
+        id: Date.now(), title, exam, class_name: cls, subject: subj, year,
+        description: desc, file_name: selectedFile ? selectedFile.name : 'No file',
+        file_size: selectedFile ? (selectedFile.size/1024).toFixed(0)+' KB' : '',
+        uploaded_at: new Date().toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}),
+    };
+    papers.unshift(paper);
+    localStorage.setItem('qp_papers_{{teacher.id}}', JSON.stringify(papers));
+
+    // Reset form
+    document.getElementById('qpTitle').value = ''; document.getElementById('qpDesc').value = '';
+    selectedFile = null; document.getElementById('filePreview').innerHTML = '';
+    showToast('✅ Question paper uploaded!', 'success');
+    switchTab('library', document.querySelectorAll('.qp-tab')[0]);
+    renderPapers();
+}
+
+let activeFilter = 'all';
+function filterPapers(filter, el) {
+    document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+    el.classList.add('active');
+    activeFilter = filter;
+    renderPapers();
+}
+
+function renderPapers() {
+    const grid = document.getElementById('paperGrid');
+    let filtered = activeFilter === 'all' ? papers : papers.filter(p=>p.subject===activeFilter);
+    if (!filtered.length) {
+        grid.innerHTML = '<div class="empty-state"><i class="fas fa-scroll"></i>No question papers found. Upload one to get started!</div>';
+        return;
+    }
+    grid.innerHTML = filtered.map(p => `<div class="paper-card">
+        <div class="pc-header">
+            <div class="pc-icon">📜</div>
+            <div><div class="pc-title">${p.title}</div><div class="pc-meta">${p.uploaded_at} · ${p.file_name} ${p.file_size?'('+p.file_size+')':''}</div></div>
+        </div>
+        <div class="pc-tags">
+            <span class="pc-tag exam">${p.exam}</span>
+            <span class="pc-tag class">${p.class_name}</span>
+            <span class="pc-tag subject">${p.subject}</span>
+            <span class="pc-tag">${p.year}</span>
+        </div>
+        ${p.description?`<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:8px;">${p.description}</div>`:''}
+        <div class="pc-actions">
+            <button class="pc-btn"><i class="fas fa-download"></i> Download</button>
+            <button class="pc-btn"><i class="fas fa-share"></i> Share</button>
+            <button class="pc-btn danger" onclick="deletePaper(${p.id})"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>`).join('');
+}
+
+function deletePaper(id) {
+    if (!confirm('Delete this paper?')) return;
+    papers = papers.filter(p=>p.id!==id);
+    localStorage.setItem('qp_papers_{{teacher.id}}', JSON.stringify(papers));
+    renderPapers();
+}
+
+function showToast(msg,type) { const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

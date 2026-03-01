@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}🎒 My Profile{% endblock %}
+{% block page_subtitle %}Your complete school profile — transport, health, achievements{% endblock %}
+
+{% block extra_css %}
+<style>
+.profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.profile-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:18px; }
+.profile-card h3 { font-size:0.88rem; font-weight:800; margin:0 0 12px; display:flex; align-items:center; gap:8px; }
+.full-span { grid-column:1/-1; }
+.info-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:0.82rem; }
+.info-row:last-child { border:none; }
+.info-label { color:var(--text-light); font-weight:600; }
+.info-val { font-weight:700; text-align:right; }
+.badge-row { display:flex; flex-wrap:wrap; gap:6px; }
+.allergy-tag { display:inline-block; padding:3px 10px; border-radius:10px; font-size:0.72rem; font-weight:700; background:#FEE2E2; color:#DC2626; }
+.condition-tag { display:inline-block; padding:3px 10px; border-radius:10px; font-size:0.72rem; font-weight:700; background:#FEF3C7; color:#92400E; }
+.achievement-item { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--border); align-items:center; }
+.achievement-item:last-child { border:none; }
+.ach-badge { font-size:1.5rem; }
+.ach-title { font-weight:700; font-size:0.82rem; }
+.ach-meta { font-size:0.68rem; color:var(--text-light); }
+.diary-item { padding:10px; background:var(--bg); border-radius:8px; margin-bottom:6px; }
+.diary-item .di-date { font-size:0.68rem; color:var(--text-light); }
+.diary-item .di-content { font-size:0.82rem; margin-top:2px; }
+.diary-item .di-type { display:inline-block; padding:1px 8px; border-radius:8px; font-size:0.62rem; font-weight:700; }
+.di-type.positive { background:#ECFDF5; color:#059669; }
+.di-type.concern { background:#FEE2E2; color:#DC2626; }
+.di-type.informational { background:#EFF6FF; color:#2563EB; }
+.transport-hero { background:linear-gradient(135deg,#1E3A5F,#2563EB); color:white; border-radius:14px; padding:20px; }
+.transport-hero h3 { color:white; }
+.transport-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:12px; }
+.tr-stat { text-align:center; background:rgba(255,255,255,0.1); border-radius:10px; padding:10px; }
+.tr-stat .tr-val { font-size:1.1rem; font-weight:900; }
+.tr-stat .tr-lbl { font-size:0.68rem; opacity:0.7; }
+.empty-note { text-align:center; padding:20px; font-size:0.82rem; color:var(--text-light); }
+@media(max-width:768px) { .profile-grid { grid-template-columns:1fr; } .transport-grid { grid-template-columns:1fr 1fr; } }
+[data-theme="dark"] .profile-card { background:var(--card-bg); }
+[data-theme="dark"] .diary-item { background:var(--bg-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="profileRoot"><div style="text-align:center;padding:40px;color:var(--text-light);"><i class="fas fa-circle-notch fa-spin" style="font-size:2rem;"></i><div>Loading profile...</div></div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadProfile() {
+    try {
+        const [profileResp, diaryResp, achieveResp] = await Promise.all([
+            fetch('/api/sprint21/student/profile-extra', {credentials:'same-origin'}),
+            fetch('/api/sprint21/diary/student/{{ student.id }}', {credentials:'same-origin'}).catch(()=>null),
+            fetch('/api/sprint21/achievements/{{ student.id }}', {credentials:'same-origin'}).catch(()=>null),
+        ]);
+        const profile = await profileResp.json();
+        const diary = diaryResp && diaryResp.ok ? await diaryResp.json() : {entries:[]};
+        const achieve = achieveResp && achieveResp.ok ? await achieveResp.json() : {achievements:[]};
+        renderProfile(profile, diary, achieve);
+    } catch(e) { document.getElementById('profileRoot').innerHTML = '<div class="empty-note">Could not load profile.</div>'; }
+}
+
+function renderProfile(p, diary, achieve) {
+    let html = '<div class="profile-grid">';
+
+    // Student Info
+    html += `<div class="profile-card">
+        <h3>👤 Personal Information</h3>
+        <div style="text-align:center;margin-bottom:14px;">
+            {% if student.photo_url %}
+            <img src="{{ student.photo_url }}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid #6366F1;">
+            {% else %}
+            <div style="width:90px;height:90px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;display:inline-flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;">{{ student.first_name[0] }}{{ (student.last_name or ' ')[0] }}</div>
+            {% endif %}
+            <div style="font-size:0.68rem;color:var(--text-light);margin-top:4px;">Photo managed by school admin</div>
+        </div>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-val">{{ student.full_name }}</span></div>
+        <div class="info-row"><span class="info-label">Class</span><span class="info-val">{{ student.class_.name if student.class_ else '—' }} {{ student.section.name if student.section else '' }}</span></div>
+        <div class="info-row"><span class="info-label">Roll Number</span><span class="info-val">{{ student.roll_number or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">Admission No.</span><span class="info-val">{{ student.admission_number or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">DOB</span><span class="info-val">{{ student.date_of_birth or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">Gender</span><span class="info-val">{{ student.gender.value if student.gender else '—' }}</span></div>
+        <div class="info-row"><span class="info-label">Blood Group</span><span class="info-val">{{ student.blood_group or '—' }}</span></div>
+    </div>`;
+
+    // Address
+    html += `<div class="profile-card">
+        <h3>🏠 Home Address</h3>
+        <div class="info-row"><span class="info-label">Address</span><span class="info-val">${p.address.address || '—'}</span></div>
+        <div class="info-row"><span class="info-label">City</span><span class="info-val">${p.address.city || '—'}</span></div>
+        <div class="info-row"><span class="info-label">State</span><span class="info-val">${p.address.state || '—'}</span></div>
+        <div class="info-row"><span class="info-label">Pincode</span><span class="info-val">${p.address.pincode || '—'}</span></div>
+        <h3 style="margin-top:16px;">👨‍👩‍👧 Parent/Guardian</h3>
+        <div class="info-row"><span class="info-label">Father</span><span class="info-val">{{ student.father_name or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">Mother</span><span class="info-val">{{ student.mother_name or '—' }}</span></div>
+        <div class="info-row"><span class="info-label">Guardian</span><span class="info-val">{{ student.guardian_name or '—' }}</span></div>
+    </div>`;
+
+    // Transport
+    if (p.transport) {
+        html += `<div class="transport-hero full-span">
+            <h3>🚌 My Bus Route</h3>
+            <div class="transport-grid">
+                <div class="tr-stat"><div class="tr-val">${p.transport.route_name}</div><div class="tr-lbl">Route</div></div>
+                <div class="tr-stat"><div class="tr-val">${p.transport.stop_name}</div><div class="tr-lbl">My Stop</div></div>
+                <div class="tr-stat"><div class="tr-val">${p.transport.pickup_time}</div><div class="tr-lbl">Pickup Time</div></div>
+            </div>
+            <div style="margin-top:10px;font-size:0.78rem;opacity:0.8;">Drop Time: ${p.transport.drop_time} ${p.transport.route_number ? '· Route #' + p.transport.route_number : ''}</div>
+        </div>`;
+    } else {
+        html += `<div class="profile-card full-span"><h3>🚌 Transport</h3><div class="empty-note">No transport assigned. Using self-transport.</div></div>`;
+    }
+
+    // Health
+    html += `<div class="profile-card">
+        <h3>🏥 Health Record</h3>`;
+    if (p.health) {
+        html += `
+        <div class="info-row"><span class="info-label">Blood Group</span><span class="info-val">${p.health.blood_group}</span></div>
+        <div class="info-row"><span class="info-label">Height</span><span class="info-val">${p.health.height ? p.health.height + ' cm' : '—'}</span></div>
+        <div class="info-row"><span class="info-label">Weight</span><span class="info-val">${p.health.weight ? p.health.weight + ' kg' : '—'}</span></div>
+        <div class="info-row"><span class="info-label">BMI</span><span class="info-val">${p.health.bmi ? p.health.bmi.toFixed(1) : '—'}</span></div>
+        <div class="info-row"><span class="info-label">Vision (L/R)</span><span class="info-val">${p.health.vision_left || '—'} / ${p.health.vision_right || '—'} ${p.health.wears_glasses ? '👓' : ''}</span></div>
+        <div class="info-row"><span class="info-label">Emergency</span><span class="info-val">${p.health.emergency_1 || '—'}</span></div>
+        <div class="info-row"><span class="info-label">Doctor</span><span class="info-val">${p.health.doctor || '—'}</span></div>
+        ${p.health.allergies.length > 0 ? `<div style="margin-top:8px;"><span class="info-label">Allergies:</span> <div class="badge-row" style="margin-top:4px;">${p.health.allergies.map(a => `<span class="allergy-tag">${a}</span>`).join('')}</div></div>` : ''}
+        ${p.health.conditions.length > 0 ? `<div style="margin-top:6px;"><span class="info-label">Conditions:</span> <div class="badge-row" style="margin-top:4px;">${p.health.conditions.map(c => `<span class="condition-tag">${c}</span>`).join('')}</div></div>` : ''}`;
+    } else {
+        html += `<div class="empty-note">No health record on file. Ask school admin to update.</div>`;
+    }
+    html += '</div>';
+
+    // Achievements
+    html += `<div class="profile-card"><h3>🏆 Achievements & Awards</h3>`;
+    if (achieve.achievements.length > 0) {
+        achieve.achievements.forEach(a => {
+            html += `<div class="achievement-item"><div class="ach-badge">${a.badge}</div><div><div class="ach-title">${a.title}</div><div class="ach-meta">${a.category} · ${a.date}</div></div></div>`;
+        });
+    } else {
+        html += `<div class="empty-note">No achievements yet. Keep working hard! 💪</div>`;
+    }
+    html += '</div>';
+
+    // Daily Diary
+    html += `<div class="profile-card full-span"><h3>📋 Teacher's Diary</h3>`;
+    if (diary.entries.length > 0) {
+        diary.entries.slice(0, 10).forEach(e => {
+            const typeClass = e.type === 'positive' ? 'positive' : e.type === 'concern' ? 'concern' : 'informational';
+            html += `<div class="diary-item">
+                <div class="di-date">${e.date_display} · ${e.teacher} <span class="di-type ${typeClass}">${e.type}</span> ${e.is_personal ? '👤 Personal' : '📢 Class'}</div>
+                <div class="di-content">${e.content}</div>
+                ${e.parent_acknowledged ? '<div style="font-size:0.68rem;color:#10B981;">✓ Parent seen</div>' : ''}
+            </div>`;
+        });
+    } else {
+        html += `<div class="empty-note">No diary entries yet.</div>`;
+    }
+    html += '</div></div>';
+
+    document.getElementById('profileRoot').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', loadProfile);
+</script>
+{% endblock %}

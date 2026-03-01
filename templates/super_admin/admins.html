@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}School Admins{% endblock %}
+{% block page_title %}School Admins{% endblock %}
+{% block page_subtitle %}Manage school administrators across all branches{% endblock %}
+{% block extra_css %}
+<style>
+.adm-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.adm-toolbar input{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.75rem;min-width:220px;}
+.adm-toolbar select{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.75rem;}
+.adm-table{width:100%;border-collapse:collapse;font-size:0.75rem;}
+.adm-table th{font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);padding:8px 10px;text-align:left;border-bottom:2px solid var(--border-light);}
+.adm-table td{padding:10px;border-bottom:1px solid var(--border-light);vertical-align:middle;}
+.adm-table tr:hover{background:rgba(67,56,202,0.03);}
+.adm-table tr.suspended{background:rgba(220,38,38,0.05);}
+.adm-name{font-weight:800;}.adm-email{font-size:0.68rem;color:var(--text-light);}
+.pill{padding:2px 8px;border-radius:6px;font-size:0.58rem;font-weight:800;display:inline-block;}
+.pill-g{background:#D1FAE5;color:#065F46;}.pill-r{background:#FEE2E2;color:#991B1B;}.pill-y{background:#FEF3C7;color:#92400E;}
+.act-btn{padding:4px 8px;border-radius:6px;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;margin:1px;}
+.act-suspend{background:#FEF3C7;color:#92400E;}.act-activate{background:#D1FAE5;color:#065F46;}
+.act-delete{background:#FEE2E2;color:#991B1B;}.act-email{background:#DBEAFE;color:#1D4ED8;}
+.act-reset{background:#EDE9FE;color:#7C3AED;}
+.avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.65rem;color:white;flex-shrink:0;background:#4338CA;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>School Admins ({{ admins | length }})</h2>
+        <button class="btn btn-primary" onclick="openModal('addAdminModal')"><i class="fas fa-plus"></i> Add School Admin</button>
+    </div>
+    <div class="card-body">
+        <div class="adm-toolbar">
+            <input type="text" id="admSearch" placeholder="🔍 Search name, email, branch..." oninput="filterAdmins()">
+            <select id="admStatus" onchange="filterAdmins()"><option value="">All Status</option><option value="active">Active</option><option value="suspended">Suspended</option></select>
+        </div>
+        {% if admins %}
+        <div class="table-wrapper">
+            <table class="adm-table" id="admTable">
+                <thead><tr>
+                    <th>Admin</th><th>Email / Phone</th><th>Branch</th><th>Status</th><th>Last Login</th><th>Actions</th>
+                </tr></thead>
+                <tbody>
+                {% for admin in admins %}
+                <tr class="{{ 'suspended' if not admin.is_active else '' }}" data-name="{{ admin.first_name }} {{ admin.last_name or '' }}" data-email="{{ admin.email or '' }}" data-branch="{{ admin.branch.name if admin.branch else '' }}" data-status="{{ 'active' if admin.is_active else 'suspended' }}">
+                    <td>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div class="avatar">{{ admin.first_name[0]|upper }}{{ (admin.last_name or ' ')[0]|upper }}</div>
+                            <div>
+                                <div class="adm-name">{{ admin.first_name }} {{ admin.last_name or '' }}{% if admin.is_first_admin %} <span style="font-size:0.52rem;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:4px;">👑 First Admin</span>{% endif %}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="adm-email">{{ admin.email or '—' }}</div>
+                        <div class="adm-email">{{ admin.phone or '' }}</div>
+                    </td>
+                    <td style="font-size:0.72rem;">{{ admin.branch.name if admin.branch else '—' }}</td>
+                    <td>
+                        {% if admin.is_active %}
+                        <span class="pill pill-g">Active</span>
+                        {% else %}
+                        <span class="pill pill-r">Suspended</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:0.65rem;color:var(--text-light);">
+                        {% if admin.last_login %}
+                        {{ admin.last_login.strftime('%d/%m/%Y %H:%M:%S') }}
+                        {% else %}
+                        <span style="color:var(--text-light);">Never</span>
+                        {% endif %}
+                    </td>
+                    <td style="white-space:nowrap;">
+                        {% if admin.is_active %}
+                        <button class="act-btn act-suspend" onclick="suspendAdmin('{{ admin.id }}','{{ admin.first_name }}')" title="Suspend"><i class="fas fa-ban"></i></button>
+                        {% else %}
+                        <button class="act-btn act-activate" onclick="activateAdmin('{{ admin.id }}','{{ admin.first_name }}')" title="Activate"><i class="fas fa-check"></i></button>
+                        <button class="act-btn act-delete" onclick="deleteAdmin('{{ admin.id }}','{{ admin.first_name }}',{{ 'true' if not admin.is_active else 'false' }})" title="Delete"><i class="fas fa-trash"></i></button>
+                        {% endif %}
+                        <button class="act-btn act-reset" onclick="resetPwd('{{ admin.id }}','{{ admin.first_name }}')" title="Reset Password"><i class="fas fa-key"></i></button>
+                        <button class="act-btn act-email" onclick="emailAdmin('{{ admin.email }}','{{ admin.first_name }}')" title="Send Email"><i class="fas fa-envelope"></i></button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-user-shield"></i>
+            <h3>No school admins yet</h3>
+            <p>Add school admins to manage individual branches</p>
+            <button class="btn btn-primary" onclick="openModal('addAdminModal')"><i class="fas fa-plus"></i> Add School Admin</button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Admin Modal -->
+<div class="modal-overlay" id="addAdminModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
+    <div class="modal">
+        <div class="modal-header"><h2>Add School Admin</h2><button class="modal-close" onclick="closeModal('addAdminModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <form id="addAdminForm">
+                <div class="form-group"><label class="form-label">Branch <span class="required">*</span></label>
+                <select name="branch_id" class="form-select" required><option value="">Select Branch</option>{% for branch in branches %}<option value="{{ branch.id }}">{{ branch.organization.name if branch.organization else '' }} — {{ branch.name }}</option>{% endfor %}</select></div>
+                <div class="form-row"><div class="form-group"><label class="form-label">First Name <span class="required">*</span></label><input type="text" name="first_name" class="form-input" required></div>
+                <div class="form-group"><label class="form-label">Last Name</label><input type="text" name="last_name" class="form-input"></div></div>
+                <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" name="email" class="form-input" required></div>
+                <div class="form-group"><label class="form-label">Phone</label><input type="tel" name="phone" class="form-input"></div></div>
+                <div class="form-group"><label class="form-label">Password <span class="required">*</span></label><input type="password" name="password" class="form-input" required><div class="form-hint">Min 6 chars. Admin can change after first login.</div></div>
+            </form>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('addAdminModal')">Cancel</button><button class="btn btn-primary" onclick="submitAdminForm()"><i class="fas fa-plus"></i> Create Admin</button></div>
+    </div>
+</div>
+
+<!-- Email Modal -->
+<div class="modal-overlay" id="emailModal" style="display:none;">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header"><h2>📧 Send Email to Admin</h2><button class="modal-close" onclick="closeModal('emailModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">To</label><input id="emailTo" class="form-input" readonly></div>
+            <div class="form-group"><label class="form-label">Subject</label><input id="emailSubject" class="form-input" placeholder="Subject"></div>
+            <div class="form-group"><label class="form-label">Message</label><textarea id="emailBody" class="form-input" rows="5" placeholder="Write your message..."></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('emailModal')">Cancel</button><button class="btn btn-primary" onclick="sendEmail()"><i class="fas fa-paper-plane"></i> Send</button></div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal-overlay" id="resetPwdModal" style="display:none;">
+    <div class="modal" style="max-width:400px;">
+        <div class="modal-header"><h2>🔑 Reset Password</h2><button class="modal-close" onclick="closeModal('resetPwdModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <p style="font-size:0.75rem;color:var(--text-light);" id="resetInfo"></p>
+            <div class="form-group"><label class="form-label">New Password</label><input id="newPwd" type="password" class="form-input" placeholder="Min 6 characters"></div>
+            <div class="form-group"><label class="form-label">Confirm</label><input id="confirmPwd" type="password" class="form-input" placeholder="Type again"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('resetPwdModal')">Cancel</button><button class="btn btn-primary" onclick="doResetPwd()"><i class="fas fa-key"></i> Reset</button></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function submitAdminForm(){
+    const data=getFormData('addAdminForm');
+    if(!data.branch_id||!data.first_name||!data.email||!data.password){showToast('error','Fill all required fields');return;}
+    const r=await apiCall('/api/super-admin/admins','POST',data);
+    if(r.error)showToast('error',r.error);
+    else{showToast('success','Admin created');setTimeout(()=>location.reload(),800);}
+}
+
+function filterAdmins(){
+    const q=document.getElementById('admSearch').value.toLowerCase();
+    const st=document.getElementById('admStatus').value;
+    document.querySelectorAll('#admTable tbody tr').forEach(tr=>{
+        const name=tr.dataset.name.toLowerCase(),email=tr.dataset.email.toLowerCase(),branch=tr.dataset.branch.toLowerCase(),status=tr.dataset.status;
+        let show=true;
+        if(q&&!name.includes(q)&&!email.includes(q)&&!branch.includes(q))show=false;
+        if(st&&status!==st)show=false;
+        tr.style.display=show?'':'none';
+    });
+}
+
+function suspendAdmin(id,name){
+    showConfirm('Suspend Admin','Suspend <strong>'+name+'</strong>? They will not be able to login until reactivated.',async()=>{
+        const d=await apiCall(`/api/super-admin/admins/${id}/suspend`,'PUT');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1000);}else showToast('error',d.error||'Failed');
+    },{icon:'⚠️',yesText:'Suspend',danger:true});
+}
+
+function activateAdmin(id,name){
+    showConfirm('Reactivate Admin','Reactivate <strong>'+name+'</strong>?',async()=>{
+        const d=await apiCall(`/api/super-admin/admins/${id}/activate`,'PUT');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1000);}else showToast('error',d.error||'Failed');
+    },{icon:'✅',yesText:'Activate'});
+}
+
+function deleteAdmin(id,name,isSuspended){
+    if(!isSuspended){showToast('error','Admin must be suspended before deletion. Suspend first.');return;}
+    showConfirm('⚠️ Delete Admin PERMANENTLY','Delete <strong>'+name+'</strong>? This action is <strong>IRREVERSIBLE</strong>. All their data will be removed.<br><br>Type <strong>DELETE</strong> to confirm.',async()=>{
+        const d=await apiCall(`/api/super-admin/admins/${id}`,'DELETE');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1000);}else showToast('error',d.error||'Failed');
+    },{icon:'🗑️',yesText:'Delete Permanently',danger:true});
+}
+
+let _resetId=null;
+function resetPwd(id,name){
+    _resetId=id;
+    document.getElementById('resetInfo').textContent='Set new password for '+name;
+    document.getElementById('newPwd').value='';document.getElementById('confirmPwd').value='';
+    openModal('resetPwdModal');
+}
+async function doResetPwd(){
+    const p=document.getElementById('newPwd').value,c=document.getElementById('confirmPwd').value;
+    if(p.length<6){showToast('error','Min 6 characters');return;}
+    if(p!==c){showToast('error','Passwords do not match');return;}
+    const d=await apiCall(`/api/super-admin/admins/${_resetId}/reset-password`,'POST',{password:p});
+    if(d.success){showToast('success',d.message);closeModal('resetPwdModal');}else showToast('error',d.error||'Failed');
+}
+
+function emailAdmin(email,name){
+    document.getElementById('emailTo').value=email;
+    document.getElementById('emailSubject').value='';
+    document.getElementById('emailBody').value='';
+    openModal('emailModal');
+}
+async function sendEmail(){
+    const to=document.getElementById('emailTo').value;
+    const subject=document.getElementById('emailSubject').value;
+    const body=document.getElementById('emailBody').value;
+    if(!subject||!body){showToast('error','Subject and message required');return;}
+    const d=await apiCall('/api/super-admin/send-email','POST',{to:to,subject:subject,body:body});
+    if(d.success){showToast('success','Email sent');closeModal('emailModal');}
+    else showToast('error',d.error||'Email sending not configured yet');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}My Subjects{% endblock %}
+{% block page_title %}📖 My Subjects{% endblock %}
+{% block page_subtitle %}Subjects and teachers assigned to your class{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table">
+            <thead><tr><th>Subject</th><th>Code</th><th>Teacher</th><th>Contact</th></tr></thead>
+            <tbody>
+            {% for s in subjects %}
+            <tr>
+                <td><strong>{{ s.name }}</strong></td>
+                <td>{{ s.code }}</td>
+                <td>{{ s.teacher }}</td>
+                <td>{{ s.teacher_phone or '—' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not subjects %}
+            <tr><td colspan="4"><div class="empty-state"><i class="fas fa-book"></i><p>No subjects assigned yet.</p></div></td></tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

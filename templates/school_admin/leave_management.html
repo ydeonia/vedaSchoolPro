@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Leave Management{% endblock %}
+{% block page_title %}Leave Management{% endblock %}
+{% block page_subtitle %}Review and manage teacher leave requests{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg); padding: 4px; border-radius: var(--radius); }
+    .tab-btn { padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; border: none; background: none; transition: all 0.2s; }
+    .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(79,70,229,0.3); }
+    .tab-btn:hover:not(.active) { background: var(--border-light); }
+    .tab-btn .badge-count { background: var(--danger); color: white; border-radius: 10px; padding: 2px 7px; font-size: 0.7rem; margin-left: 6px; }
+
+    .leave-card {
+        background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm);
+        padding: 20px; margin-bottom: 12px; display: grid;
+        grid-template-columns: 1fr auto; gap: 16px; align-items: center;
+        transition: all 0.2s; border-left: 4px solid transparent;
+    }
+    .leave-card.pending { border-left-color: var(--warning); }
+    .leave-card.approved { border-left-color: var(--success); }
+    .leave-card.rejected { border-left-color: var(--danger); }
+    .leave-card.cancelled { border-left-color: var(--border); }
+    .leave-card:hover { box-shadow: var(--shadow); }
+
+    .lc-name { font-weight: 700; font-size: 1rem; }
+    .lc-type { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+    .lc-type.casual { background: #DBEAFE; color: #2563EB; }
+    .lc-type.sick { background: #FEE2E2; color: var(--danger); }
+    .lc-type.earned { background: #D1FAE5; color: var(--success); }
+    .lc-type.maternity, .lc-type.paternity { background: #FAE8FF; color: #A855F7; }
+    .lc-type.unpaid { background: #FEF3C7; color: var(--warning); }
+    .lc-type.other, .lc-type.compensatory { background: var(--border-light); color: var(--text-secondary); }
+
+    .lc-dates { font-size: 0.85rem; margin-top: 6px; }
+    .lc-reason { font-size: 0.82rem; color: var(--text-secondary); margin-top: 6px; font-style: italic; }
+    .lc-meta { font-size: 0.72rem; color: var(--text-light); margin-top: 6px; }
+
+    .lc-actions { display: flex; gap: 8px; flex-direction: column; }
+    .lc-actions .btn { min-width: 100px; font-size: 0.82rem; }
+
+    .status-badge { padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; display: inline-block; }
+    .status-badge.approved { background: var(--success-light); color: var(--success); }
+    .status-badge.rejected { background: var(--danger-light); color: var(--danger); }
+    .status-badge.cancelled { background: var(--border-light); color: var(--text-secondary); }
+    .status-badge.pending { background: var(--warning-light); color: var(--warning); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('pending')">
+        <i class="fas fa-clock"></i> Pending <span class="badge-count" id="pendingCount">0</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('all')">
+        <i class="fas fa-list"></i> All Requests
+    </button>
+</div>
+
+<div id="tab-pending">
+    <div id="pendingList"><div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div></div>
+</div>
+
+<div id="tab-all" style="display: none;">
+    <div id="allList"><div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div></div>
+</div>
+
+<!-- Remarks Modal -->
+<div class="modal-overlay" id="remarksModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="remarksTitle">Admin Remarks</h2>
+            <button class="modal-close" onclick="closeModal('remarksModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Remarks (optional)</label>
+                <textarea class="form-input" id="remarksInput" rows="3" placeholder="Add any notes..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('remarksModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="confirmAction()" id="confirmActionBtn">Confirm</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let pendingAction = {};
+const TYPE_LABELS = { casual: 'Casual', sick: 'Sick', earned: 'Earned', maternity: 'Maternity', paternity: 'Paternity', compensatory: 'Comp-Off', unpaid: 'Unpaid', other: 'Other' };
+
+function switchTab(tab) {
+    document.getElementById('tab-pending').style.display = tab === 'pending' ? 'block' : 'none';
+    document.getElementById('tab-all').style.display = tab === 'all' ? 'block' : 'none';
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    event.target.closest('.tab-btn').classList.add('active');
+    if (tab === 'all') loadAllLeaves();
+}
+
+async function loadPendingLeaves() {
+    try {
+        const result = await apiCall('/api/school/leaves/pending');
+        document.getElementById('pendingCount').textContent = result.leaves.length;
+        if (result.leaves.length === 0) {
+            document.getElementById('pendingList').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-check-circle" style="color: var(--success);"></i><h3>All Clear!</h3><p>No pending leave requests</p></div></div></div>';
+            return;
+        }
+        document.getElementById('pendingList').innerHTML = result.leaves.map(l => renderLeaveCard(l, true)).join('');
+    } catch(e) {}
+}
+
+async function loadAllLeaves() {
+    try {
+        const result = await apiCall('/api/school/leaves/all');
+        if (result.leaves.length === 0) {
+            document.getElementById('allList').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-calendar-minus"></i><h3>No Leave Requests</h3></div></div></div>';
+            return;
+        }
+        document.getElementById('allList').innerHTML = result.leaves.map(l => renderLeaveCard(l, false)).join('');
+    } catch(e) {}
+}
+
+function renderLeaveCard(l, showActions) {
+    return `
+        <div class="leave-card ${l.status}">
+            <div>
+                <div class="lc-name">${l.teacher_name} <span class="lc-type ${l.type}">${TYPE_LABELS[l.type] || l.type}</span></div>
+                <div class="lc-dates">📅 ${formatDate(l.start)} → ${formatDate(l.end)} <strong>(${l.days} day${l.days > 1 ? 's' : ''})</strong></div>
+                <div class="lc-reason">"${l.reason}"</div>
+                <div class="lc-meta">Applied: ${l.applied}${l.admin_remarks ? ' · Admin: ' + l.admin_remarks : ''}</div>
+            </div>
+            <div class="lc-actions">
+                ${showActions && l.status === 'pending' ? `
+                    <button class="btn btn-primary btn-sm" onclick="leaveAction('${l.id}', 'approve')"><i class="fas fa-check"></i> Approve</button>
+                    <button class="btn btn-danger btn-sm" onclick="leaveAction('${l.id}', 'reject')"><i class="fas fa-times"></i> Reject</button>
+                ` : `<span class="status-badge ${l.status}">${l.status.charAt(0).toUpperCase() + l.status.slice(1)}</span>`}
+            </div>
+        </div>
+    `;
+}
+
+function formatDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function leaveAction(leaveId, action) {
+    pendingAction = { leaveId, action };
+    document.getElementById('remarksTitle').textContent = action === 'approve' ? '✅ Approve Leave' : '❌ Reject Leave';
+    document.getElementById('confirmActionBtn').className = `btn ${action === 'approve' ? 'btn-primary' : 'btn-danger'}`;
+    document.getElementById('confirmActionBtn').innerHTML = action === 'approve' ? '<i class="fas fa-check"></i> Approve' : '<i class="fas fa-times"></i> Reject';
+    document.getElementById('remarksInput').value = '';
+    openModal('remarksModal');
+}
+
+async function confirmAction() {
+    const btn = document.getElementById('confirmActionBtn');
+    btn.disabled = true;
+    try {
+        const result = await apiCall(`/api/school/leaves/${pendingAction.leaveId}/action`, 'POST', {
+            action: pendingAction.action,
+            remarks: document.getElementById('remarksInput').value || null,
+        });
+        closeModal('remarksModal');
+        showToast('success', result.message, '');
+        loadPendingLeaves();
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false;
+}
+
+// Load on page start
+loadPendingLeaves();
+</script>
+{% endblock %}

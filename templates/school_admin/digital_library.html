@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Digital Library{% endblock %}
+{% block page_title %}📚 Digital Library{% endblock %}
+{% block page_subtitle %}Magazines, textbooks, and study material{% endblock %}
+{% block extra_css %}
+<style>
+.lib-tabs{display:flex;gap:4px;background:var(--bg-card,white);border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
+.lib-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.lib-tab.active{background:var(--primary);color:white;}
+.upload-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.60rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select,.f-grp textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.content-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;transition:all 0.15s;}
+.content-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+.cc-thumb{height:50px;display:flex;align-items:center;justify-content:center;font-size:2rem;}
+.cc-body{padding:14px;}
+.cc-title{font-weight:900;font-size:0.88rem;margin-bottom:2px;}
+.cc-meta{font-size:0.68rem;color:var(--text-light);}
+.cc-stats{display:flex;gap:12px;margin-top:8px;}
+.cc-stat{text-align:center;}.cc-stat .sv{font-weight:900;font-size:0.92rem;}.cc-stat .sl{font-size:0.55rem;text-transform:uppercase;color:var(--text-light);font-weight:700;}
+.cc-actions{display:flex;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border-light);}
+.ca-btn{padding:4px 8px;border-radius:6px;font-size:0.65rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);color:var(--text);}
+.ca-btn:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
+/* Analytics drilldown */
+.drill-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;}
+.drill-box{background:var(--bg-card,white);border-radius:16px;padding:24px;width:90%;max-width:600px;max-height:80vh;overflow-y:auto;color:var(--text);}
+.view-row{display:grid;grid-template-columns:1fr 120px 80px;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);font-size:0.78rem;}
+.view-row.header{font-weight:900;font-size:0.60rem;text-transform:uppercase;color:var(--text-light);}
+.type-colors{magazine:'#DC2626',textbook:'#2563EB',notes:'#059669',worksheet:'#7C3AED',circular:'#D97706'}
+@media(max-width:768px){.f-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="lib-tabs">
+    <div class="lib-tab active" onclick="filterContent('all',this)">📚 All</div>
+    <div class="lib-tab" onclick="filterContent('magazine',this)">📰 Magazines</div>
+    <div class="lib-tab" onclick="filterContent('textbook',this)">📖 Textbooks</div>
+    <div class="lib-tab" onclick="filterContent('notes',this)">📝 Notes</div>
+    <div class="lib-tab" onclick="filterContent('worksheet',this)">📄 Worksheets</div>
+    <div class="lib-tab" onclick="filterContent('circular',this)">📋 Circulars</div>
+</div>
+
+<div class="upload-card">
+    <h3 style="font-size:0.92rem;margin-bottom:12px;">📤 Upload Content</h3>
+    <div class="f-grid">
+        <div class="f-grp"><label>Title *</label><input id="cTitle" placeholder="Mathematics Textbook - Class 10"></div>
+        <div class="f-grp"><label>Content Type</label><select id="cType">
+            <option value="magazine">📰 Magazine</option><option value="textbook">📖 Textbook</option>
+            <option value="notes">📝 Notes</option><option value="worksheet">📄 Worksheet</option>
+            <option value="circular">📋 Circular</option>
+        </select></div>
+        <div class="f-grp"><label>Class (optional)</label><select id="cClass"><option value="">All Classes</option></select></div>
+    </div>
+    <div class="f-grid">
+        <div class="f-grp"><label>Subject (optional)</label><select id="cSubject"><option value="">General</option></select></div>
+        <div class="f-grp"><label>Visibility</label><select id="cVisibility">
+            <option value="students_parents">Students & Parents</option><option value="students_only">Students Only</option>
+            <option value="teachers_only">Teachers Only</option><option value="all">Everyone</option>
+        </select></div>
+        <div class="f-grp"><label>PDF File *</label><input type="file" id="cFile" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.png"></div>
+    </div>
+    <div class="f-grp" style="margin-bottom:10px;"><label>Description</label><textarea id="cDesc" rows="2" placeholder="Brief description..."></textarea></div>
+    <button class="btn-primary" onclick="uploadContent()"><i class="fas fa-upload"></i> Upload</button>
+</div>
+
+<div class="content-grid" id="contentGrid"></div>
+
+<!-- View Analytics Modal -->
+<div class="drill-modal" id="drillModal">
+    <div class="drill-box">
+        <div style="display:flex;align-items:center;margin-bottom:14px;">
+            <h3 style="flex:1;font-size:1rem;">📊 View Analytics</h3>
+            <button style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-light);" onclick="closeDrill()">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
+            <div style="text-align:center;padding:10px;border-radius:8px;background:var(--bg,#f1f5f9);">
+                <div style="font-weight:900;font-size:1.3rem;" id="drTotal">0</div>
+                <div style="font-size:0.58rem;text-transform:uppercase;font-weight:700;color:var(--text-light);">Total Views</div>
+            </div>
+            <div style="text-align:center;padding:10px;border-radius:8px;background:var(--bg,#f1f5f9);">
+                <div style="font-weight:900;font-size:1.3rem;" id="drUnique">0</div>
+                <div style="font-size:0.58rem;text-transform:uppercase;font-weight:700;color:var(--text-light);">Unique Viewers</div>
+            </div>
+            <div style="text-align:center;padding:10px;border-radius:8px;background:var(--bg,#f1f5f9);">
+                <div style="font-weight:900;font-size:1.3rem;" id="drAvgTime">0s</div>
+                <div style="font-size:0.58rem;text-transform:uppercase;font-weight:700;color:var(--text-light);">Avg. View Time</div>
+            </div>
+        </div>
+        <div class="view-row header"><div>Student</div><div>Viewed At</div><div>Duration</div></div>
+        <div id="drillRows"></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let allContent=[], currentFilter='all';
+const typeColors={magazine:'#DC2626',textbook:'#2563EB',notes:'#059669',worksheet:'#7C3AED',circular:'#D97706'};
+const typeIcons={magazine:'📰',textbook:'📖',notes:'📝',worksheet:'📄',circular:'📋'};
+
+async function init(){
+    try{const r=await fetch('/api/school/classes',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('cClass').innerHTML='<option value="">All Classes</option>'+(d.classes||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}catch(e){}
+    try{const r=await fetch('/api/school/subjects-list',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('cSubject').innerHTML='<option value="">General</option>'+(d.subjects||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}
+    loadContent();
+}
+
+async function loadContent(){
+    try{const r=await fetch('/api/school/digital-library',{credentials:'same-origin'});const d=await r.json();
+    allContent=d.contents||[];renderContent();}catch(e){}
+}
+
+function filterContent(type,btn){
+    currentFilter=type;
+    document.querySelectorAll('.lib-tab').forEach(t=>t.classList.remove('active'));
+    if(btn)btn.classList.add('active');
+    renderContent();
+}
+
+function renderContent(){
+    const filtered=currentFilter==='all'?allContent:allContent.filter(c=>c.content_type===currentFilter);
+    if(!filtered.length){document.getElementById('contentGrid').innerHTML='<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-light);">No content yet</div>';return;}
+    document.getElementById('contentGrid').innerHTML=filtered.map(c=>`<div class="content-card">
+        <div class="cc-thumb" style="background:${typeColors[c.content_type]||'#6366f1'}20;">${typeIcons[c.content_type]||'📄'}</div>
+        <div class="cc-body">
+            <div class="cc-title">${c.title}</div>
+            <div class="cc-meta">${c.content_type} ${c.class_name?'· '+c.class_name:''} ${c.subject_name?'· '+c.subject_name:''}</div>
+            <div class="cc-meta">${c.file_size} · ${c.uploaded_by_name} · ${c.date}</div>
+            <div class="cc-stats">
+                <div class="cc-stat"><div class="sv" style="color:${typeColors[c.content_type]||'var(--primary)'};">${c.views||0}</div><div class="sl">Views</div></div>
+                <div class="cc-stat"><div class="sv">${c.unique_viewers||0}</div><div class="sl">Unique</div></div>
+            </div>
+            <div class="cc-actions">
+                <a href="${c.file_url}" target="_blank" class="ca-btn"><i class="fas fa-eye"></i> View</a>
+                <button class="ca-btn" onclick="showDrill('${c.id}')"><i class="fas fa-chart-bar"></i> Analytics</button>
+                <button class="ca-btn" onclick="deleteContent('${c.id}')" style="color:var(--danger);"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    </div>`).join('');
+}
+
+async function uploadContent(){
+    const title=document.getElementById('cTitle').value.trim();
+    if(!title){showToast('error','Title required');return;}
+    const file=document.getElementById('cFile').files[0];
+    if(!file){showToast('error','Select a file');return;}
+
+    const fd=new FormData();
+    fd.append('file',file);fd.append('title',title);
+    fd.append('content_type',document.getElementById('cType').value);
+    fd.append('class_id',document.getElementById('cClass').value);
+    fd.append('subject_id',document.getElementById('cSubject').value);
+    fd.append('visibility',document.getElementById('cVisibility').value);
+    fd.append('description',document.getElementById('cDesc').value);
+
+    try{const r=await fetch('/api/school/digital-library/upload',{method:'POST',body:fd,credentials:'same-origin'});
+    const d=await r.json();if(d.error){showToast('error',d.error);}else{showToast('success','Uploaded!');loadContent();
+    document.getElementById('cTitle').value='';document.getElementById('cFile').value='';}}catch(e){showToast('error','Upload failed');}
+}
+
+async function deleteContent(id){if(!confirm('Delete?'))return;await apiCall('/api/school/digital-library/'+id,'DELETE');loadContent();}
+
+async function showDrill(id){
+    try{const r=await fetch('/api/school/digital-library/'+id+'/analytics',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('drTotal').textContent=d.total_views||0;
+    document.getElementById('drUnique').textContent=d.unique_viewers||0;
+    document.getElementById('drAvgTime').textContent=(d.avg_duration||0)+'s';
+    document.getElementById('drillRows').innerHTML=(d.views||[]).map(v=>`<div class="view-row">
+        <div><strong>${v.student_name||v.user_name||'Unknown'}</strong></div>
+        <div style="font-size:0.68rem;color:var(--text-light);">${v.viewed_at}</div>
+        <div>${v.duration||0}s</div>
+    </div>`).join('')||'<div style="padding:12px;color:var(--text-light);">No views yet</div>';
+    document.getElementById('drillModal').style.display='flex';}catch(e){showToast('error','Failed');}
+}
+function closeDrill(){document.getElementById('drillModal').style.display='none';}
+
+init();
+</script>
+{% endblock %}

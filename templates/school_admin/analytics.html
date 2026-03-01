@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}Analytics Dashboard{% endblock %}
+{% block page_title %}📊 Analytics Command Center{% endblock %}
+{% block page_subtitle %}Real-time insights — drill down to every detail{% endblock %}
+
+{% block extra_css %}
+<style>
+    .analytics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .chart-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; transition: all 0.3s; }
+    .chart-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .chart-card h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .chart-card h3 .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .chart-card canvas { max-height: 260px; }
+    .kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
+    .kpi-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 14px 16px; text-align: center; border-top: 3px solid var(--primary); transition: all 0.3s; position: relative; overflow: hidden; }
+    .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+    .kpi-card .kpi-val { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
+    .kpi-card .kpi-label { font-size: 0.68rem; color: var(--text-light); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-card .kpi-delta { font-size: 0.68rem; font-weight: 600; margin-top: 4px; }
+    .kpi-card .kpi-delta.up { color: #059669; }
+    .kpi-card .kpi-delta.down { color: #DC2626; }
+    .kpi-card::after { content: ''; position: absolute; top: 0; right: 0; width: 50px; height: 50px; background: linear-gradient(135deg, transparent 50%, rgba(79,70,229,0.04) 50%); }
+
+    .gauge-container { display: flex; justify-content: center; align-items: center; flex-direction: column; }
+    .gauge-ring { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(var(--color, var(--primary)) calc(var(--pct, 0) * 3.6deg), var(--bg-secondary, #F1F5F9) 0); display: flex; align-items: center; justify-content: center; position: relative; transition: all 1s ease; }
+    .gauge-ring::after { content: ''; width: 90px; height: 90px; border-radius: 50%; background: white; position: absolute; }
+    .gauge-value { position: relative; z-index: 1; font-size: 1.5rem; font-weight: 800; }
+    .gauge-label { font-size: 0.72rem; color: var(--text-light); margin-top: 6px; }
+
+    .heatmap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .heatmap-cell { width: 100%; aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 600; transition: all 0.2s; cursor: pointer; }
+    .heatmap-cell:hover { transform: scale(1.15); z-index: 1; }
+    .heatmap-cell.sun { background: var(--bg-secondary, #F1F5F9); color: var(--text-light); }
+
+    .full-width { grid-column: 1 / -1; }
+    .span-2 { grid-column: span 2; }
+    @media (max-width: 768px) { .span-2 { grid-column: span 1; } .kpi-strip { grid-template-columns: repeat(3, 1fr); } }
+
+    /* Animated loading */
+    .chart-loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: var(--text-light); }
+    .pulse { animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Strip -->
+<div class="kpi-strip" id="kpiStrip">
+    <div class="kpi-card" style="border-top-color:#4F46E5;"><div class="kpi-val" id="kStudents" style="color:#4F46E5;">—</div><div class="kpi-label">Students</div></div>
+    <div class="kpi-card" style="border-top-color:#059669;"><div class="kpi-val" id="kTeachers" style="color:#059669;">—</div><div class="kpi-label">Teachers</div></div>
+    <div class="kpi-card" style="border-top-color:#D97706;"><div class="kpi-val" id="kEmployees" style="color:#D97706;">—</div><div class="kpi-label">Employees</div></div>
+    <div class="kpi-card" style="border-top-color:#7C3AED;"><div class="kpi-val" id="kAttPct" style="color:#7C3AED;">—</div><div class="kpi-label">Today's Attendance</div></div>
+    <div class="kpi-card" style="border-top-color:#059669;"><div class="kpi-val" id="kCollected" style="color:#059669;">—</div><div class="kpi-label">Total Collected</div></div>
+    <div class="kpi-card" style="border-top-color:#DC2626;"><div class="kpi-val" id="kPending" style="color:#DC2626;">—</div><div class="kpi-label">Pending Fees</div></div>
+    <div class="kpi-card" style="border-top-color:#2563EB;"><div class="kpi-val" id="kAdmissions" style="color:#2563EB;">—</div><div class="kpi-label">New Enquiries</div></div>
+    <div class="kpi-card" style="border-top-color:#0891B2;"><div class="kpi-val" id="kToday" style="color:#0891B2;">—</div><div class="kpi-label">Collected Today</div></div>
+</div>
+
+<div class="analytics-grid">
+    <!-- Attendance Trend (30 days) -->
+    <div class="chart-card span-2">
+        <h3><i class="fas fa-chart-line" style="color:#7C3AED;"></i> Attendance Trend (30 Days) <span class="badge" style="background:#EDE9FE; color:#7C3AED;">LIVE</span></h3>
+        <canvas id="attTrendChart"></canvas>
+    </div>
+
+    <!-- Attendance Gauge -->
+    <div class="chart-card">
+        <h3><i class="fas fa-tachometer-alt" style="color:#059669;"></i> Today's Attendance</h3>
+        <div class="gauge-container">
+            <div class="gauge-ring" id="attGauge" style="--pct:0; --color:#059669;">
+                <span class="gauge-value" id="attGaugeVal">0%</span>
+            </div>
+            <div class="gauge-label" id="attGaugeLabel">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Fee Collection Trend -->
+    <div class="chart-card span-2">
+        <h3><i class="fas fa-indian-rupee-sign" style="color:#059669;"></i> Fee Collection (6 Months) <span class="badge" style="background:#D1FAE5; color:#059669;">₹</span></h3>
+        <canvas id="feesTrendChart"></canvas>
+    </div>
+
+    <!-- Payment Mode Split -->
+    <div class="chart-card">
+        <h3><i class="fas fa-credit-card" style="color:#2563EB;"></i> Payment Modes</h3>
+        <canvas id="paymentModeChart"></canvas>
+    </div>
+
+    <!-- Class-wise Attendance -->
+    <div class="chart-card span-2">
+        <h3><i class="fas fa-chart-bar" style="color:#4F46E5;"></i> Class-wise Attendance (Today)</h3>
+        <canvas id="classAttChart"></canvas>
+    </div>
+
+    <!-- Class-wise Fee Dues -->
+    <div class="chart-card">
+        <h3><i class="fas fa-exclamation-triangle" style="color:#DC2626;"></i> Fee Dues by Class</h3>
+        <canvas id="classFeeChart"></canvas>
+    </div>
+
+    <!-- Exam Performance Trend -->
+    <div class="chart-card span-2">
+        <h3><i class="fas fa-graduation-cap" style="color:#D97706;"></i> Exam Performance Trend</h3>
+        <canvas id="examTrendChart"></canvas>
+    </div>
+
+    <!-- Subject Radar -->
+    <div class="chart-card">
+        <h3><i class="fas fa-spider" style="color:#7C3AED;"></i> Subject Analysis</h3>
+        <canvas id="subjectRadarChart"></canvas>
+    </div>
+
+    <!-- Attendance Heatmap -->
+    <div class="chart-card full-width">
+        <h3><i class="fas fa-fire" style="color:#DC2626;"></i> Attendance Heatmap (This Month) <span class="badge" style="background:#FEE2E2; color:#DC2626;">🔥</span></h3>
+        <div style="display:grid; grid-template-columns: repeat(7,1fr); gap:3px; margin-bottom:6px; font-size:0.65rem; color:var(--text-light); text-align:center; font-weight:600;">
+            <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+        </div>
+        <div class="heatmap-grid" id="heatmapGrid"></div>
+        <div style="display:flex; gap:12px; justify-content:center; margin-top:8px; font-size:0.65rem; color:var(--text-light);">
+            <span>■ <span style="color:#FEE2E2;">Low</span></span>
+            <span>■ <span style="color:#FEF3C7;">Med</span></span>
+            <span>■ <span style="color:#D1FAE5;">Good</span></span>
+            <span>■ <span style="color:#059669;">Excellent</span></span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const COLORS = {
+    primary: '#4F46E5', success: '#059669', warning: '#D97706', danger: '#DC2626',
+    info: '#2563EB', purple: '#7C3AED', teal: '#0891B2',
+    primaryAlpha: 'rgba(79,70,229,0.15)', successAlpha: 'rgba(5,150,105,0.15)',
+    dangerAlpha: 'rgba(220,38,38,0.15)', warningAlpha: 'rgba(217,119,6,0.15)',
+};
+const chartDefaults = { responsive: true, maintainAspectRatio: true, animation: { duration: 800, easing: 'easeOutQuart' },
+    plugins: { legend: { labels: { font: { size: 11, family: "'Inter',sans-serif" }, usePointStyle: true, padding: 12 } } },
+    scales: { x: { grid: { display: false }, ticks: { font: { size: 10 } } }, y: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 10 } } } }
+};
+
+function formatINR(n) { if (n >= 10000000) return '₹' + (n/10000000).toFixed(1) + 'Cr'; if (n >= 100000) return '₹' + (n/100000).toFixed(1) + 'L'; if (n >= 1000) return '₹' + (n/1000).toFixed(1) + 'K'; return '₹' + n.toFixed(0); }
+
+// ═══ LOAD ALL DATA ═══
+async function loadAnalytics() {
+    // KPIs
+    try {
+        const ov = await (await fetch('/api/school/analytics/overview')).json();
+        document.getElementById('kStudents').textContent = ov.students;
+        document.getElementById('kTeachers').textContent = ov.teachers;
+        document.getElementById('kEmployees').textContent = ov.employees;
+        document.getElementById('kAttPct').textContent = ov.attendance_pct + '%';
+        document.getElementById('kCollected').textContent = formatINR(ov.total_collected);
+        document.getElementById('kPending').textContent = formatINR(ov.total_pending);
+        document.getElementById('kAdmissions').textContent = ov.new_admissions;
+        document.getElementById('kToday').textContent = formatINR(ov.collected_today);
+
+        // Gauge
+        const gauge = document.getElementById('attGauge');
+        gauge.style.setProperty('--pct', ov.attendance_pct);
+        gauge.style.setProperty('--color', ov.attendance_pct >= 85 ? COLORS.success : ov.attendance_pct >= 70 ? COLORS.warning : COLORS.danger);
+        document.getElementById('attGaugeVal').textContent = ov.attendance_pct + '%';
+        document.getElementById('attGaugeLabel').textContent = `${ov.present_today} present of ${ov.marked_today} marked`;
+    } catch(e) { console.log('Overview:', e); }
+
+    // Attendance Trend
+    try {
+        const at = await (await fetch('/api/school/analytics/attendance/daily-trend?days=30')).json();
+        new Chart(document.getElementById('attTrendChart'), {
+            type: 'line', data: {
+                labels: at.labels,
+                datasets: [
+                    { label: 'Present', data: at.present, borderColor: COLORS.success, backgroundColor: COLORS.successAlpha, fill: true, tension: 0.4, pointRadius: 2 },
+                    { label: 'Absent', data: at.absent, borderColor: COLORS.danger, backgroundColor: COLORS.dangerAlpha, fill: true, tension: 0.4, pointRadius: 2 },
+                ]
+            }, options: { ...chartDefaults, interaction: { intersect: false, mode: 'index' } }
+        });
+    } catch(e) { console.log('AttTrend:', e); }
+
+    // Class-wise Attendance
+    try {
+        const ca = await (await fetch('/api/school/analytics/attendance/class-wise')).json();
+        new Chart(document.getElementById('classAttChart'), {
+            type: 'bar', data: {
+                labels: ca.labels,
+                datasets: [
+                    { label: 'Present', data: ca.present, backgroundColor: COLORS.success, borderRadius: 4 },
+                    { label: 'Absent', data: ca.absent, backgroundColor: COLORS.danger, borderRadius: 4 },
+                ]
+            }, options: { ...chartDefaults, plugins: { ...chartDefaults.plugins }, scales: { ...chartDefaults.scales, x: { ...chartDefaults.scales.x, stacked: true }, y: { ...chartDefaults.scales.y, stacked: true } } }
+        });
+    } catch(e) { console.log('ClassAtt:', e); }
+
+    // Fee Collection Trend
+    try {
+        const ft = await (await fetch('/api/school/analytics/fees/collection-trend?months=6')).json();
+        new Chart(document.getElementById('feesTrendChart'), {
+            type: 'bar', data: {
+                labels: ft.labels,
+                datasets: [{ label: 'Collected (₹)', data: ft.collected, backgroundColor: 'rgba(5,150,105,0.7)', borderColor: COLORS.success, borderWidth: 1, borderRadius: 6 }]
+            }, options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, tooltip: { callbacks: { label: ctx => '₹' + ctx.raw.toLocaleString('en-IN') } } } }
+        });
+    } catch(e) { console.log('FeeTrend:', e); }
+
+    // Payment Modes
+    try {
+        const pm = await (await fetch('/api/school/analytics/fees/payment-mode-split')).json();
+        new Chart(document.getElementById('paymentModeChart'), {
+            type: 'doughnut', data: {
+                labels: pm.labels,
+                datasets: [{ data: pm.values, backgroundColor: [COLORS.primary, COLORS.success, COLORS.warning, COLORS.info, COLORS.purple, COLORS.teal, '#F59E0B'] }]
+            }, options: { responsive: true, animation: { duration: 1000 }, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8 } } } }
+        });
+    } catch(e) { console.log('PayMode:', e); }
+
+    // Class-wise Fee Dues
+    try {
+        const cf = await (await fetch('/api/school/analytics/fees/class-wise-dues')).json();
+        new Chart(document.getElementById('classFeeChart'), {
+            type: 'bar', data: {
+                labels: cf.labels,
+                datasets: [
+                    { label: 'Paid', data: cf.paid, backgroundColor: COLORS.success, borderRadius: 4 },
+                    { label: 'Dues', data: cf.dues, backgroundColor: COLORS.danger, borderRadius: 4 },
+                ]
+            }, options: { ...chartDefaults, indexAxis: 'y', scales: { x: { grid: { color: '#F3F4F6' }, ticks: { font: { size: 9 }, callback: v => formatINR(v) } }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } } }
+        });
+    } catch(e) { console.log('ClassFee:', e); }
+
+    // Exam Performance
+    try {
+        const ep = await (await fetch('/api/school/analytics/exams/performance-trend')).json();
+        new Chart(document.getElementById('examTrendChart'), {
+            type: 'line', data: {
+                labels: ep.labels,
+                datasets: [
+                    { label: 'Average %', data: ep.averages, borderColor: COLORS.primary, backgroundColor: COLORS.primaryAlpha, fill: true, tension: 0.4, pointRadius: 4 },
+                    { label: 'Pass Rate %', data: ep.pass_rates, borderColor: COLORS.success, borderDash: [5, 3], tension: 0.4, pointRadius: 3 },
+                ]
+            }, options: { ...chartDefaults, scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, min: 0, max: 100 } } }
+        });
+    } catch(e) { console.log('ExamTrend:', e); }
+
+    // Subject Radar
+    try {
+        const sr = await (await fetch('/api/school/analytics/exams/subject-wise')).json();
+        new Chart(document.getElementById('subjectRadarChart'), {
+            type: 'radar', data: {
+                labels: sr.labels,
+                datasets: [
+                    { label: 'Avg %', data: sr.averages, borderColor: COLORS.primary, backgroundColor: COLORS.primaryAlpha, pointBackgroundColor: COLORS.primary },
+                    { label: 'Pass %', data: sr.pass_rates, borderColor: COLORS.success, backgroundColor: COLORS.successAlpha, pointBackgroundColor: COLORS.success },
+                ]
+            }, options: { responsive: true, animation: { duration: 1000 }, scales: { r: { min: 0, max: 100, ticks: { stepSize: 25, font: { size: 9 } } } },
+                plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+        });
+    } catch(e) { console.log('SubRadar:', e); }
+
+    // Heatmap
+    try {
+        const hm = await (await fetch('/api/school/analytics/attendance/monthly-heatmap')).json();
+        const grid = document.getElementById('heatmapGrid');
+        // Pad start of month
+        const firstDay = new Date(hm.year, hm.month - 1, 1).getDay();
+        const offset = firstDay === 0 ? 6 : firstDay - 1; // Mon=0
+        for (let i = 0; i < offset; i++) grid.innerHTML += '<div class="heatmap-cell" style="background:transparent;"></div>';
+
+        hm.days.forEach(d => {
+            let bg, color;
+            if (d.pct === -1) { bg = 'var(--bg-secondary,#F1F5F9)'; color = 'var(--text-light)'; }
+            else if (d.pct === 0) { bg = '#F3F4F6'; color = '#9CA3AF'; }
+            else if (d.pct < 70) { bg = '#FEE2E2'; color = '#DC2626'; }
+            else if (d.pct < 85) { bg = '#FEF3C7'; color = '#D97706'; }
+            else if (d.pct < 95) { bg = '#D1FAE5'; color = '#059669'; }
+            else { bg = '#059669'; color = 'white'; }
+            grid.innerHTML += `<div class="heatmap-cell" style="background:${bg}; color:${color};" title="Day ${d.day}: ${d.pct === -1 ? 'Sunday' : d.pct + '%'}">${d.day}</div>`;
+        });
+    } catch(e) { console.log('Heatmap:', e); }
+}
+
+// Auto-refresh every 60 seconds
+loadAnalytics();
+setInterval(loadAnalytics, 60000);
+</script>
+{% endblock %}

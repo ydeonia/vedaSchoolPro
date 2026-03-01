@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Report Card{% endblock %}
+{% block page_title %}🎓 Report Card{% endblock %}
+{% block page_subtitle %}{{ student.full_name }} — {{ student.class_.name if student.class_ else '' }} {{ student.section.name if student.section else '' }}{% endblock %}
+{% block content %}
+{% if exam_results %}
+<div style="text-align:right;margin-bottom:12px;"><a href="/student/results/report-card-pdf" target="_blank" class="btn btn-primary"><i class="fas fa-download"></i> Download PDF</a></div>
+{% for er in exam_results %}
+<div class="card mb-3">
+    <div class="card-header"><h2>{{ er.name }}</h2><span class="badge {% if er.pct >= 80 %}badge-success{% elif er.pct >= 50 %}badge-warning{% else %}badge-danger{% endif %}">{{ er.pct }}%</span></div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Subject</th><th>Max</th><th>Obtained</th><th>Grade</th><th></th></tr></thead><tbody>
+        {% for s in er.subjects %}
+        <tr {% if s.absent %}style="opacity:0.5;"{% endif %}>
+            <td>{{ s.subject }}</td><td>{{ s.max }}</td>
+            <td><strong>{{ s.obtained }}</strong></td><td>{{ s.grade }}</td>
+            <td>{% if s.absent %}🚫 Absent{% elif s.obtained >= s.max * 0.33 %}✅{% else %}❌{% endif %}</td>
+        </tr>
+        {% endfor %}
+        <tr style="font-weight:800;background:var(--bg);"><td>TOTAL</td><td>{{ er.max }}</td><td>{{ er.total }}</td><td colspan="2">{{ er.pct }}%</td></tr>
+        </tbody></table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-file-alt"></i><h3>No Published Results</h3><p>Report card will appear after results are published.</p></div></div></div>
+{% endif %}
+{% endblock %}

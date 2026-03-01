@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}House System{% endblock %}
+{% block page_title %}🏠 House System{% endblock %}
+{% block page_subtitle %}Manage school houses, assign students, and track house points{% endblock %}
+{% block extra_css %}
+<style>
+.h-tabs{display:flex;gap:4px;background:white;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
+.h-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.h-tab.active{background:var(--primary);color:white;}
+/* House cards */
+.house-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-bottom:16px;}
+.house-card{border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;transition:all 0.2s;}
+.house-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+.house-banner{height:60px;display:flex;align-items:center;justify-content:center;position:relative;}
+.house-banner .house-emoji{font-size:2rem;}
+.house-body{background:white;padding:14px;}
+.house-name{font-weight:900;font-size:1.1rem;margin-bottom:2px;}
+.house-tagline{font-size:0.72rem;color:var(--text-light);font-style:italic;margin-bottom:8px;}
+.house-stats{display:flex;gap:12px;margin-bottom:8px;}
+.hs{text-align:center;}.hs-val{font-weight:900;font-size:1.1rem;}.hs-lbl{font-size:0.58rem;text-transform:uppercase;color:var(--text-light);font-weight:700;}
+.house-master{font-size:0.72rem;color:var(--text-light);margin-bottom:8px;}
+.house-roles{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+.role-chip{padding:2px 8px;border-radius:6px;font-size:0.62rem;font-weight:700;background:var(--bg);color:var(--text-secondary);}
+.house-actions{display:flex;gap:4px;}
+.ha-btn{padding:5px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;}
+.ha-btn:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
+/* Add form */
+.add-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+/* Assign tab */
+.assign-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
+/* Roles tab */
+.role-card{background:white;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.role-badge{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+.role-info{flex:1;}.role-name{font-weight:800;font-size:0.85rem;}.role-meta{font-size:0.68rem;color:var(--text-light);}
+@media(max-width:768px){.f-row{grid-template-columns:1fr 1fr;}.house-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="h-tabs">
+    <div class="h-tab active" onclick="switchTab('houses',this)">🏠 Houses</div>
+    
+    <div class="h-tab" onclick="switchTab('roles',this)">👑 Roles & Positions</div>
+    <div class="h-tab" onclick="switchTab('points',this)">⭐ Points</div>
+</div>
+
+<!-- Houses Tab -->
+<div id="housesTab">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">➕ Create House</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>House Name</label><input id="hName" placeholder="Red House"></div>
+            <div class="f-grp"><label>Color</label><input type="color" id="hColor" value="#DC2626"></div>
+            <div class="f-grp"><label>Tagline</label><input id="hTagline" placeholder="Courage and Strength"></div>
+            <div class="f-grp"><label>House Master (Teacher)</label><select id="hMaster"><option value="">Select</option></select></div>
+        </div>
+        <button class="btn-primary" onclick="createHouse()"><i class="fas fa-plus"></i> Create House</button>
+    </div>
+    <div class="house-grid" id="houseGrid"></div>
+</div>
+
+<!-- Assign Students Tab -->
+<div id="assignTab" style="display:none;">
+    <div class="assign-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">👨‍🎓 Assign Students to Houses</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Class</label><select id="asClass" onchange="loadAsSections()"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="asSection" onchange="loadAsStudents()"><option value="">All</option></select></div>
+            <div class="f-grp"><label>House</label><select id="asHouse"><option value="">Select House</option></select></div>
+            <div class="f-grp"><label>&nbsp;</label><button class="btn-primary" onclick="bulkAssignHouse()" style="width:100%;">Assign Selected</button></div>
+        </div>
+        <div style="max-height:50vh;overflow-y:auto;margin-top:10px;" id="asStudentList"></div>
+    </div>
+</div>
+
+<!-- Roles Tab -->
+<div id="rolesTab" style="display:none;">
+    <div class="assign-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">👑 Assign Role / Position</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Role</label><select id="roleType">
+                <option value="head_boy">👑 Head Boy</option><option value="head_girl">👑 Head Girl</option>
+                <option value="house_captain">🏠 House Captain</option><option value="vice_captain">🏠 Vice Captain</option>
+                <option value="class_monitor">📋 Class Monitor</option><option value="sports_captain">⚽ Sports Captain</option>
+                <option value="prefect">🎖️ Prefect</option><option value="student_of_year">🌟 Student of the Year</option>
+            </select></div>
+            <div class="f-grp"><label>Class</label><select id="rlClass" onchange="loadRlSections()"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="rlSection" onchange="loadRlStudents()"><option value="">All</option></select></div>
+            <div class="f-grp"><label>Student</label><select id="rlStudent"><option value="">Select</option></select></div>
+        </div>
+        <div class="f-row" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>House (for house roles)</label><select id="rlHouse"><option value="">N/A</option></select></div>
+            <div class="f-grp"><label>&nbsp;</label><button class="btn-primary" onclick="assignRole()" style="width:100%;"><i class="fas fa-crown"></i> Assign Role</button></div>
+        </div>
+    </div>
+    <h3 style="font-size:0.88rem;margin-bottom:8px;">Current Roles</h3>
+    <div id="rolesList"></div>
+</div>
+
+<!-- Points Tab -->
+<div id="pointsTab" style="display:none;">
+    <div class="assign-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">⭐ Award House Points</h3>
+        <div class="f-row" style="grid-template-columns:1fr 1fr 1fr;">
+            <div class="f-grp"><label>House</label><select id="ptHouse"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Points</label><input type="number" id="ptPoints" placeholder="10"></div>
+            <div class="f-grp"><label>&nbsp;</label><button class="btn-primary" onclick="awardPoints()" style="width:100%;">⭐ Award</button></div>
+        </div>
+    </div>
+    <div class="house-grid" id="pointsGrid"></div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let houses=[], allClasses=[];
+function switchTab(t,btn){document.querySelectorAll('.h-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+['housesTab','assignTab','rolesTab','pointsTab'].forEach(id=>document.getElementById(id).style.display='none');
+document.getElementById(t+'Tab').style.display='block';}
+
+async function init(){
+    // Load classes
+    try{const r=await fetch('/api/school/classes',{credentials:'same-origin'});const d=await r.json();allClasses=d.classes||[];
+    const opts=allClasses.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    ['asClass','rlClass'].forEach(id=>document.getElementById(id).innerHTML='<option value="">Select</option>'+opts);}catch(e){}
+    // Load teachers
+    try{const r=await fetch('/api/school/teachers-list',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('hMaster').innerHTML='<option value="">Select</option>'+(d.teachers||[]).map(t=>`<option value="${t.id}">${t.name}</option>`).join('');}catch(e){}
+    loadHouses();
+    loadRoles();
+}
+
+async function loadHouses(){
+    try{const r=await fetch('/api/school/houses',{credentials:'same-origin'});const d=await r.json();houses=d.houses||[];
+    const hOpts=houses.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+    ['asHouse','rlHouse','ptHouse'].forEach(id=>document.getElementById(id).innerHTML='<option value="">Select</option>'+hOpts);
+    renderHouses();renderPointsBoard();}catch(e){}
+}
+
+function renderHouses(){
+    const g=document.getElementById('houseGrid');
+    if(!houses.length){g.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-light);grid-column:1/-1;">No houses yet. Create your first!</div>';return;}
+    g.innerHTML=houses.map(h=>`<div class="house-card">
+        <div class="house-banner" style="background:${h.color}20;"><span class="house-emoji">🏠</span></div>
+        <div class="house-body">
+            <div class="house-name" style="color:${h.color};">${h.name}</div>
+            <div class="house-tagline">${h.tagline||'No tagline'}</div>
+            <div class="house-stats">
+                <div class="hs"><div class="hs-val" style="color:${h.color};">${h.points||0}</div><div class="hs-lbl">Points</div></div>
+                <div class="hs"><div class="hs-val">${h.student_count||0}</div><div class="hs-lbl">Students</div></div>
+            </div>
+            ${h.master_name?`<div class="house-master">🧑‍🏫 House Master: <strong>${h.master_name}</strong></div>`:''}
+            <div class="house-actions">
+                <button class="ha-btn" onclick="editHouse('${h.id}')"><i class="fas fa-edit"></i> Edit</button>
+                <button class="ha-btn" onclick="deleteHouse('${h.id}')"><i class="fas fa-trash" style="color:#DC2626;"></i></button>
+            </div>
+        </div>
+    </div>`).join('');
+}
+
+function renderPointsBoard(){
+    const g=document.getElementById('pointsGrid');
+    const sorted=[...houses].sort((a,b)=>(b.points||0)-(a.points||0));
+    g.innerHTML=sorted.map((h,i)=>`<div class="house-card">
+        <div class="house-banner" style="background:${h.color};">
+            <span style="font-size:2.5rem;color:white;font-weight:900;">${i===0?'🏆':''}${h.points||0}</span>
+        </div>
+        <div class="house-body" style="text-align:center;">
+            <div class="house-name" style="color:${h.color};">${i===0?'🥇':i===1?'🥈':i===2?'🥉':''}${h.name}</div>
+            <div class="house-tagline">${h.student_count||0} students</div>
+        </div>
+    </div>`).join('');
+}
+
+async function createHouse(){
+    const d={name:g('hName'),color:g('hColor'),tagline:g('hTagline'),house_master_id:g('hMaster')||null};
+    if(!d.name){alert('Enter house name');return;}
+    await apiCall('/api/school/houses','POST',d);showToast('success','House created');loadHouses();
+}
+async function deleteHouse(id){if(!confirm('Delete?'))return;await apiCall('/api/school/houses/'+id,'DELETE');loadHouses();}
+
+// Assign students
+async function loadAsSections(){const cid=g('asClass');if(!cid)return;
+try{const r=await fetch(`/api/school/classes/${cid}/sections`,{credentials:'same-origin'});const d=await r.json();
+document.getElementById('asSection').innerHTML='<option value="">All</option>'+(d.sections||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}loadAsStudents();}
+
+async function loadAsStudents(){const cid=g('asClass');if(!cid)return;const sid=g('asSection');
+let url=`/api/school/students?class_id=${cid}`;if(sid)url+=`&section_id=${sid}`;
+try{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json();
+document.getElementById('asStudentList').innerHTML=(d.students||[]).map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);">
+    <input type="checkbox" value="${s.id}" class="as-check" style="width:16px;height:16px;">
+    <span style="font-weight:700;font-size:0.82rem;flex:1;">${s.name}</span>
+    <span style="font-size:0.70rem;color:var(--text-light);">${s.roll||''}</span>
+    <span style="font-size:0.65rem;padding:2px 6px;border-radius:4px;background:${s.house_color||'var(--bg)'};color:${s.house_color?'white':'var(--text-light)'}">${s.house_name||'No house'}</span>
+</div>`).join('');}catch(e){}}
+
+async function bulkAssignHouse(){
+    const houseId=g('asHouse');if(!houseId){alert('Select a house');return;}
+    const checks=document.querySelectorAll('.as-check:checked');if(!checks.length){alert('Select students');return;}
+    const studentIds=[...checks].map(c=>c.value);
+    await apiCall('/api/school/houses/assign','POST',{house_id:houseId,student_ids:studentIds});
+    showToast('success',`${studentIds.length} students assigned`);loadAsStudents();loadHouses();
+}
+
+// Roles
+async function loadRlSections(){const cid=g('rlClass');if(!cid)return;
+try{const r=await fetch(`/api/school/classes/${cid}/sections`,{credentials:'same-origin'});const d=await r.json();
+document.getElementById('rlSection').innerHTML='<option value="">All</option>'+(d.sections||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}loadRlStudents();}
+
+async function loadRlStudents(){const cid=g('rlClass');if(!cid)return;const sid=g('rlSection');
+let url=`/api/school/students?class_id=${cid}`;if(sid)url+=`&section_id=${sid}`;
+try{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json();
+document.getElementById('rlStudent').innerHTML='<option value="">Select</option>'+(d.students||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}}
+
+async function assignRole(){
+    const sid=g('rlStudent');if(!sid){alert('Select student');return;}
+    const roleType=g('roleType');
+    const labels={head_boy:'Head Boy',head_girl:'Head Girl',house_captain:'House Captain',vice_captain:'Vice Captain',class_monitor:'Class Monitor',sports_captain:'Sports Captain',prefect:'Prefect',student_of_year:'Student of the Year'};
+    const d={student_id:sid,role_type:roleType,title:labels[roleType]||roleType,house_id:g('rlHouse')||null,class_id:g('rlClass')||null};
+    await apiCall('/api/school/student-roles','POST',d);showToast('success','Role assigned');loadRoles();
+}
+
+async function loadRoles(){
+    try{const r=await fetch('/api/school/student-roles',{credentials:'same-origin'});const d=await r.json();
+    const el=document.getElementById('rolesList');
+    const icons={head_boy:'👑',head_girl:'👑',house_captain:'🏠',vice_captain:'🏠',class_monitor:'📋',sports_captain:'⚽',prefect:'🎖️',student_of_year:'🌟'};
+    if(!(d.roles||[]).length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--text-light);">No roles assigned yet.</div>';return;}
+    el.innerHTML=(d.roles||[]).map(r=>`<div class="role-card">
+        <div class="role-badge" style="background:${r.house_color||'var(--bg)'}20;">${icons[r.role_type]||'🎖️'}</div>
+        <div class="role-info"><div class="role-name">${r.student_name} — ${r.title}</div>
+        <div class="role-meta">${r.class_name||''} ${r.house_name?'· '+r.house_name:''}</div></div>
+        <button class="ha-btn" onclick="removeRole('${r.id}')"><i class="fas fa-times" style="color:#DC2626;"></i></button>
+    </div>`).join('');}catch(e){}}
+
+async function removeRole(id){if(!confirm('Remove?'))return;await apiCall('/api/school/student-roles/'+id,'DELETE');loadRoles();}
+
+async function awardPoints(){
+    const hid=g('ptHouse'),pts=parseInt(g('ptPoints'))||0;
+    if(!hid||!pts){alert('Select house and enter points');return;}
+    await apiCall('/api/school/houses/'+hid+'/points','POST',{points:pts});
+    showToast('success',`${pts} points awarded`);loadHouses();
+}
+
+function g(id){return document.getElementById(id).value.trim();}
+init();
+</script>
+{% endblock %}

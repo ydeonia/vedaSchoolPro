@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Teacher Awards{% endblock %}
+{% block page_title %}🌟 Teacher Awards & Recognition{% endblock %}
+{% block page_subtitle %}Nominate, recognize, and reward outstanding teachers{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Star of month hero */
+.star-hero { background:linear-gradient(135deg,#FEF3C7,#FFFBEB); border:2px solid #FDE68A; border-radius:16px; padding:24px; margin-bottom:16px; display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.star-trophy { font-size:3rem; }
+.star-info h2 { font-size:1.1rem; font-weight:900; color:#78350F; }
+.star-info p { font-size:0.82rem; color:#92400E; margin-top:2px; }
+.star-metrics { display:flex; gap:10px; margin-top:8px; flex-wrap:wrap; }
+.star-metric { padding:4px 10px; border-radius:8px; background:rgba(180,83,9,0.1); font-size:0.72rem; font-weight:700; color:#92400E; }
+.star-action { margin-left:auto; }
+.star-btn { padding:10px 20px; border-radius:10px; background:#B45309; color:white; border:none; font-weight:700; cursor:pointer; font-size:0.82rem; }
+
+/* Award types */
+.award-types { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.at-chip { padding:8px 14px; border-radius:10px; font-size:0.78rem; font-weight:700; cursor:pointer; border:2px solid var(--border); background:white; }
+.at-chip.active { border-color:var(--primary); background:var(--primary-50); color:var(--primary); }
+
+/* Leaderboard */
+.leaderboard { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; margin-bottom:16px; }
+.lb-header { padding:14px 16px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
+.lb-header h3 { font-size:0.92rem; }
+.lb-item { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border-light); transition:background 0.15s; }
+.lb-item:hover { background:var(--bg); }
+.lb-rank { width:30px; text-align:center; font-weight:900; font-size:0.85rem; }
+.lb-rank.g { color:#B45309; } .lb-rank.s { color:#6B7280; } .lb-rank.b { color:#C2410C; }
+.lb-avatar { width:40px; height:40px; border-radius:10px; background:var(--primary-50); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.82rem; }
+.lb-info { flex:1; }
+.lb-name { font-weight:700; font-size:0.85rem; }
+.lb-dept { font-size:0.72rem; color:var(--text-light); }
+.lb-score { font-weight:900; font-size:1rem; color:var(--primary); }
+.lb-bars { display:flex; gap:4px; align-items:center; }
+.lb-bar { height:6px; border-radius:3px; }
+.lb-bar.att { background:#10B981; } .lb-bar.perf { background:#6366F1; } .lb-bar.punc { background:#F59E0B; }
+
+/* Nominate */
+.nom-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; }
+.n-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.n-grp { display:flex; flex-direction:column; gap:3px; }
+.n-grp label { font-size:0.68rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.n-grp input,.n-grp select,.n-grp textarea { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+
+/* Past awards */
+.award-card { background:white; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:14px; display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.aw-medal { font-size:1.5rem; }
+.aw-info { flex:1; } .aw-title { font-weight:700; font-size:0.85rem; } .aw-meta { font-size:0.72rem; color:var(--text-light); }
+.aw-status { padding:4px 10px; border-radius:8px; font-size:0.68rem; font-weight:700; }
+.aw-status.awarded { background:#D1FAE5; color:#059669; } .aw-status.nominated { background:#FEF3C7; color:#D97706; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+@media(max-width:768px) { .star-hero { flex-direction:column; text-align:center; } .n-row { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Star of the Month -->
+<div class="star-hero" id="starHero">
+    <div class="star-trophy">🏆</div>
+    <div class="star-info">
+        <h2 id="starName">Loading...</h2>
+        <p id="starSubtitle"></p>
+        <div class="star-metrics" id="starMetrics"></div>
+    </div>
+    <div class="star-action"><button class="star-btn" onclick="nominateNew()">✨ Nominate Teacher</button></div>
+</div>
+
+<!-- Leaderboard -->
+<div class="leaderboard">
+    <div class="lb-header">
+        <h3>📊 Performance Leaderboard — {{ month_name }}</h3>
+        <div style="font-size:0.72rem;color:var(--text-light);">Auto-calculated from attendance + periods + feedback</div>
+    </div>
+    <div id="leaderboard"><div style="padding:20px;text-align:center;color:var(--text-light);">Loading...</div></div>
+</div>
+
+<!-- Past Awards -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">🏅 Recent Awards</h3>
+        <div id="pastAwards"></div>
+    </div>
+    <div>
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">📋 Pending Nominations</h3>
+        <div id="pendingNoms"></div>
+    </div>
+</div>
+
+<!-- Nominate Modal -->
+<div class="modal-overlay" id="nomModal" onclick="if(event.target===this)document.getElementById('nomModal').classList.remove('show')" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;justify-content:center;align-items:center;">
+    <div class="nom-card" style="width:90%;max-width:480px;">
+        <h3 style="margin-bottom:14px;">✨ Nominate for Award</h3>
+        <div class="n-row">
+            <div class="n-grp"><label>Teacher</label><select id="nomTeacher"></select></div>
+            <div class="n-grp"><label>Award Type</label><select id="nomType"><option value="star_of_month">⭐ Star of the Month</option><option value="best_performance">🎯 Best Performance</option><option value="innovation">💡 Innovation in Teaching</option><option value="punctuality">⏰ Punctuality Award</option><option value="parent_choice">❤️ Parent's Choice</option></select></div>
+        </div>
+        <div class="n-grp" style="margin-bottom:10px;"><label>Reason / Citation</label><textarea id="nomReason" placeholder="Why does this teacher deserve recognition?"></textarea></div>
+        <div class="n-grp" style="margin-bottom:12px;"><label>Prize Details (optional)</label><input id="nomPrize" placeholder="e.g., Certificate + ₹2000 voucher"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button style="padding:8px 16px;border-radius:8px;background:var(--bg);border:none;cursor:pointer;" onclick="document.getElementById('nomModal').classList.remove('show')">Cancel</button>
+            <button class="btn-primary" onclick="submitNomination()"><i class="fas fa-award"></i> Nominate</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadData() {
+    try {
+        const res = await fetch('/api/school/teacher-awards/leaderboard', {credentials:'same-origin'});
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        renderLeaderboard(d.leaderboard || []);
+        renderStar(d.star_of_month);
+        renderAwards(d.awards || [], d.nominations || []);
+        populateTeachers(d.teachers || []);
+    } catch(e) {
+        document.getElementById('leaderboard').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-light);">No data yet — leaderboard populates as teachers use the system.</div>';
+        document.getElementById('starName').textContent = 'No Star of the Month yet';
+        document.getElementById('starSubtitle').textContent = 'Nominate a deserving teacher!';
+    }
+}
+
+function renderLeaderboard(lb) {
+    if (!lb.length) { document.getElementById('leaderboard').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-light);">Leaderboard will appear as data accumulates.</div>'; return; }
+    document.getElementById('leaderboard').innerHTML = lb.map((t,i) => {
+        const rc = i===0?'g':i===1?'s':i===2?'b':'';
+        const initials = t.name.split(' ').map(n=>n[0]).join('').substring(0,2);
+        const attW = Math.min(t.attendance_score||0, 100);
+        const perfW = Math.min(t.performance_score||0, 100);
+        return `<div class="lb-item"><div class="lb-rank ${rc}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</div><div class="lb-avatar">${initials}</div><div class="lb-info"><div class="lb-name">${t.name}</div><div class="lb-dept">${t.subjects||'—'}</div><div class="lb-bars" style="margin-top:4px;"><div class="lb-bar att" style="width:${attW}px;" title="Attendance ${t.attendance_score}%"></div><div class="lb-bar perf" style="width:${perfW}px;" title="Performance ${t.performance_score}%"></div></div></div><div class="lb-score">${t.total_score}</div></div>`;
+    }).join('');
+}
+
+function renderStar(star) {
+    if (!star) { document.getElementById('starName').textContent = 'Nominate your Star of the Month!'; document.getElementById('starSubtitle').textContent = 'Click "Nominate Teacher" to get started'; return; }
+    document.getElementById('starName').textContent = `⭐ ${star.name} — Star of the Month`;
+    document.getElementById('starSubtitle').textContent = star.title || '';
+    document.getElementById('starMetrics').innerHTML = `<div class="star-metric">📊 Attendance: ${star.attendance||0}%</div><div class="star-metric">📚 Periods: ${star.periods||0}</div>${star.prize?`<div class="star-metric">🎁 ${star.prize}</div>`:''}`;
+}
+
+function renderAwards(awards, nominations) {
+    const pa = document.getElementById('pastAwards');
+    const pn = document.getElementById('pendingNoms');
+    if (!awards.length) pa.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">No awards given yet.</div>';
+    else pa.innerHTML = awards.map(a => `<div class="award-card"><div class="aw-medal">🏅</div><div class="aw-info"><div class="aw-title">${a.teacher_name} — ${a.title}</div><div class="aw-meta">${a.month_label} ${a.year} ${a.prize_details?'· '+a.prize_details:''}</div></div><span class="aw-status awarded">Awarded</span></div>`).join('');
+    if (!nominations.length) pn.innerHTML = '<div style="color:var(--text-light);font-size:0.82rem;">No pending nominations.</div>';
+    else pn.innerHTML = nominations.map(n => `<div class="award-card"><div class="aw-medal">📋</div><div class="aw-info"><div class="aw-title">${n.teacher_name} — ${n.title}</div><div class="aw-meta">${n.description||''}</div></div><span class="aw-status nominated">Pending</span><button style="padding:4px 10px;border-radius:6px;background:#059669;color:white;border:none;font-size:0.68rem;font-weight:700;cursor:pointer;margin-left:6px;" onclick="approveAward('${n.id}')">✅ Approve</button></div>`).join('');
+}
+
+let teachersList = [];
+function populateTeachers(teachers) {
+    teachersList = teachers;
+    const sel = document.getElementById('nomTeacher');
+    sel.innerHTML = teachers.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+}
+
+function nominateNew() { document.getElementById('nomModal').style.display='flex'; document.getElementById('nomModal').classList.add('show'); }
+
+async function submitNomination() {
+    const data = {
+        teacher_id: document.getElementById('nomTeacher').value,
+        award_type: document.getElementById('nomType').value,
+        description: document.getElementById('nomReason').value.trim(),
+        prize_details: document.getElementById('nomPrize').value.trim(),
+    };
+    if (!data.teacher_id || !data.description) { alert('Select teacher and enter reason'); return; }
+    try {
+        const res = await fetch('/api/school/teacher-awards/nominate', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        if (!res.ok) throw new Error();
+        alert('✅ Nomination submitted!');
+        document.getElementById('nomModal').classList.remove('show'); document.getElementById('nomModal').style.display='none';
+        loadData();
+    } catch(e) { alert('Failed'); }
+}
+
+async function approveAward(id) {
+    if (!confirm('Approve this award?')) return;
+    try { await fetch(`/api/school/teacher-awards/${id}/approve`, {method:'POST',credentials:'same-origin'}); loadData(); } catch(e) {}
+}
+
+loadData();
+</script>
+{% endblock %}

@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Marks Entry{% endblock %}
+{% block page_title %}Marks Entry{% endblock %}
+{% block page_subtitle %}Enter student marks for exams{% endblock %}
+
+{% block extra_css %}
+<style>
+    .marks-table { width: 100%; border-collapse: collapse; }
+    .marks-table th { padding: 10px; background: var(--bg-sidebar); color: white; font-size: 0.75rem; text-align: center; }
+    .marks-table th:first-child { text-align: left; min-width: 40px; }
+    .marks-table th:nth-child(2) { text-align: left; min-width: 180px; }
+    .marks-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-light); }
+    .marks-table tr:hover { background: #FAFBFF; }
+    .marks-table tr.absent-row { background: #FEF2F2; }
+
+    .marks-input { width: 70px; padding: 6px 8px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); text-align: center; font-weight: 600; font-size: 0.88rem; }
+    .marks-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .marks-input.pass { border-color: var(--success); background: #F0FDF4; }
+    .marks-input.fail { border-color: var(--danger); background: #FEF2F2; }
+
+    .grade-pill { padding: 3px 8px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; }
+    .grade-A1, .grade-A2 { background: var(--success-light); color: var(--success); }
+    .grade-B1, .grade-B2 { background: #DBEAFE; color: #2563EB; }
+    .grade-C1, .grade-C2 { background: var(--warning-light); color: var(--warning); }
+    .grade-D { background: #FEF3C7; color: #B45309; }
+    .grade-E { background: var(--danger-light); color: var(--danger); }
+
+    .absent-check { width: 18px; height: 18px; cursor: pointer; }
+    .max-info { font-size: 0.72rem; color: var(--text-light); font-weight: 400; }
+
+    .confetti-piece { position: fixed; top: -10px; width: 10px; height: 10px; border-radius: 2px; animation: confettiFall 3s ease-out forwards; z-index: 10000; }
+    @keyframes confettiFall { 0% { opacity: 1; transform: translateY(0) rotate(0deg); } 100% { opacity: 0; transform: translateY(100vh) rotate(720deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-body" style="padding: 14px 20px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <select id="selExam" class="form-select" style="flex:1; min-width:160px; padding:10px;">
+                <option value="">Select Exam</option>
+                {% for e in exams %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+            </select>
+            <select id="selClass" class="form-select" onchange="onClassChange()" style="flex:1; min-width:140px; padding:10px;">
+                <option value="">Select Class</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <select id="selSection" class="form-select" style="flex:1; min-width:120px; padding:10px;">
+                <option value="">All Sections</option>
+            </select>
+            <select id="selSubject" class="form-select" style="flex:1; min-width:160px; padding:10px;">
+                <option value="">Select Subject</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadMarks()"><i class="fas fa-pen"></i> Load</button>
+        </div>
+    </div>
+</div>
+
+<div id="marksArea">
+    <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-pen"></i><h3>Select Exam, Class & Subject</h3><p>Choose filters above to start entering marks</p></div></div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classSections = {{ sections_json | safe }};
+let studentsData = [];
+let maxMarks = 100, passMarks = 33, examSubjectId = '';
+
+function onClassChange() {
+    const classId = document.getElementById('selClass').value;
+    const sec = document.getElementById('selSection');
+    sec.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(s => sec.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+    }
+    // Load subjects for this exam+class
+    loadSubjects();
+}
+
+async function loadSubjects() {
+    const examId = document.getElementById('selExam').value;
+    const classId = document.getElementById('selClass').value;
+    const sub = document.getElementById('selSubject');
+    sub.innerHTML = '<option value="">Select Subject</option>';
+    if (!examId || !classId) return;
+    try {
+        const result = await apiCall(`/api/school/exams/${examId}/subjects?class_id=${classId}`);
+        result.subjects.forEach(s => sub.innerHTML += `<option value="${s.subject_id}" data-esid="${s.id}" data-max="${s.max_marks}" data-pass="${s.passing_marks}">${s.subject_name} (Max: ${s.max_marks})</option>`);
+    } catch(e) {}
+}
+
+async function loadMarks() {
+    const examId = document.getElementById('selExam').value;
+    const classId = document.getElementById('selClass').value;
+    const sectionId = document.getElementById('selSection').value;
+    const subjectId = document.getElementById('selSubject').value;
+    if (!examId || !classId || !subjectId) { showToast('warning', 'Select all filters', ''); return; }
+
+    const area = document.getElementById('marksArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div>';
+
+    try {
+        const params = new URLSearchParams({ exam_id: examId, class_id: classId, subject_id: subjectId });
+        if (sectionId) params.append('section_id', sectionId);
+        const result = await apiCall(`/api/school/marks/load?${params}`);
+
+        studentsData = result.students;
+        examSubjectId = result.exam_subject_id;
+        maxMarks = result.max_marks;
+        passMarks = result.passing_marks;
+        renderMarksTable();
+    } catch(e) {
+        area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error</h3><p>${e.message}</p></div></div></div>`;
+    }
+}
+
+function renderMarksTable() {
+    if (studentsData.length === 0) {
+        document.getElementById('marksArea').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-users"></i><h3>No Students Found</h3></div></div></div>';
+        return;
+    }
+
+    let html = `<div class="card"><div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="marks-table"><thead><tr>
+            <th>#</th><th>Student</th><th>Roll</th>
+            <th>Marks <span class="max-info">(Max: ${maxMarks})</span></th>
+            <th>Grade</th><th>Absent</th>
+        </tr></thead><tbody>`;
+
+    studentsData.forEach((s, i) => {
+        const grade = s.marks !== null ? calcGrade(s.marks) : '';
+        const passClass = s.marks !== null ? (s.marks >= passMarks ? 'pass' : 'fail') : '';
+        html += `<tr class="${s.is_absent ? 'absent-row' : ''}" id="row-${i}">
+            <td style="color:var(--text-light); font-size:0.78rem;">${i + 1}</td>
+            <td style="font-weight:600;">${s.name}</td>
+            <td style="font-size:0.82rem; color:var(--text-secondary);">${s.roll}</td>
+            <td><input type="number" class="marks-input ${passClass}" value="${s.marks !== null ? s.marks : ''}"
+                min="0" max="${maxMarks}" step="0.5" id="marks-${i}"
+                oninput="onMarksChange(${i})" ${s.is_absent ? 'disabled' : ''}></td>
+            <td><span class="grade-pill grade-${grade}" id="grade-${i}">${grade}</span></td>
+            <td style="text-align:center;"><input type="checkbox" class="absent-check" id="absent-${i}"
+                ${s.is_absent ? 'checked' : ''} onchange="toggleAbsent(${i})"></td>
+        </tr>`;
+    });
+
+    html += `</tbody></table></div>
+        <div class="card-footer" style="text-align:center;">
+            <button class="btn btn-primary btn-lg" onclick="saveMarks()" id="saveMarksBtn">
+                <i class="fas fa-save"></i> Save All Marks
+            </button>
+            <div style="font-size:0.72rem; color: var(--text-light); margin-top:8px;">✏️ You can re-enter & update marks anytime before publishing results</div>
+        </div></div>`;
+    document.getElementById('marksArea').innerHTML = html;
+}
+
+function calcGrade(marks) {
+    const pct = (marks / maxMarks) * 100;
+    if (pct >= 91) return 'A1'; if (pct >= 81) return 'A2';
+    if (pct >= 71) return 'B1'; if (pct >= 61) return 'B2';
+    if (pct >= 51) return 'C1'; if (pct >= 41) return 'C2';
+    if (pct >= 33) return 'D'; return 'E';
+}
+
+function onMarksChange(i) {
+    const input = document.getElementById('marks-' + i);
+    let val = parseFloat(input.value);
+    if (isNaN(val)) val = null;
+    if (val !== null && val > maxMarks) { input.value = maxMarks; val = maxMarks; }
+    if (val !== null && val < 0) { input.value = 0; val = 0; }
+
+    studentsData[i].marks = val;
+    input.className = 'marks-input ' + (val !== null ? (val >= passMarks ? 'pass' : 'fail') : '');
+
+    const grade = val !== null ? calcGrade(val) : '';
+    const gradeEl = document.getElementById('grade-' + i);
+    gradeEl.textContent = grade;
+    gradeEl.className = 'grade-pill grade-' + grade;
+}
+
+function toggleAbsent(i) {
+    const checked = document.getElementById('absent-' + i).checked;
+    studentsData[i].is_absent = checked;
+    const input = document.getElementById('marks-' + i);
+    input.disabled = checked;
+    if (checked) {
+        input.value = ''; studentsData[i].marks = null;
+        document.getElementById('grade-' + i).textContent = '';
+        document.getElementById('row-' + i).classList.add('absent-row');
+    } else {
+        document.getElementById('row-' + i).classList.remove('absent-row');
+    }
+}
+
+async function saveMarks() {
+    const btn = document.getElementById('saveMarksBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const records = studentsData.map(s => ({
+        student_id: s.id, marks: s.is_absent ? null : (s.marks !== null ? s.marks : null), is_absent: s.is_absent,
+    }));
+
+    try {
+        const result = await apiCall('/api/school/marks/save', 'POST', { exam_subject_id: examSubjectId, records });
+        showToast('success', 'Marks Saved! 🎉', result.message);
+        // Confetti
+        const colors = ['#4F46E5','#10B981','#F59E0B','#EF4444','#8B5CF6'];
+        for (let i = 0; i < 25; i++) {
+            const p = document.createElement('div'); p.className = 'confetti-piece';
+            p.style.left = Math.random()*100+'vw'; p.style.background = colors[Math.floor(Math.random()*colors.length)];
+            p.style.animationDelay = Math.random()*0.5+'s'; document.body.appendChild(p);
+            setTimeout(() => p.remove(), 3500);
+        }
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save All Marks';
+}
+</script>
+{% endblock %}

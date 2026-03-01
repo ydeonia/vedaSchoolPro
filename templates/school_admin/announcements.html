@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_subtitle %}Create targeted announcements for teachers, students, or everyone{% endblock %}
+
+{% block extra_css %}
+<style>
+    .compose-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 24px; margin-bottom: 20px; }
+    .compose-card h3 { margin-bottom: 16px; font-size: 1rem; }
+    .priority-selector { display: flex; gap: 8px; flex-wrap: wrap; }
+    .priority-pill { padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.2s; user-select: none; }
+    .priority-pill.selected { color: white; }
+    .priority-pill[data-p="normal"].selected { background: #3B82F6; border-color: #3B82F6; }
+    .priority-pill[data-p="important"].selected { background: #F59E0B; border-color: #F59E0B; }
+    .priority-pill[data-p="urgent"].selected { background: #EF4444; border-color: #EF4444; }
+    .priority-pill[data-p="emergency"].selected { background: #7C3AED; border-color: #7C3AED; }
+    .target-selector { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .target-pill { padding: 8px 16px; border: 2px solid var(--border); border-radius: 20px; cursor: pointer; font-size: 0.78rem; font-weight: 600; transition: all 0.2s; }
+    .target-pill.selected { background: var(--primary); border-color: var(--primary); color: white; }
+    .ann-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px 20px; margin-bottom: 8px; border-left: 4px solid var(--border); }
+    .ann-card.pinned { border-left-color: #F59E0B; background: #FFFBEB; }
+    .ann-card.emergency { border-left-color: #7C3AED; background: #F5F3FF; }
+    .ann-card.urgent { border-left-color: #EF4444; }
+    .ann-card.important { border-left-color: #F59E0B; }
+    .ann-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .ann-title { font-weight: 700; font-size: 0.92rem; flex: 1; }
+    .ann-meta { font-size: 0.72rem; color: var(--text-light); }
+    .ann-content { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; }
+    .ann-badges { display: flex; gap: 6px; margin-top: 8px; }
+    .ann-badge { font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+    .ann-badge.pin { background: #FEF3C7; color: #D97706; }
+    .ann-badge.emg { background: #EDE9FE; color: #7C3AED; }
+    .ann-badge.target { background: var(--primary-50); color: var(--primary); }
+    .quiet-banner { padding: 10px 16px; background: #F0FDF4; border: 1px solid #86EFAC; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 0.78rem; color: #166534; display: flex; align-items: center; gap: 8px; }
+    @media (max-width: 640px) { .priority-selector, .target-selector { gap: 6px; } .priority-pill, .target-pill { padding: 6px 12px; font-size: 0.72rem; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="quiet-banner">
+    <i class="fas fa-moon"></i>
+    <span><strong>Quiet Hours Active:</strong> Non-emergency messages won't be sent between 8 PM — 7 AM. This protects teachers' & parents' personal time.</span>
+</div>
+
+<!-- Compose -->
+<div class="compose-card">
+    <h3><i class="fas fa-bullhorn" style="color:var(--primary);"></i> New Announcement</h3>
+    <div class="form-group">
+        <label class="form-label">Title</label>
+        <input type="text" id="annTitle" class="form-input" placeholder="e.g. Parent-Teacher Meeting on Saturday">
+    </div>
+    <div class="form-group">
+        <label class="form-label">Message</label>
+        <textarea id="annContent" class="form-input" rows="3" placeholder="Write your announcement here..."></textarea>
+    </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+            <label class="form-label">Priority</label>
+            <div class="priority-selector">
+                <div class="priority-pill selected" data-p="normal" onclick="selectPriority(this)">📋 Normal</div>
+                <div class="priority-pill" data-p="important" onclick="selectPriority(this)">⚠️ Important</div>
+                <div class="priority-pill" data-p="urgent" onclick="selectPriority(this)">🔴 Urgent</div>
+                <div class="priority-pill" data-p="emergency" onclick="selectPriority(this)">🚨 Emergency</div>
+            </div>
+        </div>
+        <div>
+            <label class="form-label">Send To</label>
+            <div class="target-selector">
+                <div class="target-pill selected" data-t="all" onclick="selectTarget(this)">👥 Everyone</div>
+                <div class="target-pill" data-t="teacher" onclick="selectTarget(this)">👩‍🏫 Teachers</div>
+                <div class="target-pill" data-t="student" onclick="selectTarget(this)">🎓 Students</div>
+                <div class="target-pill" data-t="parent" onclick="selectTarget(this)">👨‍👩‍👧 Parents</div>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:16px; margin-top:16px;">
+        <label style="font-size:0.82rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
+            <input type="checkbox" id="annPinned"> 📌 Pin to top
+        </label>
+        <div style="flex:1;"></div>
+        <button class="btn btn-primary" onclick="publishAnnouncement()" id="publishBtn"><i class="fas fa-paper-plane"></i> Publish Announcement</button>
+    </div>
+    <div style="font-size:0.72rem; color:var(--text-light); margin-top:8px;">
+        ✏️ Nothing is published until you press "Publish". You can delete announcements anytime.
+    </div>
+</div>
+
+<!-- Announcements List -->
+<div id="annList">
+    {% if announcements %}
+    {% for a in announcements %}
+    <div class="ann-card {{ 'pinned' if a.is_pinned }} {{ 'emergency' if a.is_emergency }} {{ a.priority.value if a.priority else '' }}">
+        <div class="ann-header">
+            {% if a.is_pinned %}<span style="color:#D97706;">📌</span>{% endif %}
+            {% if a.is_emergency %}<span>🚨</span>{% endif %}
+            <span class="ann-title">{{ a.title }}</span>
+            <span class="ann-meta">{{ a.created_at.strftime('%d %b, %I:%M %p') if a.created_at else '' }}</span>
+            <button class="btn btn-ghost btn-sm" onclick="togglePin('{{ a.id }}')" title="Pin/Unpin"><i class="fas fa-thumbtack"></i></button>
+            <button class="btn btn-ghost btn-sm" onclick="deleteAnn('{{ a.id }}')" style="color:var(--danger);" title="Delete"><i class="fas fa-trash"></i></button>
+        </div>
+        <div class="ann-content">{{ a.content }}</div>
+        <div class="ann-badges">
+            <span class="ann-badge target">{{ a.target_role or 'all' | title }}</span>
+            {% if a.is_pinned %}<span class="ann-badge pin">Pinned</span>{% endif %}
+            {% if a.is_emergency %}<span class="ann-badge emg">Emergency</span>{% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bullhorn"></i><h3>No Announcements</h3><p>Create your first announcement above</p></div></div></div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedPriority = 'normal';
+let selectedTarget = 'all';
+
+function selectPriority(el) {
+    document.querySelectorAll('.priority-pill').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedPriority = el.dataset.p;
+}
+function selectTarget(el) {
+    document.querySelectorAll('.target-pill').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedTarget = el.dataset.t;
+}
+
+async function publishAnnouncement() {
+    const title = document.getElementById('annTitle').value.trim();
+    const content = document.getElementById('annContent').value.trim();
+    if (!title || !content) { showToast('warning', 'Enter title & message', ''); return; }
+
+    const isEmergency = selectedPriority === 'emergency';
+    if (isEmergency && !confirm('🚨 Emergency announcements override quiet hours and are sent immediately to everyone. Continue?')) return;
+
+    try {
+        const result = await apiCall('/api/school/announcements/create', 'POST', {
+            title, content, priority: selectedPriority, target_role: selectedTarget,
+            is_pinned: document.getElementById('annPinned').checked,
+            is_emergency: isEmergency,
+        });
+        showToast('success', 'Published! 📢', result.message);
+        setTimeout(() => location.reload(), 800);
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+
+async function deleteAnn(id) {
+    if (!confirm('Delete this announcement? It will be removed for all users.')) return;
+    try { await apiCall(`/api/school/announcements/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+}
+
+async function togglePin(id) {
+    try {
+        const result = await apiCall(`/api/school/announcements/${id}/pin`, 'POST');
+        showToast('info', result.pinned ? '📌 Pinned' : 'Unpinned', '');
+        setTimeout(() => location.reload(), 500);
+    } catch(e) {}
+}
+</script>
+{% endblock %}

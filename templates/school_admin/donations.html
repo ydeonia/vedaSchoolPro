@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Donations{% endblock %}
+{% block page_title %}Donations{% endblock %}
+{% block page_subtitle %}Track all donations — online, cash, cheque, on-record & off-record{% endblock %}
+
+{% block extra_css %}
+<style>
+    .don-stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+    .don-stat{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:14px;padding:16px 20px;flex:1;min-width:140px;}
+    .don-stat .val{font-size:1.3rem;font-weight:900;color:var(--text);}
+    .don-stat .lbl{font-size:0.62rem;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+    .don-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+    .don-toolbar input,.don-toolbar select{padding:8px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;}
+    .don-toolbar .btn{padding:9px 18px;border-radius:10px;border:none;font-weight:700;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;gap:6px;}
+    .don-card{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:14px;align-items:center;padding:14px 20px;background:var(--bg-card,white);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;transition:all 0.15s;}
+    .don-card:hover{border-color:var(--primary);}
+    .don-avatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;font-weight:700;}
+    .don-name{font-weight:700;font-size:0.85rem;color:var(--text);}
+    .don-meta{font-size:0.68rem;color:var(--text-light);margin-top:2px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+    .don-tag{font-size:0.55rem;padding:2px 7px;border-radius:6px;font-weight:700;display:inline-block;}
+    .don-tag.on{background:rgba(34,197,94,0.1);color:#16a34a;}
+    .don-tag.off{background:rgba(245,158,11,0.1);color:#d97706;}
+    .don-tag.anon{background:rgba(99,102,241,0.1);color:#6366f1;}
+    .don-tag.cash{background:rgba(107,114,128,0.1);color:#6b7280;}
+    .don-tag.online{background:rgba(59,130,246,0.1);color:#3b82f6;}
+    .don-amount{font-weight:900;font-size:1rem;color:#d97706;}
+    .don-badge{font-size:0.58rem;padding:3px 10px;border-radius:20px;font-weight:700;}
+    .don-badge.completed{background:rgba(34,197,94,0.1);color:#16a34a;}
+    .don-badge.pending{background:rgba(245,158,11,0.1);color:#d97706;}
+    /* Modal */
+    .don-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+    .don-modal{background:var(--bg-card,white);border-radius:16px;padding:24px 28px;width:560px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.2);max-height:90vh;overflow-y:auto;}
+    .don-modal h3{margin:0 0 16px;font-weight:800;font-size:0.95rem;color:var(--text);}
+    .mr{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+    .mf label{font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.5px;display:block;margin-bottom:3px;}
+    .mf input,.mf select,.mf textarea{width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.8rem;box-sizing:border-box;}
+    .mf input:focus,.mf select:focus,.mf textarea:focus{border-color:#d97706;outline:none;box-shadow:0 0 0 3px rgba(217,119,6,0.12);}
+    .mf textarea{resize:vertical;min-height:50px;}
+    .mf-check{display:flex;align-items:center;gap:8px;font-size:0.78rem;color:var(--text-light);padding:4px 0;}
+    .mf-check input{width:16px;height:16px;accent-color:#d97706;}
+    .record-toggle{display:flex;gap:0;border-radius:10px;overflow:hidden;border:1.5px solid var(--border);margin-bottom:14px;}
+    .record-toggle button{flex:1;padding:10px;border:none;font-size:0.75rem;font-weight:700;cursor:pointer;transition:all 0.2s;background:var(--bg);color:var(--text-light);}
+    .record-toggle button.active{color:white;}
+    .record-toggle .on-rec.active{background:#16a34a;}
+    .record-toggle .off-rec.active{background:#d97706;}
+    .hint{font-size:0.62rem;color:var(--text-light);margin-top:4px;font-style:italic;}
+    @media(max-width:768px){.don-card{grid-template-columns:1fr auto;}.don-card>:nth-child(1),.don-card>:nth-child(4),.don-card>:nth-child(5){display:none;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="don-stats" id="donStats"></div>
+
+<!-- Toolbar -->
+<div class="don-toolbar">
+    <button onclick="openAddDonation()" class="btn" style="background:#d97706;color:white;"><i class="fas fa-plus"></i> Record Donation</button>
+    <a href="/donate?branch_id={{ branch_id }}" target="_blank" class="btn" style="background:var(--bg-card);color:var(--text);border:1.5px solid var(--border);"><i class="fas fa-external-link-alt"></i> Public Link</a>
+    <div style="flex:1;"></div>
+    <select id="fPurpose" onchange="renderList()"><option value="">All Purposes</option><option value="general">General</option><option value="infrastructure">Infrastructure</option><option value="scholarship">Scholarship</option><option value="building">Building</option><option value="sports">Sports</option><option value="library">Library</option></select>
+    <select id="fRecord" onchange="renderList()"><option value="">All Types</option><option value="on">On Record</option><option value="off">Off Record</option></select>
+    <input type="text" id="fSearch" placeholder="Search donor..." oninput="renderList()" style="min-width:180px;">
+</div>
+
+<!-- Donations List -->
+<div id="donList"><div style="text-align:center;padding:40px;color:var(--text-light);">Loading...</div></div>
+
+<!-- Add/Edit Donation Modal -->
+<div class="don-overlay" id="donModal">
+    <div class="don-modal">
+        <h3 id="modalTitle">💛 Record Donation</h3>
+
+        <!-- On/Off Record Toggle -->
+        <div class="record-toggle">
+            <button class="on-rec active" onclick="setRecord('on',this)">📋 On Record</button>
+            <button class="off-rec" onclick="setRecord('off',this)">🔒 Off Record</button>
+        </div>
+        <div class="hint" id="recordHint">On-record donations appear in official reports. Receipt will be generated.</div>
+
+        <input type="hidden" id="donRecordType" value="on">
+
+        <div class="mr">
+            <div class="mf"><label>Donor Name *</label><input type="text" id="donName" placeholder="Full name"></div>
+            <div class="mf"><label>Amount (₹) *</label><input type="number" id="donAmount" placeholder="10000" min="1"></div>
+        </div>
+        <div class="mr">
+            <div class="mf"><label>Phone</label><input type="tel" id="donPhone" placeholder="+91 98765 43210"></div>
+            <div class="mf"><label>Email</label><input type="email" id="donEmail" placeholder="donor@email.com"></div>
+        </div>
+        <div class="mr">
+            <div class="mf"><label>Purpose</label>
+                <select id="donPurpose"><option value="general">General Fund</option><option value="infrastructure">Infrastructure</option><option value="scholarship">Scholarship</option><option value="building">Building Fund</option><option value="sports">Sports</option><option value="library">Library</option><option value="event">Event</option><option value="other">Other</option></select></div>
+            <div class="mf"><label>Payment Mode</label>
+                <select id="donMode"><option value="cash">💵 Cash</option><option value="cheque">📝 Cheque</option><option value="bank_transfer">🏦 Bank Transfer</option><option value="upi">📲 UPI</option><option value="online">💳 Online</option></select></div>
+        </div>
+        <div class="mr">
+            <div class="mf"><label>PAN (for 80G Tax Receipt)</label><input type="text" id="donPan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase;"></div>
+            <div class="mf"><label>Link to Student (optional)</label>
+                <select id="donStudent"><option value="">— None (standalone donation) —</option></select></div>
+        </div>
+        <div class="mf"><label>Note / Remarks</label>
+            <textarea id="donNote" placeholder="Any internal remarks..."></textarea></div>
+
+        <div class="mf-check"><input type="checkbox" id="donAnon"><label for="donAnon">Anonymous — hide donor name from reports & staff</label></div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">
+            <button onclick="closeModal()" style="padding:10px 22px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="saveDonation()" id="saveBtn" style="padding:10px 22px;border-radius:10px;border:none;background:#d97706;color:white;font-weight:700;cursor:pointer;"><i class="fas fa-check"></i> Save Donation</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const BRANCH_ID='{{ branch_id }}';
+let allDonations=[];
+const PURPOSE_ICONS={general:'💰',infrastructure:'🏗️',scholarship:'🎓',building:'🏛️',sports:'⚽',library:'📚',event:'🎪',other:'📦'};
+
+async function loadDonations(){
+    try{
+        const r=await fetch('/api/payments/donations/'+BRANCH_ID);
+        const d=await r.json();
+        allDonations=d.donations||[];
+        renderStats(d);
+        renderList();
+    }catch(e){document.getElementById('donList').innerHTML='<div style="color:var(--danger);">Failed to load</div>';}
+}
+
+function renderStats(d){
+    const onRecord=allDonations.filter(x=>x.status==='completed'&&!x._off_record);
+    const totalOn=onRecord.reduce((s,x)=>s+x.amount,0);
+    const purposes={};allDonations.forEach(x=>{purposes[x.purpose]=(purposes[x.purpose]||0)+1;});
+    const topPurpose=Object.entries(purposes).sort((a,b)=>b[1]-a[1])[0];
+    const thisMonth=allDonations.filter(x=>{const d=new Date(x.created_at);const n=new Date();return d.getMonth()===n.getMonth()&&d.getFullYear()===n.getFullYear();});
+    const monthTotal=thisMonth.reduce((s,x)=>s+x.amount,0);
+    document.getElementById('donStats').innerHTML=`
+        <div class="don-stat"><div class="val">₹${totalOn.toLocaleString('en-IN')}</div><div class="lbl">Total (On Record)</div></div>
+        <div class="don-stat"><div class="val">${allDonations.length}</div><div class="lbl">All Donations</div></div>
+        <div class="don-stat"><div class="val">₹${monthTotal.toLocaleString('en-IN')}</div><div class="lbl">This Month</div></div>
+        <div class="don-stat"><div class="val" style="text-transform:capitalize;">${topPurpose?topPurpose[0]:'—'}</div><div class="lbl">Top Category</div></div>
+    `;
+}
+
+function renderList(){
+    const q=(document.getElementById('fSearch').value||'').toLowerCase();
+    const fp=document.getElementById('fPurpose').value;
+    const fr=document.getElementById('fRecord').value;
+    let list=allDonations;
+    if(q) list=list.filter(d=>(d.donor_name||'').toLowerCase().includes(q)||(d.message||'').toLowerCase().includes(q));
+    if(fp) list=list.filter(d=>d.purpose===fp);
+    // off-record check would need a field — for now filter by message containing [OFF-RECORD]
+    if(fr==='off') list=list.filter(d=>(d.message||'').includes('[OFF-RECORD]'));
+    if(fr==='on') list=list.filter(d=>!(d.message||'').includes('[OFF-RECORD]'));
+
+    if(!list.length){document.getElementById('donList').innerHTML='<div style="text-align:center;padding:48px;color:var(--text-light);"><i class="fas fa-heart" style="font-size:2rem;opacity:0.2;display:block;margin-bottom:8px;"></i>No donations found</div>';return;}
+
+    document.getElementById('donList').innerHTML=list.map(d=>{
+        const isOff=(d.message||'').includes('[OFF-RECORD]');
+        const isAnon=d.donor_name==='Anonymous';
+        const icon=PURPOSE_ICONS[d.purpose]||'💰';
+        const color=isOff?'#d97706':'#16a34a';
+        const dt=d.created_at?new Date(d.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'2-digit'}):'';
+        const mode=d.payment_mode||'cash';
+        const modeTag=mode==='cash'||mode==='cheque'?'cash':'online';
+        const cleanMsg=(d.message||'').replace('[OFF-RECORD]','').trim();
+        return `<div class="don-card">
+            <div class="don-avatar" style="background:${color}15;color:${color};">${icon}</div>
+            <div>
+                <div class="don-name">${isAnon?'🕶️ Anonymous':d.donor_name}</div>
+                <div class="don-meta">
+                    <span>${dt}</span>
+                    <span style="text-transform:capitalize;">${d.purpose||'general'}</span>
+                    <span class="don-tag ${modeTag}">${mode}</span>
+                    ${isOff?'<span class="don-tag off">OFF RECORD</span>':'<span class="don-tag on">ON RECORD</span>'}
+                    ${isAnon?'<span class="don-tag anon">ANONYMOUS</span>':''}
+                    ${d.donor_pan?'<span>PAN: '+d.donor_pan+'</span>':''}
+                    ${cleanMsg?'<span style="opacity:0.6;">'+cleanMsg+'</span>':''}
+                </div>
+            </div>
+            <div class="don-amount">₹${d.amount.toLocaleString('en-IN')}</div>
+            <div class="don-badge ${d.status}">${d.status||'completed'}</div>
+            <div style="font-size:0.6rem;color:var(--text-light);font-family:monospace;">${d.receipt_number||'—'}</div>
+        </div>`;
+    }).join('');
+}
+
+function openAddDonation(){
+    document.getElementById('donModal').style.display='flex';
+    document.getElementById('modalTitle').textContent='💛 Record Donation';
+    // Reset form
+    ['donName','donAmount','donPhone','donEmail','donPan','donNote'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('donAnon').checked=false;
+    document.getElementById('donStudent').value='';
+    setRecord('on',document.querySelector('.on-rec'));
+    loadStudentsDropdown();
+}
+
+function closeModal(){document.getElementById('donModal').style.display='none';}
+
+function setRecord(type,btn){
+    document.getElementById('donRecordType').value=type;
+    document.querySelectorAll('.record-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const hint=document.getElementById('recordHint');
+    if(type==='on'){hint.textContent='On-record donations appear in official reports. Receipt will be generated.';}
+    else{hint.textContent='Off-record donation — saved as internal note only. Not in official reports or tax receipts.';}
+}
+
+async function loadStudentsDropdown(){
+    try{
+        const r=await apiCall('/api/school/students/list?limit=500');
+        const sel=document.getElementById('donStudent');
+        sel.innerHTML='<option value="">— None (standalone) —</option>';
+        (r.students||[]).forEach(s=>{
+            sel.innerHTML+=`<option value="${s.id}">${s.name} — ${s.class_name||''} ${s.section||''}</option>`;
+        });
+    }catch(e){}
+}
+
+async function saveDonation(){
+    const name=document.getElementById('donName').value.trim();
+    const amount=parseFloat(document.getElementById('donAmount').value);
+    if(!name){showToast('warning','Enter donor name');return;}
+    if(!amount||amount<1){showToast('warning','Enter valid amount');return;}
+
+    const isOff=document.getElementById('donRecordType').value==='off';
+    const isAnon=document.getElementById('donAnon').checked;
+    let note=document.getElementById('donNote').value.trim();
+    if(isOff) note='[OFF-RECORD] '+note;
+
+    const btn=document.getElementById('saveBtn');
+    btn.disabled=true;btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try{
+        const r=await fetch('/api/payments/donate',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+                branch_id:BRANCH_ID,
+                donor_name:isAnon?'Anonymous':name,
+                donor_phone:document.getElementById('donPhone').value.trim(),
+                donor_email:document.getElementById('donEmail').value.trim(),
+                donor_pan:isOff?'':document.getElementById('donPan').value.trim().toUpperCase(),
+                amount,
+                purpose:document.getElementById('donPurpose').value,
+                payment_mode:document.getElementById('donMode').value,
+                student_id:document.getElementById('donStudent').value||null,
+                message:note,
+                is_anonymous:isAnon,
+            })
+        }).then(r=>r.json());
+
+        if(r.success){
+            const msg=isOff?'Donation noted (off-record)':'Donation recorded! Receipt: '+r.receipt_number;
+            showToast('success',msg);
+            closeModal();
+            loadDonations();
+        }else{throw new Error(r.detail||'Failed');}
+    }catch(e){showToast('error',e.message);}
+    btn.disabled=false;btn.innerHTML='<i class="fas fa-check"></i> Save Donation';
+}
+
+// Close on backdrop / Escape
+document.getElementById('donModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeModal();});
+
+loadDonations();
+</script>
+{% endblock %}

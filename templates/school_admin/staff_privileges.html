@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}Staff Privileges{% endblock %}
+{% block page_title %}🔐 Staff Privileges{% endblock %}
+{% block page_subtitle %}Manage access for each staff member — check the modules they can see{% endblock %}
+{% block extra_css %}
+<style>
+.priv-wrap{max-width:960px;margin:0 auto;}
+.staff-list{display:grid;gap:8px;margin-bottom:16px;}
+.staff-card{display:grid;grid-template-columns:auto 1fr auto auto;gap:12px;align-items:center;padding:12px 16px;border-radius:12px;background:var(--bg-card,white);box-shadow:0 1px 6px rgba(0,0,0,0.05);cursor:pointer;transition:all 0.2s;border:2px solid transparent;}
+.staff-card:hover{border-color:var(--primary);transform:translateY(-1px);}
+.staff-card.active{border-color:var(--primary);background:var(--primary-light,#EEF2FF);}
+.staff-avatar{width:40px;height:40px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;}
+.staff-name{font-weight:700;font-size:0.88rem;}.staff-email{font-size:0.68rem;color:var(--text-light);}
+.staff-designation{font-size:0.65rem;padding:2px 8px;border-radius:5px;background:#E0E7FF;color:#4338CA;font-weight:700;}
+.staff-count{font-size:0.62rem;color:var(--text-light);}
+.priv-panel{background:var(--bg-card,white);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:24px;display:none;}
+.priv-panel.show{display:block;}
+.priv-panel h3{font-size:1rem;font-weight:900;margin-bottom:12px;}
+.priv-group{margin-bottom:16px;}
+.priv-group-title{font-size:0.62rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.5px;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border-light);}
+.priv-items{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.priv-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;transition:background 0.15s;}
+.priv-item:hover{background:var(--bg,#f1f5f9);}
+.priv-item input[type=checkbox]{accent-color:var(--primary);width:16px;height:16px;}
+.priv-item label{font-size:0.78rem;cursor:pointer;flex:1;}.priv-item .sensitive{font-size:0.56rem;color:#DC2626;font-weight:700;margin-left:4px;}
+.btn-save{padding:10px 24px;border-radius:10px;font-weight:700;font-size:0.82rem;cursor:pointer;border:none;background:var(--primary);color:white;box-shadow:0 4px 12px rgba(79,70,229,0.2);margin-top:10px;}
+.btn-save:hover{transform:translateY(-1px);}
+.btn-add{padding:8px 18px;border-radius:10px;font-weight:700;font-size:0.78rem;cursor:pointer;border:2px dashed var(--primary);color:var(--primary);background:transparent;}
+.new-staff-form{background:var(--bg-card,white);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:20px;margin-bottom:14px;display:none;}
+.new-staff-form.show{display:block;}
+.f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:2px;}
+.f-grp label{font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);}
+.f-grp input,.f-grp select{padding:8px 10px;border-radius:9px;border:1.5px solid var(--border,#e2e8f0);font-size:0.82rem;background:var(--bg-card,white);color:var(--text);}
+.f-grp input:focus,.f-grp select:focus{border-color:var(--primary);outline:none;}
+.tier-badge{font-size:0.52rem;padding:1px 5px;border-radius:3px;font-weight:700;margin-left:4px;}
+.tier1{background:#D1FAE5;color:#059669;}.tier2{background:#FEE2E2;color:#DC2626;}.tier3{background:#DBEAFE;color:#1D4ED8;}
+.privacy-info{padding:12px;border-radius:9px;background:#FEF3C7;border:1px solid #F59E0B;margin-bottom:14px;}
+.privacy-info p{font-size:0.72rem;color:#92400E;margin:0;}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:10px;color:white;font-weight:700;font-size:0.82rem;z-index:9999;animation:slideIn 0.3s;}
+.toast.success{background:#059669;}.toast.error{background:#DC2626;}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@media(max-width:768px){.priv-items{grid-template-columns:1fr;}.f-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="priv-wrap">
+    <div class="privacy-info">
+        <p>🔒 <strong>Privacy Tiers:</strong>
+            <span class="tier-badge tier1">Tier 1</span> Operational — shared via checkboxes &nbsp;
+            <span class="tier-badge tier2">Tier 2</span> Sensitive — only see records assigned to you &nbsp;
+            <span class="tier-badge tier3">Tier 3</span> Private — messages always between sender & receiver only
+        </p>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="font-size:0.88rem;font-weight:900;">School Staff</h3>
+        <button class="btn-add" onclick="toggleNewStaff()"><i class="fas fa-plus"></i> Add Staff Member</button>
+    </div>
+
+    <!-- New Staff Form -->
+    <div class="new-staff-form" id="newStaffForm">
+        <h3 style="font-size:0.92rem;font-weight:900;margin-bottom:10px;">👤 Create New Staff Account</h3>
+        <div class="f-grid">
+            <div class="f-grp"><label>First Name *</label><input id="nsFirst"></div>
+            <div class="f-grp"><label>Last Name</label><input id="nsLast"></div>
+            <div class="f-grp"><label>Email *</label><input id="nsEmail" type="email" placeholder="for login"></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Phone</label><input id="nsPhone" maxlength="10"></div>
+            <div class="f-grp"><label>Designation</label><select id="nsDesignation" onchange="autoApplyOnDesignation()">
+                <option value="">Select</option>
+                <option>Principal</option><option>Vice Principal</option>
+                <option>Academic Coordinator</option><option>Admission Incharge</option>
+                <option>Clerk</option><option>Accountant</option><option>Office Superintendent</option>
+                <option>Receptionist</option><option>HR Manager</option>
+                <option>Exam Coordinator</option><option>Transport Incharge</option>
+                <option>Hostel Warden</option><option>Librarian</option>
+                <option>Lab Incharge</option><option>IT Administrator</option>
+                <option>Other</option>
+            </select></div>
+            <div class="f-grp"><label>Temp Password *</label><input id="nsPassword" value="Staff@123"></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+            <button class="btn-save" onclick="createStaff()"><i class="fas fa-user-plus"></i> Create & Set Privileges</button>
+            <button class="btn-add" onclick="toggleNewStaff()">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Staff List -->
+    <div class="staff-list" id="staffList">
+        <div style="text-align:center;padding:30px;color:var(--text-light);font-size:0.82rem;">Loading staff...</div>
+    </div>
+
+    <!-- Privilege Editor Panel -->
+    <div class="priv-panel" id="privPanel">
+        <h3 id="privPanelTitle">Edit Privileges</h3>
+        <p style="font-size:0.72rem;color:var(--text-light);margin-bottom:14px;" id="privPanelSub"></p>
+
+        <div id="privCheckboxes"></div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center;">
+            <button class="btn-save" onclick="savePrivileges()"><i class="fas fa-save"></i> Save Privileges</button>
+            <button class="btn-add" onclick="selectAllPrivs()"><i class="fas fa-check-double"></i> Select All</button>
+            <button class="btn-add" onclick="clearAllPrivs()"><i class="fas fa-times"></i> Clear All</button>
+            <span style="font-size:0.65rem;color:var(--text-light);margin-left:4px;">Quick Presets:</span>
+            <select id="presetSelect" onchange="applyPresetFromDropdown()" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--primary);font-size:0.72rem;font-weight:700;color:var(--primary);background:transparent;cursor:pointer;">
+                <option value="">— Apply Role Preset —</option>
+            </select>
+        </div>
+        <div id="presetDesc" style="display:none;margin-top:6px;padding:6px 10px;border-radius:6px;background:#EEF2FF;font-size:0.68rem;color:#4338CA;"></div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+// Privilege definitions (mirrored from Python)
+const PRIV_GROUPS = {
+    "Student Management": {
+        "student_admission": "Student Admission & Profiles",
+        "student_attendance": "Student Attendance",
+        "student_promotion": "Student Promotion & TC",
+        "student_documents": "Student Documents & Records",
+    },
+    "Academics": {
+        "class_management": "Class, Section & Subjects",
+        "timetable": "Timetable Management",
+        "exam_management": "Exam Creation & Marks Entry",
+        "results": "Results & Report Cards",
+        "activities": "Activities, Sports & Quiz",
+    },
+    "Finance": {
+        "fee_structure": "Fee Structure Setup",
+        "fee_collection": "Fee Collection & Receipts",
+        "fee_reports": "Fee Reports & Defaulters",
+        "salary_payroll": "Salary & Payroll",
+        "accounts_expenses": "Accounts & Expenses",
+    },
+    "HR & Staff": {
+        "employee_management": "Employee / Teacher Management",
+        "teacher_attendance": "Teacher Attendance & Leave",
+        "teacher_performance": "Teacher Performance & Awards",
+    },
+    "Operations": {
+        "transport": "Transport Management",
+        "hostel": "Hostel Management",
+        "library": "Library",
+        "id_cards": "ID Card Generation",
+    },
+    "Communication": {
+        "announcements": "Notifications & Announcements",
+        "complaints": "Complaints & Discipline",
+        "parent_comm": "Parent Communication",
+    },
+    "Reports & Settings": {
+        "analytics": "Analytics Dashboard",
+        "reports": "All Reports",
+        "school_settings": "School Settings & Configuration",
+        "manage_staff": "Manage Staff & Privileges",
+    },
+};
+
+const TIER2 = new Set(["complaints", "teacher_performance", "salary_payroll"]);
+const PRESETS = {
+    "Principal": {
+        desc: "👑 Full access — all modules",
+        privs: Object.keys(PRIV_GROUPS).flatMap(g => Object.keys(PRIV_GROUPS[g]))
+    },
+    "Vice Principal": {
+        desc: "Almost full — no salary/payroll, no staff management",
+        privs: ["student_admission","student_attendance","student_promotion","student_documents",
+            "class_management","timetable","exam_management","results","activities",
+            "fee_structure","fee_collection","fee_reports",
+            "employee_management","teacher_attendance","teacher_performance",
+            "transport","hostel","library","id_cards",
+            "announcements","complaints","parent_comm",
+            "analytics","reports","school_settings"]
+    },
+    "Academic Coordinator": {
+        desc: "Academics + exams + timetable + student management",
+        privs: ["student_admission","student_attendance","student_promotion","student_documents",
+            "class_management","timetable","exam_management","results","activities",
+            "employee_management","teacher_attendance","teacher_performance",
+            "announcements","parent_comm","analytics","reports"]
+    },
+    "Admission Incharge": {
+        desc: "Student admission + docs + parent communication",
+        privs: ["student_admission","student_documents","student_promotion",
+            "class_management","fee_structure","fee_collection",
+            "announcements","parent_comm","id_cards"]
+    },
+    "Clerk": {
+        desc: "Day-to-day operations — admission, attendance, fees, ID cards",
+        privs: ["student_admission","student_attendance","student_documents","student_promotion",
+            "fee_collection","id_cards","announcements","parent_comm"]
+    },
+    "Accountant": {
+        desc: "Finance only — fees, salary, accounts, reports",
+        privs: ["fee_structure","fee_collection","fee_reports","salary_payroll","accounts_expenses","reports"]
+    },
+    "Office Superintendent": {
+        desc: "Admin operations — students, staff, transport, communication",
+        privs: ["student_admission","student_attendance","student_promotion","student_documents",
+            "employee_management","teacher_attendance",
+            "transport","id_cards",
+            "announcements","parent_comm","reports"]
+    },
+    "Exam Coordinator": {
+        desc: "Exams, marks entry, results, report cards",
+        privs: ["class_management","exam_management","results","activities",
+            "student_attendance","reports"]
+    },
+    "Transport Incharge": {
+        desc: "Transport + hostel management only",
+        privs: ["transport","hostel","announcements"]
+    },
+    "Hostel Warden": {
+        desc: "Hostel + student attendance",
+        privs: ["hostel","student_attendance","announcements"]
+    },
+    "Librarian": {
+        desc: "Library module only",
+        privs: ["library","announcements"]
+    },
+    "HR Manager": {
+        desc: "Employee management, payroll, teacher attendance, leave",
+        privs: ["employee_management","teacher_attendance","teacher_performance","salary_payroll","reports"]
+    },
+    "Receptionist": {
+        desc: "Basic — view students, announcements, parent communication",
+        privs: ["student_admission","announcements","parent_comm"]
+    },
+    "Lab Incharge": {
+        desc: "Minimal — activities, library",
+        privs: ["activities","library","announcements"]
+    },
+    "IT Administrator": {
+        desc: "Settings + staff management + data",
+        privs: ["school_settings","manage_staff","reports","analytics"]
+    },
+};
+
+let staffMembers = [];
+let selectedStaffId = null;
+
+async function loadStaff(){
+    try{
+        const r=await fetch('/api/school/staff-list',{credentials:'same-origin'});
+        const d=await r.json();
+        staffMembers=d.staff||[];
+        renderStaffList();
+    }catch(e){document.getElementById('staffList').innerHTML='<p>Failed to load staff</p>';}
+}
+
+function renderStaffList(){
+    if(!staffMembers.length){
+        document.getElementById('staffList').innerHTML='<div style="text-align:center;padding:20px;color:var(--text-light);"><p>No staff members yet.</p><p style="font-size:0.72rem;">Click "Add Staff Member" to create accounts for your school staff.</p></div>';
+        return;
+    }
+    document.getElementById('staffList').innerHTML=staffMembers.map(s=>{
+        const initials=(s.first_name[0]+(s.last_name||'')[0]||'').toUpperCase();
+        const privCount=Object.values(s.privileges||{}).filter(v=>v).length;
+        const isActive=s.id===selectedStaffId;
+        return`<div class="staff-card ${isActive?'active':''}" onclick="selectStaff('${s.id}')">
+            <div class="staff-avatar">${initials}</div>
+            <div><div class="staff-name">${s.first_name} ${s.last_name||''}</div><div class="staff-email">${s.email||s.phone||'-'}${s.is_first_admin?' — 👑 First Admin':''}</div></div>
+            <div class="staff-designation">${s.designation||'Staff'}</div>
+            <div class="staff-count">${s.is_first_admin?'All':privCount} privileges</div>
+        </div>`;
+    }).join('');
+}
+
+function selectStaff(id){
+    selectedStaffId=id;
+    const staff=staffMembers.find(s=>s.id===id);
+    if(!staff)return;
+    renderStaffList();
+
+    const panel=document.getElementById('privPanel');
+    panel.classList.add('show');
+    document.getElementById('privPanelTitle').textContent=`🔐 ${staff.first_name} ${staff.last_name||''} — ${staff.designation||'Staff'}`;
+
+    if(staff.is_first_admin){
+        document.getElementById('privPanelSub').textContent='👑 First Admin — has all privileges by default. Cannot be modified.';
+        document.getElementById('privCheckboxes').innerHTML='<p style="color:var(--text-light);font-size:0.82rem;padding:20px;text-align:center;">All privileges are automatically enabled for the first admin.</p>';
+        return;
+    }
+
+    document.getElementById('privPanelSub').textContent='Check the modules this person can access. Uncheck to hide.';
+    const privs=staff.privileges||{};
+    let html='';
+    for(const[group,items] of Object.entries(PRIV_GROUPS)){
+        html+=`<div class="priv-group"><div class="priv-group-title">${group}</div><div class="priv-items">`;
+        for(const[key,label] of Object.entries(items)){
+            const checked=privs[key]?'checked':'';
+            const tier=TIER2.has(key)?'<span class="sensitive">🔒 TIER 2</span>':'';
+            html+=`<div class="priv-item"><input type="checkbox" id="p_${key}" ${checked}><label for="p_${key}">${label}${tier}</label></div>`;
+        }
+        html+=`</div></div>`;
+    }
+    document.getElementById('privCheckboxes').innerHTML=html;
+    populatePresets();
+    // Auto-select matching designation in dropdown
+    const sel=document.getElementById('presetSelect');
+    if(sel && staff.designation && PRESETS[staff.designation]){
+        sel.value=staff.designation;
+    }
+    document.getElementById('presetDesc').style.display='none';
+}
+
+async function savePrivileges(){
+    if(!selectedStaffId)return;
+    const staff=staffMembers.find(s=>s.id===selectedStaffId);
+    if(staff.is_first_admin){showToast('error','Cannot modify first admin privileges');return;}
+
+    const privileges={};
+    for(const items of Object.values(PRIV_GROUPS)){
+        for(const key of Object.keys(items)){
+            const cb=document.getElementById('p_'+key);
+            privileges[key]=cb?cb.checked:false;
+        }
+    }
+    try{
+        const r=await fetch('/api/school/staff/'+selectedStaffId+'/privileges',{
+            method:'PUT',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({privileges}),credentials:'same-origin'
+        });
+        const d=await r.json();
+        if(d.error){showToast('error',d.error);return;}
+        showToast('success','Privileges saved!');
+        // Update local state
+        const idx=staffMembers.findIndex(s=>s.id===selectedStaffId);
+        if(idx>=0)staffMembers[idx].privileges=privileges;
+        renderStaffList();
+    }catch(e){showToast('error','Failed to save');}
+}
+
+function selectAllPrivs(){
+    document.querySelectorAll('#privCheckboxes input[type=checkbox]').forEach(cb=>cb.checked=true);
+}
+function clearAllPrivs(){
+    document.querySelectorAll('#privCheckboxes input[type=checkbox]').forEach(cb=>cb.checked=false);
+}
+function applyPreset(presetName){
+    const preset = PRESETS[presetName];
+    if(!preset) return;
+    clearAllPrivs();
+    preset.privs.forEach(k=>{const cb=document.getElementById('p_'+k);if(cb)cb.checked=true;});
+    showToast('success',`Applied "${presetName}" preset — review and save`);
+}
+
+function applyPresetFromDropdown(){
+    const sel=document.getElementById('presetSelect');
+    const name=sel.value;
+    if(!name)return;
+    const preset=PRESETS[name];
+    if(!preset)return;
+    applyPreset(name);
+    document.getElementById('presetDesc').style.display='block';
+    document.getElementById('presetDesc').textContent='ℹ️ '+preset.desc;
+}
+
+// Populate preset dropdown
+function populatePresets(){
+    const sel=document.getElementById('presetSelect');
+    if(!sel)return;
+    sel.innerHTML='<option value="">— Apply Role Preset —</option>';
+    for(const[name,data] of Object.entries(PRESETS)){
+        sel.innerHTML+=`<option value="${name}">${name} (${data.privs.length} modules)</option>`;
+    }
+}
+
+// Auto-apply preset when creating new staff based on designation
+function autoApplyOnDesignation(){
+    const desig=document.getElementById('nsDesignation').value;
+    if(PRESETS[desig]){
+        showToast('success',`Will auto-apply "${desig}" privileges after creation`);
+    }
+}
+
+function toggleNewStaff(){
+    document.getElementById('newStaffForm').classList.toggle('show');
+}
+
+async function createStaff(){
+    const first=document.getElementById('nsFirst').value.trim();
+    const email=document.getElementById('nsEmail').value.trim();
+    const pwd=document.getElementById('nsPassword').value.trim();
+    if(!first||!email||!pwd){showToast('error','Name, email, and password are required');return;}
+    try{
+        const r=await fetch('/api/school/staff-create',{
+            method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+                first_name:first,last_name:document.getElementById('nsLast').value.trim(),
+                email:email,phone:document.getElementById('nsPhone').value.trim(),
+                designation:document.getElementById('nsDesignation').value,
+                password:pwd,
+            }),credentials:'same-origin'
+        });
+        const d=await r.json();
+        if(d.error){showToast('error',d.error);return;}
+        showToast('success','Staff account created! Now set their privileges.');
+        toggleNewStaff();
+        await loadStaff();
+        // Auto-select the new user and apply designation preset
+        if(d.user_id){
+            selectStaff(d.user_id);
+            const desig=document.getElementById('nsDesignation').value;
+            if(desig && PRESETS[desig]){
+                applyPreset(desig);
+                showToast('success',`Auto-applied "${desig}" preset — review and save`);
+            }
+        }
+    }catch(e){showToast('error','Failed to create');}
+}
+
+function showToast(type,msg){
+    const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
+    document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
+}
+
+loadStaff();
+</script>
+{% endblock %}

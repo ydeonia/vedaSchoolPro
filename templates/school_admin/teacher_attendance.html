@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Teacher Attendance{% endblock %}
+{% block page_title %}Teacher Attendance{% endblock %}
+{% block page_subtitle %}Mark daily attendance for teaching staff{% endblock %}
+
+{% block extra_css %}
+<style>
+    .teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+    .t-card {
+        background: white; border-radius: var(--radius); padding: 16px; text-align: center;
+        cursor: pointer; transition: all 0.2s; border: 2px solid transparent; box-shadow: var(--shadow-sm);
+        user-select: none;
+    }
+    .t-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .t-card:active { transform: scale(0.97); }
+    .t-card.present { background: linear-gradient(135deg, #F0FDF4, #DCFCE7); border-color: var(--success); }
+    .t-card.absent { background: linear-gradient(135deg, #FEF2F2, #FEE2E2); border-color: var(--danger); }
+    .t-card.late { background: linear-gradient(135deg, #FFFBEB, #FEF3C7); border-color: var(--warning); }
+    .t-card.on_leave { background: linear-gradient(135deg, #EFF6FF, #DBEAFE); border-color: #2563EB; }
+    .t-card.half_day { background: linear-gradient(135deg, #FDF4FF, #FAE8FF); border-color: #A855F7; }
+
+    .t-avatar { width: 48px; height: 48px; border-radius: 50%; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; }
+    .t-card.present .t-avatar { background: var(--success); color: white; }
+    .t-card.absent .t-avatar { background: var(--danger); color: white; }
+    .t-card.late .t-avatar { background: var(--warning); color: white; }
+    .t-card.on_leave .t-avatar { background: #2563EB; color: white; }
+    .t-card.half_day .t-avatar { background: #A855F7; color: white; }
+    .t-card:not(.present):not(.absent):not(.late):not(.on_leave):not(.half_day) .t-avatar { background: var(--border-light); color: var(--text-secondary); }
+
+    .t-name { font-weight: 700; font-size: 0.85rem; margin-bottom: 2px; }
+    .t-desg { font-size: 0.72rem; color: var(--text-secondary); }
+    .t-status-icon { font-size: 1.2rem; margin-top: 6px; }
+    .t-source { font-size: 0.65rem; color: var(--text-light); margin-top: 2px; }
+
+    .status-icons { present: '✅', absent: '❌', late: '⏰', on_leave: '🏖️', half_day: '½' }
+
+    .summary-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 16px; background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .s-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+    .s-pill.green { background: var(--success-light); color: var(--success); }
+    .s-pill.red { background: var(--danger-light); color: var(--danger); }
+    .s-pill.yellow { background: var(--warning-light); color: var(--warning); }
+    .s-pill.blue { background: #DBEAFE; color: #2563EB; }
+    .s-pill.purple { background: #FAE8FF; color: #A855F7; }
+
+    .confetti-piece { position: fixed; top: -10px; width: 10px; height: 10px; border-radius: 2px; animation: confettiFall 3s ease-out forwards; z-index: 10000; }
+    @keyframes confettiFall { 0% { opacity: 1; transform: translateY(0) rotate(0deg); } 100% { opacity: 0; transform: translateY(100vh) rotate(720deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-body" style="padding: 14px 20px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <input type="date" id="attDate" class="form-input" style="max-width: 200px; padding: 10px; font-weight: 600;">
+            <button class="btn btn-primary" onclick="loadTeachers()"><i class="fas fa-users"></i> Load Teachers</button>
+            <div style="flex: 1;"></div>
+            <button class="btn btn-secondary btn-sm" onclick="bulkMark('present')">✅ All Present</button>
+            <button class="btn btn-secondary btn-sm" onclick="bulkMark('absent')">❌ All Absent</button>
+        </div>
+    </div>
+</div>
+
+<div class="summary-pills" id="summaryBar" style="display: none;">
+    <span class="s-pill green" id="spPresent">Present: 0</span>
+    <span class="s-pill red" id="spAbsent">Absent: 0</span>
+    <span class="s-pill yellow" id="spLate">Late: 0</span>
+    <span class="s-pill blue" id="spLeave">On Leave: 0</span>
+    <span class="s-pill purple" id="spHalfDay">Half Day: 0</span>
+</div>
+
+<div id="teacherArea">
+    <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-check"></i><h3>Select a Date</h3><p>Pick a date and load teachers to mark attendance</p></div></div></div>
+</div>
+
+<div id="saveArea" style="display: none; margin-top: 16px; text-align: center;">
+    <button class="btn btn-primary btn-lg" onclick="saveAttendance()" id="saveBtn">
+        <i class="fas fa-save"></i> Save Teacher Attendance
+    </button>
+    <div style="font-size:0.72rem; color: var(--text-light); margin-top:8px;">✏️ You can update teacher attendance anytime today</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let teachers = [];
+const STATUSES = ['present', 'absent', 'late', 'on_leave', 'half_day'];
+const STATUS_ICONS = { present: '✅', absent: '❌', late: '⏰', on_leave: '🏖️', half_day: '½' };
+const SOURCE_LABELS = { auto_student_attendance: '⚡ Auto (attendance)', auto_period_log: '⚡ Auto (period)', self_checkin: '📱 Self', admin_manual: '👤 Admin' };
+
+// Default to today
+document.getElementById('attDate').value = new Date().toISOString().split('T')[0];
+
+async function loadTeachers() {
+    const dateVal = document.getElementById('attDate').value;
+    if (!dateVal) { showToast('warning', 'Select Date', ''); return; }
+
+    const area = document.getElementById('teacherArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
+
+    try {
+        const result = await apiCall(`/api/school/teacher-attendance/load?date=${dateVal}`);
+        teachers = result.teachers;
+
+        // Default all to present if not already marked
+        teachers.forEach(t => { if (!t.status) t.status = 'present'; });
+
+        renderTeachers();
+        document.getElementById('summaryBar').style.display = 'flex';
+        document.getElementById('saveArea').style.display = 'block';
+        updateSummary();
+    } catch(e) {
+        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error loading teachers</h3></div></div></div>';
+    }
+}
+
+function renderTeachers() {
+    const html = teachers.map((t, i) => `
+        <div class="t-card ${t.status}" onclick="cycleStatus(${i})" data-idx="${i}">
+            <div class="t-avatar">${t.name[0]}</div>
+            <div class="t-name">${t.name}</div>
+            <div class="t-desg">${t.designation || 'Teacher'}</div>
+            <div class="t-status-icon">${STATUS_ICONS[t.status] || '—'}</div>
+            ${t.source ? `<div class="t-source">${SOURCE_LABELS[t.source] || t.source}${t.check_in ? ' · ' + t.check_in : ''}</div>` : ''}
+        </div>
+    `).join('');
+    document.getElementById('teacherArea').innerHTML = `<div class="teacher-grid">${html}</div>`;
+}
+
+function cycleStatus(idx) {
+    const current = teachers[idx].status;
+    const nextIdx = (STATUSES.indexOf(current) + 1) % STATUSES.length;
+    teachers[idx].status = STATUSES[nextIdx];
+    renderTeachers();
+    updateSummary();
+}
+
+function bulkMark(status) {
+    teachers.forEach(t => t.status = status);
+    renderTeachers();
+    updateSummary();
+    showToast('info', 'Bulk Updated', `All marked ${status}`);
+}
+
+function updateSummary() {
+    const counts = { present: 0, absent: 0, late: 0, on_leave: 0, half_day: 0 };
+    teachers.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
+    document.getElementById('spPresent').textContent = `Present: ${counts.present}`;
+    document.getElementById('spAbsent').textContent = `Absent: ${counts.absent}`;
+    document.getElementById('spLate').textContent = `Late: ${counts.late}`;
+    document.getElementById('spLeave').textContent = `On Leave: ${counts.on_leave}`;
+    document.getElementById('spHalfDay').textContent = `Half Day: ${counts.half_day}`;
+}
+
+async function saveAttendance() {
+    const dateVal = document.getElementById('attDate').value;
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        const records = teachers.map(t => ({ teacher_id: t.id, status: t.status }));
+        const result = await apiCall('/api/school/teacher-attendance/save', 'POST', { date: dateVal, records });
+        showToast('success', 'Saved! 🎉', result.message);
+        fireConfetti();
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Teacher Attendance';
+}
+
+function fireConfetti() {
+    const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+    for (let i = 0; i < 25; i++) {
+        const p = document.createElement('div');
+        p.className = 'confetti-piece';
+        p.style.left = Math.random() * 100 + 'vw';
+        p.style.background = colors[Math.floor(Math.random() * colors.length)];
+        p.style.animationDelay = Math.random() * 0.5 + 's';
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 3500);
+    }
+}
+</script>
+{% endblock %}

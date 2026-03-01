@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}Student Promotion{% endblock %}
+{% block page_title %}🎓 Student Promotion{% endblock %}
+{% block page_subtitle %}Promote, detain, or transfer students to the next academic year{% endblock %}
+
+{% block extra_css %}
+<style>
+.promo-steps { display:flex; gap:4px; margin-bottom:16px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.promo-step { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.8rem; font-weight:700; color:var(--text-secondary); }
+.promo-step.active { background:var(--primary); color:white; }
+.promo-step .step-num { font-size:0.65rem; opacity:0.7; }
+.config-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
+.config-card h3 { font-size:0.92rem; margin-bottom:14px; }
+.c-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
+.c-grp { display:flex; flex-direction:column; gap:3px; }
+.c-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.c-grp select { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; }
+/* Student list */
+.stu-table { width:100%; border-collapse:collapse; }
+.stu-table th { background:var(--bg-secondary); padding:10px 12px; text-align:left; font-size:0.68rem; text-transform:uppercase; color:var(--text-secondary); font-weight:700; position:sticky; top:0; }
+.stu-table td { padding:8px 12px; border-bottom:1px solid var(--border-light); font-size:0.82rem; }
+.stu-table tr:hover { background:var(--bg); }
+.stu-table input[type=checkbox] { width:18px; height:18px; cursor:pointer; }
+.action-chip { padding:3px 10px; border-radius:8px; font-size:0.7rem; font-weight:700; cursor:pointer; border:1px solid var(--border); }
+.action-chip.promoted { background:#D1FAE5; color:#059669; border-color:#6EE7B7; }
+.action-chip.detained { background:#FEE2E2; color:#DC2626; border-color:#FCA5A5; }
+.action-chip.tc { background:#DBEAFE; color:#2563EB; border-color:#93C5FD; }
+.summary-bar { display:flex; gap:12px; padding:14px 18px; background:white; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px; align-items:center; }
+.sb-stat { text-align:center; }
+.sb-val { font-size:1.2rem; font-weight:900; } .sb-lbl { font-size:0.62rem; color:var(--text-light); text-transform:uppercase; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; font-size:0.85rem; }
+.btn-secondary { padding:8px 16px; border-radius:8px; background:var(--bg-secondary); color:var(--text-secondary); border:none; font-weight:700; cursor:pointer; font-size:0.78rem; }
+@media(max-width:768px) { .c-row { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="promo-steps">
+    <div class="promo-step active" id="step1"><div class="step-num">STEP 1</div>Select Class</div>
+    <div class="promo-step" id="step2"><div class="step-num">STEP 2</div>Review & Set Actions</div>
+    <div class="promo-step" id="step3"><div class="step-num">STEP 3</div>Confirm & Execute</div>
+</div>
+
+<!-- Step 1: Config -->
+<div id="configSection" class="config-card">
+    <h3>📋 Select Source Class & Target</h3>
+    <div class="c-row">
+        <div class="c-grp">
+            <label>From Academic Year</label>
+            <select id="fromYear"><option value="2024-25">2024-25</option><option value="2025-26" selected>2025-26</option></select>
+        </div>
+        <div class="c-grp">
+            <label>From Class</label>
+            <select id="fromClass" onchange="loadSections('fromClass','fromSection')"><option value="">Select Class</option></select>
+        </div>
+        <div class="c-grp">
+            <label>From Section</label>
+            <select id="fromSection"><option value="">All Sections</option></select>
+        </div>
+    </div>
+    <div class="c-row">
+        <div class="c-grp">
+            <label>To Academic Year</label>
+            <select id="toYear"><option value="2025-26" selected>2025-26</option><option value="2026-27">2026-27</option></select>
+        </div>
+        <div class="c-grp">
+            <label>Promote To Class</label>
+            <select id="toClass" onchange="loadSections('toClass','toSection')"><option value="">Select Target Class</option></select>
+        </div>
+        <div class="c-grp">
+            <label>To Section</label>
+            <select id="toSection"><option value="">Same Section</option></select>
+        </div>
+    </div>
+    <button class="btn-primary" onclick="loadStudents()"><i class="fas fa-users"></i> Load Students</button>
+</div>
+
+<!-- Step 2: Student List -->
+<div id="studentSection" style="display:none;">
+    <div class="summary-bar">
+        <div class="sb-stat"><div class="sb-val" id="totalCount">0</div><div class="sb-lbl">Total</div></div>
+        <div class="sb-stat"><div class="sb-val" style="color:#059669;" id="promoteCount">0</div><div class="sb-lbl">Promote</div></div>
+        <div class="sb-stat"><div class="sb-val" style="color:#DC2626;" id="detainCount">0</div><div class="sb-lbl">Detain</div></div>
+        <div class="sb-stat"><div class="sb-val" style="color:#2563EB;" id="tcCount">0</div><div class="sb-lbl">TC/Transfer</div></div>
+        <div style="flex:1;"></div>
+        <button class="btn-secondary" onclick="setAll('promoted')">✅ Promote All</button>
+        <button class="btn-primary" onclick="executePromotion()" id="execBtn"><i class="fas fa-check-double"></i> Execute Promotion</button>
+    </div>
+    <div style="background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;max-height:60vh;overflow-y:auto;">
+        <table class="stu-table">
+            <thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleAll(this)"></th><th>Student</th><th>Roll</th><th>Current Class</th><th>Action</th><th>Remarks</th></tr></thead>
+            <tbody id="stuBody"></tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let students = [], classes = [];
+
+async function init() {
+    try {
+        const r = await fetch('/api/school/classes', {credentials:'same-origin'});
+        const d = await r.json();
+        classes = d.classes || [];
+        const opts = classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+        document.getElementById('fromClass').innerHTML = '<option value="">Select Class</option>' + opts;
+        document.getElementById('toClass').innerHTML = '<option value="">Select Target</option>' + opts;
+    } catch(e) {}
+}
+
+async function loadSections(classElId, sectionElId) {
+    const cid = document.getElementById(classElId).value;
+    const sel = document.getElementById(sectionElId);
+    sel.innerHTML = '<option value="">All Sections</option>';
+    if (!cid) return;
+    try {
+        const r = await fetch(`/api/school/classes/${cid}/sections`, {credentials:'same-origin'});
+        const d = await r.json();
+        (d.sections || []).forEach(s => { sel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    } catch(e) {}
+}
+
+async function loadStudents() {
+    const fromClass = document.getElementById('fromClass').value;
+    if (!fromClass) { alert('Select source class'); return; }
+    const section = document.getElementById('fromSection').value;
+    let url = `/api/school/students?class_id=${fromClass}`;
+    if (section) url += `&section_id=${section}`;
+    try {
+        const r = await fetch(url, {credentials:'same-origin'});
+        const d = await r.json();
+        students = (d.students || []).map(s => ({...s, action:'promoted', remarks:''}));
+        renderStudents();
+        document.getElementById('configSection').style.display = 'none';
+        document.getElementById('studentSection').style.display = 'block';
+        document.getElementById('step1').classList.remove('active');
+        document.getElementById('step2').classList.add('active');
+    } catch(e) { alert('Failed to load students'); }
+}
+
+function renderStudents() {
+    const tbody = document.getElementById('stuBody');
+    tbody.innerHTML = students.map((s, i) => `<tr>
+        <td><input type="checkbox" checked data-idx="${i}"></td>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.roll || '—'}</td>
+        <td>${s.class_name || ''}</td>
+        <td>
+            <span class="action-chip ${students[i].action}" onclick="cycleAction(${i},this)">
+                ${students[i].action === 'promoted' ? '✅ Promote' : students[i].action === 'detained' ? '🔴 Detain' : '📋 TC'}
+            </span>
+        </td>
+        <td><input style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.75rem;width:120px;" placeholder="Remarks" onchange="students[${i}].remarks=this.value"></td>
+    </tr>`).join('');
+    updateCounts();
+}
+
+function cycleAction(idx, el) {
+    const actions = ['promoted','detained','tc_issued'];
+    const labels = ['✅ Promote','🔴 Detain','📋 TC'];
+    let cur = actions.indexOf(students[idx].action);
+    cur = (cur + 1) % actions.length;
+    students[idx].action = actions[cur];
+    el.className = 'action-chip ' + actions[cur];
+    el.textContent = labels[cur];
+    updateCounts();
+}
+
+function setAll(action) { students.forEach(s => s.action = action); renderStudents(); }
+function toggleAll(el) { document.querySelectorAll('#stuBody input[type=checkbox]').forEach(c => c.checked = el.checked); }
+
+function updateCounts() {
+    document.getElementById('totalCount').textContent = students.length;
+    document.getElementById('promoteCount').textContent = students.filter(s => s.action === 'promoted').length;
+    document.getElementById('detainCount').textContent = students.filter(s => s.action === 'detained').length;
+    document.getElementById('tcCount').textContent = students.filter(s => s.action === 'tc_issued').length;
+}
+
+async function executePromotion() {
+    const toClass = document.getElementById('toClass').value;
+    const toSection = document.getElementById('toSection').value;
+    if (!toClass && students.some(s => s.action === 'promoted')) { alert('Select target class for promotion'); return; }
+    if (!confirm(`Execute promotion for ${students.length} students?\n\n✅ ${students.filter(s=>s.action==='promoted').length} promoted\n🔴 ${students.filter(s=>s.action==='detained').length} detained\n📋 ${students.filter(s=>s.action==='tc_issued').length} TC`)) return;
+
+    const btn = document.getElementById('execBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    try {
+        const res = await fetch('/api/school/students/promote', {method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                from_class_id: document.getElementById('fromClass').value,
+                to_class_id: toClass,
+                to_section_id: toSection || null,
+                academic_year_from: document.getElementById('fromYear').value,
+                academic_year_to: document.getElementById('toYear').value,
+                students: students.map(s => ({student_id: s.id, action: s.action, remarks: s.remarks}))
+            })
+        });
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        alert(`✅ Done! ${d.promoted} promoted, ${d.detained} detained, ${d.tc} TC issued.`);
+        document.getElementById('step2').classList.remove('active');
+        document.getElementById('step3').classList.add('active');
+    } catch(e) { alert('Promotion failed'); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> Execute Promotion';
+}
+
+init();
+</script>
+{% endblock %}

@@ -1,0 +1,578 @@
+{% extends "base.html" %}
+{% block title %}Performance Analytics{% endblock %}
+{% block page_title %}📊 My Performance{% endblock %}
+{% block page_subtitle %}Track your progress, understand your strengths{% endblock %}
+
+{% block extra_css %}
+<style>
+:root { --cp: #6366F1; --cs: #F59E0B; --cg: #10B981; --cr: #EF4444; --ci: #3B82F6; --co: #8B5CF6; }
+.analytics-hero { background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%); border-radius: 16px; padding: 24px; color: white; margin-bottom: 20px; position: relative; overflow: hidden; }
+.analytics-hero::before { content: ''; position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%); border-radius: 50%; }
+.hero-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+.hero-stat { text-align: center; padding: 10px 8px; background: rgba(255,255,255,0.08); border-radius: 12px; backdrop-filter: blur(10px); }
+.hero-stat .num { font-size: 1.6rem; font-weight: 900; line-height: 1; }
+.hero-stat .label { font-size: 0.68rem; opacity: 0.65; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+.hero-stat .sub { font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+.percentile-badge { display: inline-block; background: linear-gradient(135deg, #F59E0B, #D97706); padding: 3px 12px; border-radius: 20px; font-weight: 800; font-size: 0.75rem; margin-top: 4px; }
+.student-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.student-name { font-size: 1.1rem; font-weight: 800; color: rgba(255,255,255,0.95); }
+.student-meta { font-size: 0.72rem; opacity: 0.7; }
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-card { background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); padding: 16px; }
+.chart-card h3 { font-size: 0.88rem; font-weight: 800; margin: 0 0 2px; display: flex; align-items: center; gap: 6px; }
+.chart-card .chart-sub { font-size: 0.68rem; color: var(--text-light); margin-bottom: 10px; }
+.full-width { grid-column: 1 / -1; }
+.tooltip-btn { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; background: var(--bg-secondary); color: var(--text-light); font-size: 0.6rem; cursor: pointer; border: none; font-weight: 700; }
+.chart-tooltip { display: none; background: #1E293B; color: white; padding: 8px 12px; border-radius: 8px; font-size: 0.72rem; line-height: 1.5; margin-bottom: 8px; }
+.legend-row { display: flex; gap: 14px; font-size: 0.68rem; color: var(--text-light); margin-bottom: 6px; flex-wrap: wrap; }
+.legend-dot { width: 8px; height: 8px; border-radius: 3px; display: inline-block; margin-right: 3px; vertical-align: middle; }
+/* Attendance Heatmap */
+.att-heatmap { display: flex; gap: 3px; flex-wrap: wrap; align-items: center; }
+.att-dot { width: 14px; height: 14px; border-radius: 3px; display: inline-block; cursor: default; transition: transform 0.15s; }
+.att-dot:hover { transform: scale(1.4); }
+.att-dot.present { background: #10B981; }
+.att-dot.absent { background: #EF4444; }
+.att-dot.late { background: #F59E0B; }
+.att-dot.none { background: #E2E8F0; }
+.att-dot.sunday { background: #F1F5F9; border: 1px dashed #CBD5E1; }
+/* Time filter pills */
+.time-filter { display: flex; gap: 6px; margin-bottom: 10px; }
+.time-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.68rem; font-weight: 700; border: 1px solid var(--border); background: white; cursor: pointer; color: var(--text-light); transition: all 0.2s; }
+.time-pill.active { background: var(--cp); color: white; border-color: var(--cp); }
+.time-pill:hover:not(.active) { background: var(--bg); }
+/* Subject table */
+.subject-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.subject-table th { text-align: left; padding: 8px 10px; background: var(--bg); font-weight: 700; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-light); }
+.subject-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.subject-table tr:hover { background: #F8FAFC; }
+.bar-inline { height: 5px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden; width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.bar-inline .fill { height: 100%; border-radius: 3px; }
+/* Teacher grid */
+.teacher-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.teacher-card { padding: 10px 12px; background: var(--bg); border-radius: 10px; border-left: 3px solid var(--cp); }
+.teacher-card .subj { font-weight: 800; font-size: 0.82rem; }
+.teacher-card .name { font-size: 0.78rem; color: var(--text); margin-top: 2px; }
+.teacher-card .desig { font-size: 0.68rem; color: var(--text-light); }
+/* Smart insights */
+.insight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.insight-card { padding: 12px; border-radius: 10px; display: flex; align-items: flex-start; gap: 10px; }
+.insight-card .icon { font-size: 1.3rem; flex-shrink: 0; margin-top: 2px; }
+.insight-card .title { font-weight: 700; font-size: 0.82rem; }
+.insight-card .desc { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; line-height: 1.4; }
+.insight-green { background: #ECFDF5; border: 1px solid #A7F3D0; }
+.insight-yellow { background: #FFFBEB; border: 1px solid #FDE68A; }
+.insight-red { background: #FEF2F2; border: 1px solid #FECACA; }
+.insight-blue { background: #EFF6FF; border: 1px solid #BFDBFE; }
+/* Exam selector tabs */
+.exam-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 4px; }
+.exam-tab { padding: 5px 14px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; border: 1px solid var(--border); background: white; cursor: pointer; white-space: nowrap; transition: all 0.2s; }
+.exam-tab.active { background: #312E81; color: white; border-color: #312E81; }
+.exam-tab:hover:not(.active) { background: var(--bg); }
+/* Loading */
+.loading-state { text-align: center; padding: 60px; color: var(--text-light); }
+/* Teacher Feedback styles */
+.tf-subject { margin-bottom: 14px; }
+.tf-subject-name { font-weight: 800; font-size: 0.88rem; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 2px solid var(--border); }
+.tf-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.tf-label { font-size: 0.72rem; font-weight: 700; min-width: 80px; margin-top: 4px; }
+.tf-label.str { color: #10B981; }
+.tf-label.con { color: #EF4444; }
+.tf-label.sug { color: #3B82F6; }
+.tf-tag { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; margin: 2px; }
+.tf-tag.str { background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; }
+.tf-tag.con { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+.tf-tag.sug { background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE; }
+.tf-custom { font-style: italic; font-size: 0.78rem; color: var(--text-secondary); padding: 6px 10px; background: var(--bg); border-radius: 8px; border-left: 3px solid #6366F1; margin-top: 6px; }
+.tf-empty { text-align: center; padding: 20px; font-size: 0.82rem; color: var(--text-light); }
+.loading-state i { font-size: 2rem; margin-bottom: 12px; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+/* Responsive */
+@media (max-width: 768px) { .hero-grid { grid-template-columns: repeat(3, 1fr); } .chart-row, .chart-row-3 { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .hero-grid { grid-template-columns: repeat(2, 1fr); } }
+/* Dark mode */
+[data-theme="dark"] .chart-card { background: var(--card-bg); }
+[data-theme="dark"] .subject-table th { background: var(--bg-secondary); }
+[data-theme="dark"] .subject-table tr:hover { background: rgba(255,255,255,0.03); }
+[data-theme="dark"] .time-pill { background: var(--card-bg); border-color: var(--border); color: var(--text-light); }
+[data-theme="dark"] .exam-tab { background: var(--card-bg); border-color: var(--border); color: var(--text-light); }
+[data-theme="dark"] .teacher-card { background: var(--bg-secondary); }
+[data-theme="dark"] .att-dot.none { background: #374151; }
+[data-theme="dark"] .insight-green { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); }
+[data-theme="dark"] .insight-yellow { background: rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.3); }
+[data-theme="dark"] .insight-red { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.3); }
+[data-theme="dark"] .insight-blue { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="analyticsRoot">
+    <div class="loading-state" id="loadingState">
+        <i class="fas fa-circle-notch"></i>
+        <div>Loading your analytics...</div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+let chartInstances = {};
+let analyticsData = null;
+let selectedExamIdx = -1;
+
+function destroyChart(id) { if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; } }
+
+async function loadAnalytics() {
+    try {
+        const [analyticsResp, remarksResp] = await Promise.all([
+            fetch('/api/student/analytics', {credentials: 'same-origin'}),
+            fetch('/api/student/remarks', {credentials: 'same-origin'}).catch(() => null),
+        ]);
+        if (!analyticsResp.ok) throw new Error('Failed');
+        analyticsData = await analyticsResp.json();
+        let remarksData = null;
+        if (remarksResp && remarksResp.ok) {
+            remarksData = await remarksResp.json();
+        }
+        analyticsData._remarks = remarksData;
+        renderDashboard(analyticsData);
+    } catch(e) {
+        document.getElementById('analyticsRoot').innerHTML = `
+            <div class="card"><div class="card-body"><div class="empty-state">
+                <i class="fas fa-chart-bar"></i><h3>Analytics Unavailable</h3>
+                <p>Please check back after exam results are published.</p>
+            </div></div></div>`;
+    }
+}
+
+function renderDashboard(d) {
+    const latestExam = d.exams.length > 0 ? d.exams[d.exams.length - 1] : null;
+    const selIdx = selectedExamIdx === -1 ? d.exams.length - 1 : selectedExamIdx;
+    const selectedExam = d.exams.length > 0 ? d.exams[selIdx] : null;
+    const percentile = latestExam ? latestExam.percentile : 0;
+    const latestPct = latestExam ? latestExam.pct : 0;
+    const prevPct = d.exams.length > 1 ? d.exams[d.exams.length - 2].pct : null;
+    const improvement = prevPct !== null ? latestPct - prevPct : null;
+    const improvementText = improvement !== null
+        ? (improvement > 0 ? `↑ +${improvement}%` : improvement < 0 ? `↓ ${improvement}%` : '→ Same')
+        : 'First exam';
+    const improvementColor = improvement > 0 ? '#10B981' : improvement < 0 ? '#EF4444' : '#F59E0B';
+
+    let html = `
+    <!-- HERO -->
+    <div class="analytics-hero">
+        <div class="student-header">
+            <div>
+                <div class="student-name">${d.student.name}</div>
+                <div class="student-meta">${d.student.class} ${d.student.section} · Roll #${d.student.roll} · ${d.student.admission}</div>
+            </div>
+        </div>
+        <div class="hero-grid">
+            <div class="hero-stat">
+                <div class="num">${latestPct}%</div>
+                <div class="label">Latest Score</div>
+                <div class="sub" style="color:${improvementColor}">${improvementText}</div>
+            </div>
+            <div class="hero-stat">
+                <div class="num">${d.attendance.pct}%</div>
+                <div class="label">Attendance</div>
+                <div class="sub">${d.attendance.present}/${d.attendance.total} days</div>
+            </div>
+            <div class="hero-stat">
+                <div class="num">${percentile}%</div>
+                <div class="label">Ahead Of Class</div>
+                <div class="percentile-badge">Top ${100 - percentile}%</div>
+            </div>
+            <div class="hero-stat">
+                <div class="num">₹${d.fees.balance.toLocaleString()}</div>
+                <div class="label">Fee Pending</div>
+                <div class="sub">₹${d.fees.total_paid.toLocaleString()} paid</div>
+            </div>
+            <div class="hero-stat">
+                <div class="num">${d.exams.length}</div>
+                <div class="label">Exams Taken</div>
+                <div class="sub">${d.class_info.strength} classmates</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMART INSIGHTS -->
+    <div class="chart-card" style="margin-bottom:16px;">
+        <h3>💡 Smart Insights</h3>
+        <div class="chart-sub">Auto-generated analysis of your performance</div>
+        <div class="insight-grid" id="insightsGrid"></div>
+    </div>
+
+    <!-- TEACHER FEEDBACK (if available) -->
+    <div class="chart-card" style="margin-bottom:16px; display:none;" id="teacherFeedbackCard">
+        <h3>👩‍🏫 Teacher Feedback <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+        <div class="chart-tooltip">Your teachers have provided personalized feedback on your strengths and areas for improvement. These are specific to YOU — pay attention to the suggestions!</div>
+        <div class="chart-sub">What your teachers say about your performance</div>
+        <div id="teacherFeedbackContent"></div>
+    </div>
+
+    <!-- ROW 1: Progress Trend + Radar -->
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3>📈 Progress Trend <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Shows how your overall percentage changed across exams. An upward line = improvement!</div>
+            <div class="chart-sub">Your score trend across exams</div>
+            <canvas id="progressChart" height="200"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🎯 Subject Strengths <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Radar shows your relative strength vs class average. Bigger area = stronger performance.</div>
+            <div class="chart-sub">You vs class average across all exams</div>
+            <div class="legend-row">
+                <span><span class="legend-dot" style="background:rgba(99,102,241,0.5);"></span>You</span>
+                <span><span class="legend-dot" style="background:rgba(245,158,11,0.4);"></span>Class Avg</span>
+            </div>
+            <canvas id="radarChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <!-- ROW 2: Subject Comparison + Attendance Pie + Heatmap -->
+    <div class="chart-row-3">
+        <div class="chart-card">
+            <h3>📊 Subject Comparison <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Compare your marks with class average. Color = above/below avg.</div>
+            <div class="chart-sub">Latest exam breakdown</div>
+            <canvas id="subjectChart" height="260"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🥧 Attendance Split <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Doughnut showing your overall attendance breakdown.</div>
+            <div class="chart-sub">Overall breakdown</div>
+            <canvas id="attPieChart" height="200"></canvas>
+            <div class="legend-row" style="justify-content:center; margin-top:8px;">
+                <span><span class="legend-dot" style="background:#10B981;"></span>Present ${d.attendance.present}</span>
+                <span><span class="legend-dot" style="background:#EF4444;"></span>Absent ${d.attendance.absent}</span>
+                <span><span class="legend-dot" style="background:#F59E0B;"></span>Late ${d.attendance.late}</span>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>📅 Attendance Heatmap <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Each square = one day. Hover to see date and status.</div>
+            <div class="chart-sub">Daily pattern — hover for details</div>
+            <div class="time-filter">
+                <button class="time-pill active" onclick="filterAttendance(30, this)">1M</button>
+                <button class="time-pill" onclick="filterAttendance(90, this)">3M</button>
+                <button class="time-pill" onclick="filterAttendance(180, this)">6M</button>
+                <button class="time-pill" onclick="filterAttendance(365, this)">1Y</button>
+            </div>
+            <div class="att-heatmap" id="attHeatmap"></div>
+            <div class="legend-row" style="margin-top:8px;">
+                <span><span class="legend-dot" style="background:#10B981;"></span>Present</span>
+                <span><span class="legend-dot" style="background:#EF4444;"></span>Absent</span>
+                <span><span class="legend-dot" style="background:#F59E0B;"></span>Late</span>
+                <span><span class="legend-dot" style="background:#E2E8F0;"></span>No data</span>
+            </div>
+        </div>
+    </div>`;
+
+    // ROW 3: Detailed marks table with exam tabs
+    if (d.exams.length > 0 && selectedExam) {
+        html += `
+    <div class="chart-row">
+        <div class="chart-card full-width">
+            <h3>📝 Detailed Marks <button class="tooltip-btn" onclick="toggleTip(this)">?</button></h3>
+            <div class="chart-tooltip">Shows your exact marks, class average, and highest. Focus on subjects below average.</div>
+            <div class="exam-tabs">`;
+        d.exams.forEach((ex, i) => {
+            const isActive = (selectedExamIdx === -1 && i === d.exams.length - 1) || (selectedExamIdx === i);
+            html += `<button class="exam-tab${isActive ? ' active' : ''}" onclick="switchExam(${i})">${ex.exam_name}</button>`;
+        });
+        html += `</div>
+            <table class="subject-table">
+                <thead><tr><th>Subject</th><th>Marks</th><th>Class Avg</th><th>Highest</th><th>Grade</th><th>vs Average</th></tr></thead>
+                <tbody>`;
+        for (const s of selectedExam.subjects) {
+            const pct = Math.round(s.my_marks / s.max_marks * 100);
+            const color = pct >= 80 ? '#10B981' : pct >= 60 ? '#6366F1' : pct >= 40 ? '#F59E0B' : '#EF4444';
+            const diff = (s.my_marks - s.class_avg).toFixed(1);
+            const vs = diff >= 0 ? `<span style="color:#10B981;font-weight:700;">+${diff}</span>` : `<span style="color:#EF4444;font-weight:700;">${diff}</span>`;
+            html += `<tr>
+                <td><strong>${s.subject}</strong></td>
+                <td>${s.my_marks}/${s.max_marks}</td>
+                <td>${s.class_avg}</td>
+                <td>${s.class_highest}</td>
+                <td><span style="font-weight:800;color:${color};">${s.grade}</span></td>
+                <td>${vs} <span class="bar-inline"><span class="fill" style="width:${pct}%;background:${color};"></span></span></td>
+            </tr>`;
+        }
+        html += `<tr style="font-weight:800;background:var(--bg);">
+                <td>TOTAL</td><td>${selectedExam.total}/${selectedExam.max}</td>
+                <td colspan="2">${selectedExam.pct}%</td><td></td>
+                <td>Ahead of ${selectedExam.percentile}% of class</td></tr>
+            </tbody></table>
+        </div>
+    </div>`;
+    }
+
+    // ROW 4: Teachers
+    html += `
+    <div class="chart-row">
+        <div class="chart-card full-width">
+            <h3>👩‍🏫 My Teachers</h3>
+            <div class="chart-sub">Subject-wise teachers for ${d.class_info.class_name} ${d.class_info.section_name}</div>
+            <div class="teacher-grid">`;
+    const bColors = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#8B5CF6','#EC4899','#14B8A6'];
+    d.class_info.teachers.forEach((t, i) => {
+        html += `<div class="teacher-card" style="border-left-color:${bColors[i % bColors.length]};">
+            <div class="subj">${t.subject}</div>
+            <div class="name">${t.teacher}</div>
+            <div class="desig">${t.designation || 'Teacher'}</div>
+        </div>`;
+    });
+    html += `</div></div></div>`;
+
+    // Footer
+    html += `
+    <div style="text-align:center;padding:12px;font-size:0.72rem;color:var(--text-light);">
+        <i class="fas fa-users"></i> ${d.class_info.strength} students · ${d.class_info.class_name} ${d.class_info.section_name}
+        &nbsp;·&nbsp; <i class="fas fa-lock"></i> All comparisons are anonymized
+    </div>`;
+
+    document.getElementById('analyticsRoot').innerHTML = html;
+    renderCharts(d, selectedExam);
+    renderAttendanceHeatmap(d.attendance.trend);
+    generateInsights(d);
+}
+
+function renderCharts(d, selectedExam) {
+    // 1. Progress Trend
+    if (d.progress_trend.length > 0) {
+        destroyChart('progressChart');
+        chartInstances['progressChart'] = new Chart(document.getElementById('progressChart'), {
+            type: 'line',
+            data: {
+                labels: d.progress_trend.map(e => e.exam),
+                datasets: [{
+                    label: 'Your %', data: d.progress_trend.map(e => e.pct),
+                    borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.08)',
+                    borderWidth: 3, fill: true, tension: 0.4,
+                    pointBackgroundColor: '#6366F1', pointRadius: 5, pointHoverRadius: 7,
+                }]
+            },
+            options: {
+                responsive: true, plugins: { legend: { display: false } },
+                scales: { y: { min: 0, max: 100, ticks: { callback: v => v+'%', font:{size:10} } }, x: { ticks: { font:{size:10} } } },
+            }
+        });
+    }
+
+    // 2. Radar
+    if (d.radar.length >= 3) {
+        destroyChart('radarChart');
+        chartInstances['radarChart'] = new Chart(document.getElementById('radarChart'), {
+            type: 'radar',
+            data: {
+                labels: d.radar.map(r => r.subject),
+                datasets: [
+                    { label: 'You', data: d.radar.map(r => r.my_pct), borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.12)', borderWidth: 2, pointRadius: 3 },
+                    { label: 'Class Avg', data: d.radar.map(r => r.class_avg_pct), borderColor: '#F59E0B', backgroundColor: 'rgba(245,158,11,0.06)', borderWidth: 2, pointRadius: 2, borderDash: [5,5] },
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: { r: { min: 0, max: 100, ticks: { stepSize: 20, display: false }, pointLabels: { font: { size: 10, weight:'600' } } } },
+                plugins: { legend: { display: false } },
+            }
+        });
+    }
+
+    // 3. Subject Comparison (Horizontal Bar)
+    if (selectedExam) {
+        destroyChart('subjectChart');
+        const subjs = selectedExam.subjects;
+        chartInstances['subjectChart'] = new Chart(document.getElementById('subjectChart'), {
+            type: 'bar',
+            data: {
+                labels: subjs.map(s => s.subject),
+                datasets: [
+                    { label: 'You', data: subjs.map(s => s.my_pct), backgroundColor: subjs.map(s => s.my_pct >= s.class_avg_pct ? '#6366F1' : '#EF4444'), borderRadius: 4, barPercentage: 0.45 },
+                    { label: 'Class Avg', data: subjs.map(s => s.class_avg_pct), backgroundColor: '#E2E8F0', borderRadius: 4, barPercentage: 0.45 },
+                ]
+            },
+            options: {
+                responsive: true, indexAxis: 'y',
+                scales: { x: { min:0, max:100, ticks:{ callback:v=>v+'%', font:{size:9} } }, y: { ticks:{font:{size:10}} } },
+                plugins: { legend: { position:'bottom', labels: { usePointStyle:true, padding:12, font:{size:10} } } },
+            }
+        });
+    }
+
+    // 4. Attendance Doughnut
+    destroyChart('attPieChart');
+    const canvas = document.getElementById('attPieChart');
+    if (canvas) {
+        chartInstances['attPieChart'] = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels: ['Present', 'Absent', 'Late'],
+                datasets: [{ data: [d.attendance.present, d.attendance.absent, d.attendance.late], backgroundColor: ['#10B981','#EF4444','#F59E0B'], borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
+            },
+            options: {
+                responsive: true, cutout: '60%',
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} days` } } },
+            },
+            plugins: [{
+                id: 'centerText',
+                beforeDraw(chart) {
+                    const {ctx, width, height} = chart;
+                    ctx.save();
+                    const pct = d.attendance.pct;
+                    ctx.font = 'bold 18px system-ui';
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillStyle = pct >= 85 ? '#10B981' : pct >= 75 ? '#F59E0B' : '#EF4444';
+                    ctx.fillText(pct + '%', width/2, height/2);
+                    ctx.restore();
+                }
+            }]
+        });
+    }
+}
+
+function renderAttendanceHeatmap(trend) {
+    const container = document.getElementById('attHeatmap');
+    if (!container) return;
+    container.innerHTML = '';
+    trend.forEach(t => {
+        const dot = document.createElement('span');
+        dot.className = 'att-dot ' + t.status;
+        dot.title = `${t.date}: ${t.status.charAt(0).toUpperCase() + t.status.slice(1)}`;
+        container.appendChild(dot);
+    });
+}
+
+function filterAttendance(days, btn) {
+    document.querySelectorAll('.time-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    if (!analyticsData) return;
+    const trend = analyticsData.attendance.trend;
+    renderAttendanceHeatmap(trend.slice(-Math.min(days, trend.length)));
+    // Info for ranges beyond available data
+    const noteParent = document.getElementById('attHeatmap').parentElement;
+    let note = noteParent.querySelector('.range-note');
+    if (days > trend.length) {
+        if (!note) { note = document.createElement('div'); note.className = 'range-note'; note.style.cssText = 'font-size:0.68rem;color:var(--text-light);margin-top:6px;'; noteParent.appendChild(note); }
+        note.textContent = `Showing ${trend.length} days available. Extended range data coming soon.`;
+    } else if (note) { note.remove(); }
+}
+
+function generateInsights(d) {
+    const grid = document.getElementById('insightsGrid');
+    if (!grid) return;
+    const insights = [];
+    const remarks = d._remarks;
+
+    // Improvement trend
+    if (d.progress_trend.length >= 2) {
+        const last = d.progress_trend[d.progress_trend.length - 1].pct;
+        const prev = d.progress_trend[d.progress_trend.length - 2].pct;
+        const diff = last - prev;
+        if (diff > 5) insights.push({icon:'🚀', title:`+${diff}% improvement!`, desc:`Jumped from ${prev}% to ${last}%. Keep this momentum!`, cls:'insight-green'});
+        else if (diff < -5) insights.push({icon:'⚠️', title:`${diff}% dip detected`, desc:`Dropped from ${prev}% to ${last}%. Focus on weak subjects.`, cls:'insight-yellow'});
+        else insights.push({icon:'✅', title:'Steady performance', desc:`Consistent at ${last}%. Small focused efforts can push you higher.`, cls:'insight-green'});
+    }
+
+    // Attendance
+    if (d.attendance.pct < 75) insights.push({icon:'🔴', title:'Attendance below 75%', desc:`At ${d.attendance.pct}% with ${d.attendance.absent} absences. Minimum 75% required.`, cls:'insight-red'});
+    else if (d.attendance.pct >= 95) insights.push({icon:'🌟', title:'Excellent attendance!', desc:`${d.attendance.pct}% — outstanding discipline and consistency!`, cls:'insight-green'});
+
+    // Best & weakest subject — enriched with teacher feedback
+    if (d.radar.length >= 2) {
+        let best = d.radar.reduce((a,b) => a.my_pct > b.my_pct ? a : b);
+        let weak = d.radar.reduce((a,b) => a.my_pct < b.my_pct ? a : b);
+        if (best.subject !== weak.subject) {
+            let bestExtra = '', weakExtra = '';
+            if (remarks && remarks.subject_feedback) {
+                const bestFb = remarks.subject_feedback[best.subject];
+                if (bestFb && bestFb.strengths.length > 0) bestExtra = ' Teacher says: "' + bestFb.strengths[0] + '"';
+                const weakFb = remarks.subject_feedback[weak.subject];
+                if (weakFb && weakFb.concerns.length > 0) weakExtra = ' Teacher notes: "' + weakFb.concerns[0] + '"';
+                else if (weakFb && weakFb.suggestions.length > 0) weakExtra = ' Tip: ' + weakFb.suggestions[0];
+            }
+            insights.push({icon:'💪', title:`Strongest: ${best.subject}`, desc:`Averaging ${best.my_pct}% — your power subject!${bestExtra}`, cls:'insight-blue'});
+            insights.push({icon:'📚', title:`Focus on: ${weak.subject}`, desc:`At ${weak.my_pct}% — needs attention.${weakExtra}`, cls:'insight-yellow'});
+        }
+    }
+
+    // Teacher remarks summary
+    if (remarks && remarks.total_concerns > 0) {
+        insights.push({icon:'👩‍🏫', title:`${remarks.total_concerns} area${remarks.total_concerns>1?'s':''} flagged by teacher`, desc:'Your teacher highlighted areas to improve. See Teacher Feedback below.', cls:'insight-yellow'});
+    }
+    if (remarks && remarks.total_strengths > 3) {
+        insights.push({icon:'🏅', title:`${remarks.total_strengths} strengths recognized!`, desc:'Your teachers have highlighted multiple strong areas. Great work!', cls:'insight-green'});
+    }
+
+    // Fee
+    if (d.fees.balance > 0) insights.push({icon:'💰', title:`₹${d.fees.balance.toLocaleString()} pending`, desc:'Fee balance outstanding. Ask parent to check fee section.', cls:'insight-yellow'});
+
+    // Percentile
+    const latestExam = d.exams.length > 0 ? d.exams[d.exams.length - 1] : null;
+    if (latestExam && latestExam.percentile >= 80) insights.push({icon:'🏆', title:`Top ${100-latestExam.percentile}% of class!`, desc:`Scored higher than ${latestExam.percentile}% of classmates!`, cls:'insight-green'});
+
+    if (!insights.length) insights.push({icon:'📊', title:'Building your profile...', desc:'More insights appear as data grows.', cls:'insight-blue'});
+
+    grid.innerHTML = insights.map(i => `
+        <div class="insight-card ${i.cls}">
+            <div class="icon">${i.icon}</div>
+            <div><div class="title">${i.title}</div><div class="desc">${i.desc}</div></div>
+        </div>`).join('');
+
+    // Render teacher feedback section
+    renderTeacherFeedback(remarks);
+}
+
+function renderTeacherFeedback(remarks) {
+    const card = document.getElementById('teacherFeedbackCard');
+    const content = document.getElementById('teacherFeedbackContent');
+    if (!card || !content) return;
+    if (!remarks || !remarks.subject_feedback || Object.keys(remarks.subject_feedback).length === 0) return;
+
+    card.style.display = 'block';
+    let html = '';
+
+    for (const [subject, fb] of Object.entries(remarks.subject_feedback)) {
+        if (fb.strengths.length === 0 && fb.concerns.length === 0 && fb.suggestions.length === 0) continue;
+        html += `<div class="tf-subject"><div class="tf-subject-name">${subject}</div>`;
+        if (fb.strengths.length > 0) {
+            html += `<div class="tf-row"><span class="tf-label str">💪 Strengths</span>${fb.strengths.map(t => `<span class="tf-tag str">${t}</span>`).join('')}</div>`;
+        }
+        if (fb.concerns.length > 0) {
+            html += `<div class="tf-row"><span class="tf-label con">⚠️ Needs Work</span>${fb.concerns.map(t => `<span class="tf-tag con">${t}</span>`).join('')}</div>`;
+        }
+        if (fb.suggestions.length > 0) {
+            html += `<div class="tf-row"><span class="tf-label sug">💡 What to Do</span>${fb.suggestions.map(t => `<span class="tf-tag sug">${t}</span>`).join('')}</div>`;
+        }
+        html += '</div>';
+    }
+
+    // Custom remarks from teachers
+    if (remarks.remarks && remarks.remarks.length > 0) {
+        const customs = remarks.remarks.filter(r => r.custom_remark).slice(0, 5);
+        if (customs.length > 0) {
+            html += '<div style="margin-top:14px;"><div style="font-size:0.78rem;font-weight:700;margin-bottom:8px;">✏️ Personal Notes from Teachers</div>';
+            customs.forEach(r => {
+                html += `<div class="tf-custom">"${r.custom_remark}" — <strong>${r.teacher}</strong> (${r.subject}, ${r.date})</div>`;
+            });
+            html += '</div>';
+        }
+    }
+
+    if (!html) { card.style.display = 'none'; return; }
+    content.innerHTML = html;
+}
+
+function switchExam(idx) { selectedExamIdx = idx; renderDashboard(analyticsData); }
+
+function toggleTip(btn) {
+    const tip = btn.closest('h3').nextElementSibling;
+    if (tip && tip.classList.contains('chart-tooltip')) tip.style.display = tip.style.display === 'block' ? 'none' : 'block';
+}
+
+document.addEventListener('DOMContentLoaded', loadAnalytics);
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Results{% endblock %}
+{% block page_title %}Exam Results{% endblock %}
+{% block page_subtitle %}View results, rankings, and generate report cards{% endblock %}
+
+{% block extra_css %}
+<style>
+    .results-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    .results-table th { padding: 8px 6px; background: var(--bg-sidebar); color: white; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; text-align: center; white-space: nowrap; }
+    .results-table th:first-child, .results-table th:nth-child(2), .results-table th:nth-child(3) { text-align: left; }
+    .results-table td { padding: 8px 6px; border-bottom: 1px solid var(--border-light); text-align: center; }
+    .results-table td:first-child, .results-table td:nth-child(2), .results-table td:nth-child(3) { text-align: left; }
+    .results-table tr:hover { background: #FAFBFF; }
+    .results-table tr.fail-row { background: #FEF2F2; }
+
+    .rank-badge { width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; }
+    .rank-1 { background: #FEF3C7; color: #B45309; } /* Gold */
+    .rank-2 { background: #E5E7EB; color: #374151; } /* Silver */
+    .rank-3 { background: #FED7AA; color: #9A3412; } /* Bronze */
+
+    .result-pass { color: var(--success); font-weight: 700; }
+    .result-fail { color: var(--danger); font-weight: 700; }
+
+    .grade-pill { padding: 2px 6px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; }
+    .grade-A1, .grade-A2 { background: var(--success-light); color: var(--success); }
+    .grade-B1, .grade-B2 { background: #DBEAFE; color: #2563EB; }
+    .grade-C1, .grade-C2 { background: var(--warning-light); color: var(--warning); }
+    .grade-D { background: #FEF3C7; color: #B45309; }
+    .grade-E { background: var(--danger-light); color: var(--danger); }
+
+    .marks-cell { font-weight: 600; }
+    .marks-cell.fail { color: var(--danger); }
+    .marks-cell.absent { color: var(--text-light); font-style: italic; font-weight: 400; }
+
+    .summary-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    .sr-card { background: white; padding: 16px 20px; border-radius: var(--radius); box-shadow: var(--shadow-sm); flex: 1; min-width: 140px; text-align: center; }
+    .sr-val { font-size: 1.6rem; font-weight: 800; }
+    .sr-label { font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px; }
+
+    /* Print Report Card */
+    .report-card { display: none; }
+    @media print {
+        body * { visibility: hidden; }
+        .report-card, .report-card * { visibility: visible; }
+        .report-card { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-3">
+    <div class="card-body" style="padding:14px 20px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+            <select id="selExam" class="form-select" style="flex:1; min-width:160px; padding:10px;">
+                <option value="">Select Exam</option>
+                {% for e in exams %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+            </select>
+            <select id="selClass" class="form-select" onchange="onClassChange()" style="flex:1; min-width:140px; padding:10px;">
+                <option value="">Select Class</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+            <select id="selSection" class="form-select" style="flex:1; min-width:120px; padding:10px;">
+                <option value="">All Sections</option>
+            </select>
+            <button class="btn btn-primary" onclick="loadResults()"><i class="fas fa-trophy"></i> View Results</button>
+        </div>
+    </div>
+</div>
+
+<div id="resultsArea">
+    <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-trophy"></i><h3>Select Exam & Class</h3><p>Choose an exam and class to view results</p></div></div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classSections = {{ sections_json | safe }};
+let resultsData = null;
+
+function onClassChange() {
+    const classId = document.getElementById('selClass').value;
+    const sec = document.getElementById('selSection');
+    sec.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(s => sec.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+    }
+}
+
+async function loadResults() {
+    const examId = document.getElementById('selExam').value;
+    const classId = document.getElementById('selClass').value;
+    const sectionId = document.getElementById('selSection').value;
+    if (!examId || !classId) { showToast('warning', 'Select exam & class', ''); return; }
+
+    const area = document.getElementById('resultsArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div>';
+
+    try {
+        const params = new URLSearchParams({ exam_id: examId, class_id: classId });
+        if (sectionId) params.append('section_id', sectionId);
+        const result = await apiCall(`/api/school/results/load?${params}`);
+        resultsData = result;
+
+        if (!result.has_data) {
+            area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-edit"></i><h3>No Marks Entered</h3><p>Enter marks first in the Marks Entry page</p></div></div></div>';
+            return;
+        }
+        renderResults(result);
+    } catch(e) {
+        area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error</h3><p>${e.message}</p></div></div></div>`;
+    }
+}
+
+function renderResults(data) {
+    const { subjects, students, total_max } = data;
+
+    // Summary
+    const totalStudents = students.length;
+    const passed = students.filter(s => s.result === 'PASS').length;
+    const failed = totalStudents - passed;
+    const passRate = totalStudents > 0 ? Math.round(passed / totalStudents * 100) : 0;
+    const topperPct = students.length > 0 ? Math.max(...students.map(s => s.percentage)) : 0;
+    const avgPct = totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.percentage, 0) / totalStudents) : 0;
+
+    let html = `
+        <div class="summary-row">
+            <div class="sr-card"><div class="sr-val" style="color:var(--primary);">${totalStudents}</div><div class="sr-label">Students</div></div>
+            <div class="sr-card"><div class="sr-val" style="color:var(--success);">${passed}</div><div class="sr-label">Passed</div></div>
+            <div class="sr-card"><div class="sr-val" style="color:var(--danger);">${failed}</div><div class="sr-label">Failed</div></div>
+            <div class="sr-card"><div class="sr-val" style="color:#2563EB;">${passRate}%</div><div class="sr-label">Pass Rate</div></div>
+            <div class="sr-card"><div class="sr-val" style="color:var(--warning);">${avgPct}%</div><div class="sr-label">Class Avg</div></div>
+            <div class="sr-card"><div class="sr-val" style="color:var(--success);">${topperPct}%</div><div class="sr-label">Topper</div></div>
+        </div>
+
+        <div class="card"><div class="card-header"><h2><i class="fas fa-list-ol" style="color:var(--primary); margin-right:8px;"></i> Class Results</h2>
+        <button class="btn btn-secondary btn-sm" onclick="printResults()"><i class="fas fa-print"></i> Print</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportResultsCSV()" title="Export CSV"><i class="fas fa-file-csv"></i></button></div>
+        <div class="card-body" style="padding:0; overflow-x:auto;">
+        <table class="results-table" id="resultsTable"><thead><tr>
+            <th>Rank</th><th>Student</th><th>Roll</th>`;
+
+    subjects.forEach(s => { html += `<th>${s.name}<br><span style="font-weight:400; font-size:0.6rem;">(${s.max})</span></th>`; });
+
+    html += `<th>Total<br><span style="font-weight:400; font-size:0.6rem;">(${total_max})</span></th><th>%</th><th>Grade</th><th>Result</th><th></th></tr></thead><tbody>`;
+
+    students.forEach(s => {
+        const isFail = s.result === 'FAIL';
+        html += `<tr class="${isFail ? 'fail-row' : ''}">`;
+
+        // Rank
+        if (s.rank <= 3) {
+            html += `<td><span class="rank-badge rank-${s.rank}">${s.rank}</span></td>`;
+        } else {
+            html += `<td style="color:var(--text-light);">${s.rank}</td>`;
+        }
+
+        html += `<td style="font-weight:600;">${s.name}</td><td style="color:var(--text-secondary);">${s.roll}</td>`;
+
+        // Subject marks
+        s.subjects.forEach((sub, i) => {
+            if (sub.absent) {
+                html += `<td class="marks-cell absent">AB</td>`;
+            } else {
+                const failMark = sub.marks < subjects[i].pass;
+                html += `<td class="marks-cell ${failMark ? 'fail' : ''}">${sub.marks}</td>`;
+            }
+        });
+
+        html += `<td style="font-weight:700;">${s.total}</td>`;
+        html += `<td style="font-weight:700;">${s.percentage}%</td>`;
+        html += `<td><span class="grade-pill grade-${s.grade}">${s.grade}</span></td>`;
+        html += `<td class="${isFail ? 'result-fail' : 'result-pass'}">${s.result}</td>`;
+        html += `<td><button class="btn btn-ghost btn-sm" onclick="downloadReportCard('${s.id}')" title="Download Report Card PDF"><i class="fas fa-file-pdf" style="color:var(--danger);"></i></button></td>`;
+        html += `</tr>`;
+    });
+
+    html += '</tbody></table></div></div>';
+    document.getElementById('resultsArea').innerHTML = html;
+}
+
+function downloadReportCard(studentId) {
+    const examId = document.getElementById('examSelect').value;
+    window.open(`/api/school/results/report-card-pdf?student_id=${studentId}&exam_id=${examId}`, '_blank');
+}
+
+function exportResultsCSV() {
+    const examId = document.getElementById('examSelect').value;
+    const classId = document.getElementById('classSelect').value;
+    const sectionId = document.getElementById('sectionSelect')?.value || '';
+    if (!examId || !classId) { showToast('error', 'Select exam and class first'); return; }
+    window.open(`/api/school/export/results-csv?exam_id=${examId}&class_id=${classId}&section_id=${sectionId}`, '_blank');
+}
+
+function printResults() {
+    window.print();
+}
+</script>
+{% endblock %}

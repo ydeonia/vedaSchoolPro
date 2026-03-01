@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Notification Settings{% endblock %}
+{% block page_title %}Notification Settings{% endblock %}
+{% block page_subtitle %}Configure WhatsApp, SMS, and Email notification channels{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ch-card{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:14px;transition:all 0.2s;}
+    .ch-card.active{border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.08);}
+    .ch-header{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+    .ch-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+    .ch-title{font-weight:800;font-size:0.92rem;color:var(--text);}
+    .ch-sub{font-size:0.68rem;color:var(--text-light);}
+    .ch-toggle{margin-left:auto;}
+    .ch-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .nf label{font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.5px;display:block;margin-bottom:3px;}
+    .nf input,.nf select{width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;box-sizing:border-box;}
+    .nf input:focus,.nf select:focus{border-color:#6366f1;outline:none;}
+    .toggle-sw{position:relative;width:44px;height:24px;cursor:pointer;}
+    .toggle-sw input{display:none;}
+    .toggle-sw .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;transition:0.2s;}
+    .toggle-sw .slider:before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:white;left:3px;top:3px;transition:0.2s;}
+    .toggle-sw input:checked+.slider{background:#6366f1;}
+    .toggle-sw input:checked+.slider:before{transform:translateX(20px);}
+    .pref-card{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:16px;padding:20px 24px;margin-bottom:14px;}
+    .pref-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:0.82rem;}
+    .pref-row:last-child{border:none;}
+    .pref-channels{display:flex;gap:6px;}
+    .pref-ch{font-size:0.6rem;padding:3px 8px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-weight:600;transition:all 0.15s;color:var(--text-light);}
+    .pref-ch.on{background:#6366f1;color:white;border-color:#6366f1;}
+    .quiet-row{display:flex;align-items:center;gap:12px;margin-top:12px;}
+    .quiet-row input[type=time]{padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;}
+    @media(max-width:768px){.ch-fields{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- WhatsApp -->
+<div class="ch-card" id="waCard">
+    <div class="ch-header">
+        <div class="ch-icon" style="background:rgba(37,211,102,0.1);color:#25d366;">💬</div>
+        <div><div class="ch-title">WhatsApp Business</div><div class="ch-sub">Send fee reminders, attendance alerts, results via WhatsApp</div></div>
+        <label class="toggle-sw ch-toggle"><input type="checkbox" id="waEnabled"><span class="slider"></span></label>
+    </div>
+    <div class="ch-fields">
+        <div class="nf"><label>Provider</label>
+            <select id="waProvider"><option value="interakt">Interakt</option><option value="wati">Wati</option><option value="meta">Meta Cloud API</option></select></div>
+        <div class="nf"><label>API Token</label><input type="password" id="waToken" placeholder="••••••••"></div>
+        <div class="nf"><label>Phone Number ID (Meta only)</label><input type="text" id="waPhoneId" placeholder="1234567890"></div>
+    </div>
+</div>
+
+<!-- SMS -->
+<div class="ch-card" id="smsCard">
+    <div class="ch-header">
+        <div class="ch-icon" style="background:rgba(59,130,246,0.1);color:#3b82f6;">📱</div>
+        <div><div class="ch-title">SMS</div><div class="ch-sub">Transactional SMS for fee & attendance alerts</div></div>
+        <label class="toggle-sw ch-toggle"><input type="checkbox" id="smsEnabled"><span class="slider"></span></label>
+    </div>
+    <div class="ch-fields">
+        <div class="nf"><label>Provider</label>
+            <select id="smsProvider"><option value="msg91">MSG91</option><option value="twilio">Twilio</option><option value="textlocal">Textlocal</option></select></div>
+        <div class="nf"><label>API Key</label><input type="password" id="smsApiKey" placeholder="••••••••"></div>
+        <div class="nf"><label>Sender ID (6 chars)</label><input type="text" id="smsSender" placeholder="EDUFLW" maxlength="6" style="text-transform:uppercase;"></div>
+        <div class="nf"><label>DLT Entity ID (India)</label><input type="text" id="smsDlt" placeholder="Required for India SMS"></div>
+    </div>
+</div>
+
+<!-- Email -->
+<div class="ch-card" id="emailCard">
+    <div class="ch-header">
+        <div class="ch-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;">📧</div>
+        <div><div class="ch-title">Email (SMTP)</div><div class="ch-sub">Results, reports, tax receipts via email</div></div>
+        <label class="toggle-sw ch-toggle"><input type="checkbox" id="emailEnabled"><span class="slider"></span></label>
+    </div>
+    <div class="ch-fields">
+        <div class="nf"><label>SMTP Host</label><input type="text" id="smtpHost" placeholder="smtp-relay.brevo.com"></div>
+        <div class="nf"><label>SMTP Port</label><input type="number" id="smtpPort" value="587" placeholder="587"></div>
+        <div class="nf"><label>Username</label><input type="text" id="smtpUser" placeholder="your@email.com"></div>
+        <div class="nf"><label>Password</label><input type="password" id="smtpPass" placeholder="••••••••"></div>
+        <div class="nf"><label>From Email</label><input type="email" id="fromEmail" placeholder="school@domain.com"></div>
+    </div>
+</div>
+
+<!-- TathaAstu -->
+<div class="ch-card" id="taCard">
+    <div class="ch-header">
+        <div class="ch-icon" style="background:rgba(249,115,22,0.1);color:#f97316;">🙏</div>
+        <div><div class="ch-title">TathaAstu</div><div class="ch-sub">Push notifications via TathaAstu app (coming soon)</div></div>
+        <label class="toggle-sw ch-toggle"><input type="checkbox" id="taEnabled"><span class="slider"></span></label>
+    </div>
+    <div class="ch-fields">
+        <div class="nf"><label>School ID</label><input type="text" id="taSchoolId" placeholder="Your TathaAstu school ID"></div>
+        <div class="nf"><label>API Key</label><input type="password" id="taApiKey" placeholder="••••••••"></div>
+    </div>
+</div>
+
+<!-- Notification Preferences -->
+<div class="pref-card">
+    <div style="font-weight:800;font-size:0.9rem;margin-bottom:14px;color:var(--text);">📋 Notification Preferences</div>
+    <div style="font-size:0.68rem;color:var(--text-light);margin-bottom:12px;">Choose which channels to use for each event type:</div>
+    <div id="prefList"></div>
+</div>
+
+<!-- Quiet Hours -->
+<div class="pref-card">
+    <div style="font-weight:800;font-size:0.9rem;margin-bottom:10px;color:var(--text);">🌙 Quiet Hours</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label class="toggle-sw"><input type="checkbox" id="quietEnabled" checked><span class="slider"></span></label>
+        <span style="font-size:0.78rem;color:var(--text-light);">No notifications between</span>
+        <input type="time" id="quietStart" value="20:00" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);">
+        <span style="font-size:0.78rem;color:var(--text-light);">and</span>
+        <input type="time" id="quietEnd" value="07:00" style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);">
+        <span style="font-size:0.65rem;color:var(--text-light);">(except emergencies)</span>
+    </div>
+</div>
+
+<!-- Save -->
+<div style="display:flex;justify-content:flex-end;margin-top:12px;">
+    <button class="btn btn-primary" onclick="saveNotifSettings()" style="padding:12px 32px;border-radius:12px;font-weight:700;">
+        <i class="fas fa-save"></i> Save Notification Settings
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const EVENTS=[
+    {id:'fee_reminder',label:'Fee Reminder',default:['in_app','whatsapp','sms']},
+    {id:'attendance_alert',label:'Attendance Absent',default:['in_app','whatsapp']},
+    {id:'payment_received',label:'Payment Received',default:['in_app','whatsapp','sms']},
+    {id:'result_published',label:'Result Published',default:['in_app','whatsapp','email']},
+    {id:'announcement',label:'Announcement',default:['in_app']},
+    {id:'emergency',label:'Emergency',default:['in_app','whatsapp','sms','email']},
+    {id:'admission',label:'Admission Update',default:['in_app','email']},
+];
+const CHANNELS=['in_app','whatsapp','sms','email'];
+const CH_LABELS={in_app:'In-App',whatsapp:'WhatsApp',sms:'SMS',email:'Email'};
+let prefs={};
+
+function renderPrefs(){
+    document.getElementById('prefList').innerHTML=EVENTS.map(ev=>{
+        const active=prefs[ev.id]||ev.default;
+        return `<div class="pref-row">
+            <span style="font-weight:600;color:var(--text);">${ev.label}</span>
+            <div class="pref-channels">${CHANNELS.map(ch=>`<span class="pref-ch ${active.includes(ch)?'on':''}" onclick="togglePref('${ev.id}','${ch}',this)">${CH_LABELS[ch]}</span>`).join('')}</div>
+        </div>`;
+    }).join('');
+}
+
+function togglePref(event,channel,el){
+    if(!prefs[event])prefs[event]=[...(EVENTS.find(e=>e.id===event)?.default||['in_app'])];
+    const idx=prefs[event].indexOf(channel);
+    if(idx>=0)prefs[event].splice(idx,1);else prefs[event].push(channel);
+    el.classList.toggle('on');
+}
+
+async function saveNotifSettings(){
+    const data={
+        whatsapp_enabled:document.getElementById('waEnabled').checked,
+        whatsapp_api_token:cleanPw(document.getElementById('waToken').value),
+        whatsapp_phone_id:document.getElementById('waPhoneId').value.trim(),
+        sms_enabled:document.getElementById('smsEnabled').checked,
+        sms_provider:document.getElementById('smsProvider').value,
+        sms_api_key:cleanPw(document.getElementById('smsApiKey').value),
+        sms_sender_id:document.getElementById('smsSender').value.trim().toUpperCase(),
+        email_enabled:document.getElementById('emailEnabled').checked,
+        smtp_host:document.getElementById('smtpHost').value.trim(),
+        smtp_port:parseInt(document.getElementById('smtpPort').value)||587,
+        smtp_username:document.getElementById('smtpUser').value.trim(),
+        smtp_password:cleanPw(document.getElementById('smtpPass').value),
+        from_email:document.getElementById('fromEmail').value.trim(),
+        tathaastu_enabled:document.getElementById('taEnabled').checked,
+        tathaastu_school_id:document.getElementById('taSchoolId').value.trim(),
+        tathaastu_api_key:cleanPw(document.getElementById('taApiKey').value),
+        quiet_hours_enabled:document.getElementById('quietEnabled').checked,
+        quiet_start:document.getElementById('quietStart').value,
+        quiet_end:document.getElementById('quietEnd').value,
+        preferences:prefs,
+    };
+    try{
+        await apiCall('/api/school/notification-settings','PUT',data);
+        showToast('success','Notification settings saved! ✅');
+    }catch(e){showToast('error',e.message);}
+}
+
+function cleanPw(v){return v.includes('••••')?null:v.trim();}
+
+renderPrefs();
+</script>
+{% endblock %}

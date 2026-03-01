@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+
+{% block title %}Students{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block page_subtitle %}Manage student records and profiles{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="card mb-3">
+    <div class="card-body" style="padding: 16px 24px;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 150px;">
+                <select id="filterClass" class="form-select" onchange="filterStudents()" style="padding: 8px 12px;">
+                    <option value="">All Classes</option>
+                    {% for cls in classes %}
+                    <option value="{{ cls.id }}" {% if selected_class == cls.id|string %}selected{% endif %}>{{ cls.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="flex: 1; min-width: 150px;">
+                <select id="filterSection" class="form-select" onchange="filterStudents()" style="padding: 8px 12px;">
+                    <option value="">All Sections</option>
+                </select>
+            </div>
+            <div style="flex: 2; min-width: 200px;">
+                <div class="search-bar" style="width: 100%;">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="studentSearch" placeholder="Search by name, admission no..." oninput="searchStudents(this.value)">
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="openModal('importModal')">
+                    <i class="fas fa-file-csv"></i> Import CSV
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="openModal('addStudentModal')">
+                    <i class="fas fa-plus"></i> Add Student
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Count -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <span class="text-sm text-muted" id="studentCount">{{ students | length }} student(s)</span>
+    <div style="display: flex; gap: 8px;">
+        <button class="btn btn-ghost btn-sm" onclick="exportStudents()">
+            <i class="fas fa-download"></i> Export
+        </button>
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="card">
+    <div class="card-body" style="padding: 0;">
+        {% if students %}
+        <div class="table-wrapper">
+            <table class="data-table" id="studentsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th>Student</th>
+                        <th>Admission No.</th>
+                        <th>Class</th>
+                        <th>Roll No.</th>
+                        <th>Father's Name</th>
+                        <th>Contact</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="studentsBody">
+                    {% for s in students %}
+                    <tr data-class="{{ s.class_id or '' }}" data-section="{{ s.section_id or '' }}">
+                        <td class="text-sm text-muted">{{ loop.index }}</td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="student-thumb" style="background: linear-gradient(135deg, 
+                                    {% if s.gender and s.gender.value == 'female' %}#FCE7F3, #FBCFE8{% else %}var(--primary-50), var(--primary-100){% endif %}); 
+                                    color: {% if s.gender and s.gender.value == 'female' %}#DB2777{% else %}var(--primary){% endif %};">
+                                    {{ s.first_name[0] }}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">{{ s.full_name }}</div>
+                                    <div class="text-xs text-muted">
+                                        {% if s.date_of_birth %}DOB: {{ s.date_of_birth.strftime('%d %b %Y') }}{% endif %}
+                                        {% if s.gender %} · {{ s.gender.value | title }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge badge-purple">{{ s.admission_number or '—' }}</span>
+                        </td>
+                        <td class="text-sm">{{ s.class_.name if s.class_ else '—' }}{% if s.section %}-{{ s.section.name }}{% endif %}</td>
+                        <td class="text-sm">{{ s.roll_number or '—' }}</td>
+                        <td class="text-sm">{{ s.father_name or '—' }}</td>
+                        <td>
+                            <div class="text-sm">{{ s.father_phone or s.mother_phone or '—' }}</div>
+                        </td>
+                        <td>
+                            {% if s.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-gray">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <a href="/school/students/{{ s.id }}" class="btn btn-secondary btn-sm" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button class="btn btn-secondary btn-sm" onclick="deleteItem('/api/school/students/{{ s.id }}', '{{ s.full_name }}')" title="Delete">
+                                    <i class="fas fa-trash" style="color: var(--danger);"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-user-graduate"></i>
+            <h3>No students yet — that's okay!</h3>
+            <p>Add your first student to get started. You can always edit details later — nothing is permanent.</p>
+            <div style="background:#F0FDF4; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:0.78rem; color:#059669; max-width:400px;">
+                <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Start with just 2-3 students to try the system. You can add the rest later or import from CSV.
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary" onclick="openModal('addStudentModal')">
+                    <i class="fas fa-plus"></i> Add Student
+                </button>
+                <button class="btn btn-secondary" onclick="openModal('importModal')">
+                    <i class="fas fa-file-csv"></i> Import CSV
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal-overlay" id="addStudentModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
+    <div class="modal modal-xl" style="max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="position: sticky; top: 0; background: white; z-index: 10; padding: 24px 28px 16px;">
+            <h2><i class="fas fa-user-graduate" style="color: var(--primary); margin-right: 8px;"></i> Add New Student</h2>
+            <button class="modal-close" onclick="closeModal('addStudentModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="addStudentForm">
+                <!-- Section: Basic Info -->
+                <div style="background: var(--primary-50); padding: 10px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; font-weight: 600; color: var(--primary); font-size: 0.85rem;">
+                    <i class="fas fa-user"></i> Basic Information
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">First Name <span class="required">*</span></label>
+                        <input type="text" name="first_name" class="form-input" placeholder="First name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" name="last_name" class="form-input" placeholder="Last name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Gender</label>
+                        <select name="gender" class="form-select">
+                            <option value="">Select...</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" name="date_of_birth" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Blood Group</label>
+                        <select name="blood_group" class="form-select">
+                            <option value="">Select...</option>
+                            <option>A+</option><option>A-</option>
+                            <option>B+</option><option>B-</option>
+                            <option>AB+</option><option>AB-</option>
+                            <option>O+</option><option>O-</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Aadhaar Number</label>
+                        <input type="text" name="aadhaar_number" class="form-input" placeholder="12 digit Aadhaar" maxlength="12">
+                    </div>
+                </div>
+
+                <!-- Section: Academic -->
+                <div style="background: var(--info-light); padding: 10px 16px; border-radius: var(--radius-sm); margin: 20px 0 16px; font-weight: 600; color: var(--info); font-size: 0.85rem;">
+                    <i class="fas fa-graduation-cap"></i> Academic Details
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Class <span class="required">*</span></label>
+                        <select name="class_id" class="form-select" id="studentClassSelect" onchange="loadSections(this.value)" required>
+                            <option value="">Select Class</option>
+                            {% for cls in classes %}
+                            <option value="{{ cls.id }}">{{ cls.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <select name="section_id" class="form-select" id="studentSectionSelect">
+                            <option value="">Select Section</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Roll Number</label>
+                        <input type="text" name="roll_number" class="form-input" placeholder="e.g., 1, 2, 3">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Admission Number</label>
+                        <input type="text" name="admission_number" class="form-input" placeholder="e.g., ADM-2025-001">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Admission Date</label>
+                        <input type="date" name="admission_date" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Section: Parent Details -->
+                <div style="background: var(--success-light); padding: 10px 16px; border-radius: var(--radius-sm); margin: 20px 0 16px; font-weight: 600; color: var(--success); font-size: 0.85rem;">
+                    <i class="fas fa-users"></i> Parent / Guardian Details
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Father's Name</label>
+                        <input type="text" name="father_name" class="form-input" placeholder="Father's full name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Father's Phone</label>
+                        <input type="tel" name="father_phone" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Mother's Name</label>
+                        <input type="text" name="mother_name" class="form-input" placeholder="Mother's full name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mother's Phone</label>
+                        <input type="tel" name="mother_phone" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Father's Email</label>
+                        <input type="email" name="father_email" class="form-input" placeholder="father@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Father's Occupation</label>
+                        <input type="text" name="father_occupation" class="form-input" placeholder="Occupation">
+                    </div>
+                </div>
+
+                <!-- Section: Address -->
+                <div style="background: var(--warning-light); padding: 10px 16px; border-radius: var(--radius-sm); margin: 20px 0 16px; font-weight: 600; color: var(--warning); font-size: 0.85rem;">
+                    <i class="fas fa-map-marker-alt"></i> Address & Contact
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-textarea" rows="2" placeholder="House no, street, locality"></textarea>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">City</label>
+                        <input type="text" name="city" class="form-input" placeholder="City">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">State</label>
+                        <input type="text" name="state" class="form-input" placeholder="State">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Pincode</label>
+                        <input type="text" name="pincode" class="form-input" placeholder="110001" maxlength="6">
+                    </div>
+                </div>
+
+                <!-- Section: Medical -->
+                <div style="background: var(--danger-light); padding: 10px 16px; border-radius: var(--radius-sm); margin: 20px 0 16px; font-weight: 600; color: var(--danger); font-size: 0.85rem;">
+                    <i class="fas fa-heartbeat"></i> Medical & Emergency
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Medical Conditions</label>
+                        <input type="text" name="medical_conditions" class="form-input" placeholder="Allergies, conditions (if any)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Emergency Contact</label>
+                        <input type="tel" name="emergency_contact" class="form-input" placeholder="Emergency phone number">
+                    </div>
+                </div>
+
+                <!-- Transport -->
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" name="uses_transport" value="true" style="accent-color: var(--primary); width: 18px; height: 18px;">
+                        <span class="form-label" style="margin: 0;">Uses school transport</span>
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer" style="position: sticky; bottom: 0; background: white; z-index: 10;">
+            <button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+            <button class="btn btn-success" onclick="submitStudentForm()">
+                <i class="fas fa-check"></i> Save Student
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- CSV Import Modal -->
+<div class="modal-overlay" id="importModal" style="display: none;">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-file-csv" style="color: var(--success); margin-right: 8px;"></i> Import Students from CSV</h2>
+            <button class="modal-close" onclick="closeModal('importModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div style="background: var(--info-light); padding: 16px; border-radius: var(--radius-sm); margin-bottom: 20px;">
+                <p style="font-size: 0.85rem; color: var(--info); font-weight: 500; margin-bottom: 8px;">
+                    <i class="fas fa-info-circle"></i> CSV Format Required
+                </p>
+                <p style="font-size: 0.78rem; color: var(--text-secondary);">
+                    Your CSV must have these columns (first row as header):<br>
+                    <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                        first_name, last_name, gender, date_of_birth, class_name, section_name, roll_number, admission_number, father_name, father_phone, mother_name, address, city
+                    </code>
+                </p>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+                <button class="btn btn-secondary btn-sm" onclick="downloadTemplate()">
+                    <i class="fas fa-download"></i> Download Template
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Select Class for Import <span class="required">*</span></label>
+                <select id="importClass" class="form-select">
+                    <option value="">Select Class</option>
+                    {% for cls in classes %}
+                    <option value="{{ cls.id }}" data-name="{{ cls.name }}">{{ cls.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Select Section <span class="required">*</span></label>
+                <select id="importSection" class="form-select">
+                    <option value="">Select Section</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">CSV File <span class="required">*</span></label>
+                <input type="file" id="csvFile" accept=".csv" class="form-input" style="padding: 10px;">
+            </div>
+
+            <!-- Import Preview -->
+            <div id="importPreview" style="display: none;">
+                <div style="background: var(--success-light); padding: 12px 16px; border-radius: var(--radius-sm); margin: 16px 0;">
+                    <span style="font-weight: 600; color: var(--success);"><i class="fas fa-check-circle"></i> <span id="previewCount">0</span> students ready to import</span>
+                </div>
+                <div class="table-wrapper" style="max-height: 200px; overflow-y: auto;">
+                    <table class="data-table" id="previewTable">
+                        <thead><tr><th>Name</th><th>Roll No</th><th>Father</th><th>Phone</th></tr></thead>
+                        <tbody id="previewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Import Errors -->
+            <div id="importErrors" style="display: none;">
+                <div style="background: var(--danger-light); padding: 12px 16px; border-radius: var(--radius-sm); margin: 16px 0;">
+                    <span style="font-weight: 600; color: var(--danger);"><i class="fas fa-exclamation-circle"></i> Errors found</span>
+                    <ul id="errorList" style="margin: 8px 0 0 20px; font-size: 0.82rem; color: var(--danger);"></ul>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('importModal')">Cancel</button>
+            <button class="btn btn-secondary" onclick="parseCSV()" id="parseBtn">
+                <i class="fas fa-eye"></i> Preview
+            </button>
+            <button class="btn btn-success" onclick="submitImport()" id="importBtn" style="display: none;">
+                <i class="fas fa-upload"></i> Import Students
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Class-Section mapping from server
+const classSections = {{ sections_json | safe }};
+
+function loadSections(classId) {
+    const sectionSelect = document.getElementById('studentSectionSelect');
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(sec => {
+            sectionSelect.innerHTML += `<option value="${sec.id}">${sec.name}</option>`;
+        });
+    }
+}
+
+// Filter logic
+function filterStudents() {
+    const classId = document.getElementById('filterClass').value;
+    const sectionId = document.getElementById('filterSection').value;
+
+    // Update section filter options
+    const filterSection = document.getElementById('filterSection');
+    filterSection.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(sec => {
+            filterSection.innerHTML += `<option value="${sec.id}">${sec.name}</option>`;
+        });
+    }
+
+    // Filter table rows
+    const rows = document.querySelectorAll('#studentsBody tr');
+    let visibleCount = 0;
+    rows.forEach(row => {
+        const matchClass = !classId || row.dataset.class === classId;
+        const matchSection = !sectionId || row.dataset.section === sectionId;
+        row.style.display = (matchClass && matchSection) ? '' : 'none';
+        if (matchClass && matchSection) visibleCount++;
+    });
+    document.getElementById('studentCount').textContent = `${visibleCount} student(s)`;
+}
+
+function searchStudents(query) {
+    const rows = document.querySelectorAll('#studentsBody tr');
+    const q = query.toLowerCase();
+    let visibleCount = 0;
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const show = text.includes(q);
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+    document.getElementById('studentCount').textContent = `${visibleCount} student(s)`;
+}
+
+// Submit Student
+async function submitStudentForm() {
+    const data = getFormData('addStudentForm');
+    if (!data.first_name || !data.class_id) {
+        showToast('error', 'Error', 'Name and class are required');
+        return;
+    }
+    data.uses_transport = data.uses_transport === 'true';
+    try {
+        await apiCall('/api/school/students', 'POST', data);
+        showToast('success', 'Student Added! 🎉', `${data.first_name} ${data.last_name || ''} has been enrolled`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+// CSV Import
+let parsedStudents = [];
+
+function downloadTemplate() {
+    const csv = 'first_name,last_name,gender,date_of_birth,roll_number,admission_number,father_name,father_phone,mother_name,address,city\nRahul,Sharma,male,2015-03-15,1,ADM-001,Rajesh Sharma,9876543210,Priya Sharma,"123 Main St",Delhi\nPriya,Gupta,female,2015-06-20,2,ADM-002,Amit Gupta,9876543211,Seema Gupta,"456 MG Road",Delhi';
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'student_import_template.csv';
+    a.click();
+    showToast('info', 'Template Downloaded', 'Fill the CSV and upload it');
+}
+
+function parseCSV() {
+    const file = document.getElementById('csvFile').files[0];
+    const classId = document.getElementById('importClass').value;
+    const sectionId = document.getElementById('importSection').value;
+
+    if (!file) { showToast('error', 'Error', 'Please select a CSV file'); return; }
+    if (!classId) { showToast('error', 'Error', 'Please select a class'); return; }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split('\n').filter(l => l.trim());
+        if (lines.length < 2) { showToast('error', 'Error', 'CSV is empty'); return; }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+        const errors = [];
+        parsedStudents = [];
+
+        for (let i = 1; i < lines.length; i++) {
+            const values = lines[i].match(/(".*?"|[^,]+)/g)?.map(v => v.trim().replace(/^"|"$/g, '')) || [];
+            if (values.length < 2) continue;
+
+            const row = {};
+            headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+
+            if (!row.first_name) {
+                errors.push(`Row ${i + 1}: Missing first_name`);
+                continue;
+            }
+
+            parsedStudents.push({
+                first_name: row.first_name,
+                last_name: row.last_name || '',
+                gender: row.gender || '',
+                date_of_birth: row.date_of_birth || null,
+                roll_number: row.roll_number || '',
+                admission_number: row.admission_number || '',
+                father_name: row.father_name || '',
+                father_phone: row.father_phone || '',
+                mother_name: row.mother_name || '',
+                address: row.address || '',
+                city: row.city || '',
+                class_id: classId,
+                section_id: sectionId || null,
+            });
+        }
+
+        // Show preview
+        if (parsedStudents.length > 0) {
+            document.getElementById('importPreview').style.display = 'block';
+            document.getElementById('previewCount').textContent = parsedStudents.length;
+            const tbody = document.getElementById('previewBody');
+            tbody.innerHTML = parsedStudents.slice(0, 10).map(s => `
+                <tr>
+                    <td class="text-sm">${s.first_name} ${s.last_name}</td>
+                    <td class="text-sm">${s.roll_number || '—'}</td>
+                    <td class="text-sm">${s.father_name || '—'}</td>
+                    <td class="text-sm">${s.father_phone || '—'}</td>
+                </tr>
+            `).join('');
+            if (parsedStudents.length > 10) {
+                tbody.innerHTML += `<tr><td colspan="4" class="text-center text-muted text-sm">...and ${parsedStudents.length - 10} more</td></tr>`;
+            }
+            document.getElementById('importBtn').style.display = '';
+        }
+
+        if (errors.length > 0) {
+            document.getElementById('importErrors').style.display = 'block';
+            document.getElementById('errorList').innerHTML = errors.map(e => `<li>${e}</li>`).join('');
+        } else {
+            document.getElementById('importErrors').style.display = 'none';
+        }
+    };
+    reader.readAsText(file);
+}
+
+async function submitImport() {
+    if (parsedStudents.length === 0) { showToast('error', 'Error', 'No students to import'); return; }
+    try {
+        const result = await apiCall('/api/school/students/bulk-import', 'POST', { students: parsedStudents });
+        showToast('success', 'Import Complete! 🎉', `${result.imported} students imported successfully`);
+        setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {}
+}
+
+// Load sections for import modal
+document.getElementById('importClass')?.addEventListener('change', function() {
+    const sectionSelect = document.getElementById('importSection');
+    sectionSelect.innerHTML = '<option value="">Select Section</option>';
+    const classId = this.value;
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(sec => {
+            sectionSelect.innerHTML += `<option value="${sec.id}">${sec.name}</option>`;
+        });
+    }
+});
+
+function exportStudents() {
+    showToast('info', 'Coming Soon', 'Export feature will be available in next sprint');
+}
+</script>
+{% endblock %}

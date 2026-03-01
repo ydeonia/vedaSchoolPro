@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Activities & Sports{% endblock %}
+{% block page_title %}🏆 Activities & Sports{% endblock %}
+{% block page_subtitle %}Manage events, nominations, and achievements{% endblock %}
+
+{% block extra_css %}
+<style>
+.act-tabs { display:flex; gap:4px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:16px; }
+.act-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
+.act-tab.active { background:var(--primary); color:white; }
+/* Event cards */
+.event-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+.event-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; transition:all 0.2s; }
+.event-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.ec-banner { padding:14px 16px; color:white; }
+.ec-banner.sports { background:linear-gradient(135deg,#059669,#10B981); }
+.ec-banner.cultural { background:linear-gradient(135deg,#7C3AED,#A78BFA); }
+.ec-banner.academic { background:linear-gradient(135deg,#2563EB,#60A5FA); }
+.ec-banner.arts { background:linear-gradient(135deg,#D97706,#FBBF24); }
+.ec-banner.tech { background:linear-gradient(135deg,#0891B2,#22D3EE); }
+.ec-type { font-size:0.65rem; text-transform:uppercase; font-weight:700; opacity:0.8; letter-spacing:0.5px; }
+.ec-title { font-size:1rem; font-weight:800; margin-top:2px; }
+.ec-body { padding:14px 16px; }
+.ec-meta { font-size:0.75rem; color:var(--text-secondary); margin-bottom:8px; }
+.ec-meta i { width:16px; color:var(--text-light); }
+.ec-stats { display:flex; gap:8px; margin-bottom:10px; }
+.ec-stat { padding:4px 10px; border-radius:6px; font-size:0.68rem; font-weight:700; background:var(--bg); }
+.ec-actions { display:flex; gap:6px; }
+.ec-btn { padding:6px 12px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:white; }
+.ec-btn:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
+.ec-btn.primary { background:var(--primary); color:white; border-color:var(--primary); }
+/* Create form */
+.create-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; }
+.c-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.c-grp { display:flex; flex-direction:column; gap:3px; }
+.c-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
+.c-grp input,.c-grp select,.c-grp textarea { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+.c-grp textarea { resize:vertical; min-height:60px; }
+/* Type chips */
+.type-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.tc { padding:8px 14px; border-radius:10px; font-size:0.78rem; font-weight:700; cursor:pointer; border:2px solid var(--border); }
+.tc.active { border-color:var(--primary); background:var(--primary-50); color:var(--primary); }
+.tc:hover:not(.active) { border-color:var(--primary); }
+/* Participants modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; justify-content:center; align-items:center; }
+.modal-overlay.show { display:flex; }
+.modal-box { background:white; border-radius:14px; padding:20px; width:90%; max-width:600px; max-height:80vh; overflow-y:auto; }
+.modal-box h3 { margin-bottom:14px; font-size:0.95rem; }
+.p-item { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-light); }
+.p-item:last-child { border:none; }
+.p-avatar { width:32px; height:32px; border-radius:8px; background:var(--primary-50); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.72rem; }
+.p-name { font-weight:700; font-size:0.82rem; flex:1; }
+.p-pos select { padding:4px 8px; border-radius:6px; border:1px solid var(--border); font-size:0.72rem; }
+.btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; }
+@media(max-width:768px) { .c-row { grid-template-columns:1fr; } .event-grid { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="act-tabs">
+    <div class="act-tab active" onclick="switchTab('events',this)">📅 Events</div>
+    <div class="act-tab" onclick="switchTab('create',this)">➕ Create Event</div>
+    <div class="act-tab" onclick="switchTab('achievements',this)">🏅 Achievements</div>
+</div>
+
+<div id="eventsTab"><div class="event-grid" id="eventGrid"><div style="padding:40px;text-align:center;color:var(--text-light);grid-column:1/-1;">Loading events...</div></div></div>
+
+<div id="createTab" style="display:none;">
+    <div class="create-card">
+        <h3 style="margin-bottom:14px;">➕ Create New Event / Activity</h3>
+        <div style="font-size:0.68rem;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">TYPE</div>
+        <div class="type-chips">
+            <div class="tc active" data-val="sports" onclick="selType(this)">🏏 Sports</div>
+            <div class="tc" data-val="cultural" onclick="selType(this)">🎭 Cultural</div>
+            <div class="tc" data-val="academic" onclick="selType(this)">📚 Academic</div>
+            <div class="tc" data-val="arts" onclick="selType(this)">🎨 Arts</div>
+            <div class="tc" data-val="tech" onclick="selType(this)">💻 Tech</div>
+        </div>
+        <div class="c-row">
+            <div class="c-grp"><label>Title</label><input id="evTitle" placeholder="e.g., Annual Sports Day, Inter-House Cricket"></div>
+            <div class="c-grp"><label>Category</label><input id="evCat" placeholder="e.g., Cricket, Debate, Painting"></div>
+        </div>
+        <div class="c-row">
+            <div class="c-grp"><label>Event Date</label><input type="date" id="evDate"></div>
+            <div class="c-grp"><label>Registration Deadline</label><input type="date" id="evDeadline"></div>
+        </div>
+        <div class="c-row">
+            <div class="c-grp"><label>Venue</label><input id="evVenue" placeholder="School Ground, Auditorium..."></div>
+            <div class="c-grp"><label>Max Participants</label><input type="number" id="evMax" placeholder="Leave blank for unlimited"></div>
+        </div>
+        <div class="c-grp" style="margin-bottom:12px;"><label>Description</label><textarea id="evDesc" placeholder="Event details, rules, eligibility..."></textarea></div>
+        <div class="c-grp" style="margin-bottom:12px;"><label>Eligible Classes (comma-separated, or blank=all)</label><input id="evClasses" placeholder="e.g., 8,9,10,11,12"></div>
+        <button class="btn-primary" onclick="createEvent()"><i class="fas fa-plus"></i> Create Event</button>
+    </div>
+</div>
+
+<div id="achievementsTab" style="display:none;">
+    <div id="achieveList" style="background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;">Loading...</div>
+</div>
+
+<!-- Participants Modal -->
+<div class="modal-overlay" id="partModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal-box"><h3 id="modalTitle">Participants</h3><div id="modalBody"></div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let events = [], selActivity = 'sports';
+
+function switchTab(t, btn) { document.querySelectorAll('.act-tab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); ['events','create','achievements'].forEach(x=>document.getElementById(x+'Tab').style.display=x===t?'block':'none'); }
+function selType(el) { document.querySelectorAll('.tc').forEach(x=>x.classList.remove('active')); el.classList.add('active'); selActivity = el.dataset.val; }
+
+async function loadEvents() {
+    try {
+        const res = await fetch('/api/school/activities', {credentials:'same-origin'});
+        if (!res.ok) throw new Error();
+        const d = await res.json();
+        events = d.activities || [];
+        renderEvents();
+    } catch(e) { events = []; renderEvents(); }
+}
+
+function renderEvents() {
+    const grid = document.getElementById('eventGrid');
+    if (!events.length) { grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text-light);grid-column:1/-1;"><i class="fas fa-trophy" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No events yet. Create your first activity!</div>'; return; }
+    grid.innerHTML = events.map(e => {
+        const typeLbl = {sports:'🏏 Sports',cultural:'🎭 Cultural',academic:'📚 Academic',arts:'🎨 Arts',tech:'💻 Tech'}[e.activity_type] || '📋 Event';
+        const statusColor = {upcoming:'#3B82F6',open:'#10B981',ongoing:'#F59E0B',completed:'#6B7280',cancelled:'#EF4444'}[e.status];
+        return `<div class="event-card">
+            <div class="ec-banner ${e.activity_type}"><div class="ec-type">${typeLbl}</div><div class="ec-title">${e.title}</div></div>
+            <div class="ec-body">
+                <div class="ec-meta"><i class="fas fa-calendar"></i> ${e.event_date||'TBD'}<br><i class="fas fa-map-marker-alt"></i> ${e.venue||'TBD'}</div>
+                <div class="ec-stats">
+                    <div class="ec-stat" style="color:${statusColor}">${e.status.toUpperCase()}</div>
+                    <div class="ec-stat">👥 ${e.participant_count||0} registered</div>
+                    ${e.category?`<div class="ec-stat">${e.category}</div>`:''}
+                </div>
+                <div class="ec-actions">
+                    <button class="ec-btn primary" onclick="openParticipants('${e.id}','${e.title}')">👥 Manage</button>
+                    <button class="ec-btn" onclick="addNominations('${e.id}')">➕ Nominate</button>
+                    ${e.status==='completed'?`<button class="ec-btn" onclick="viewWinners('${e.id}')">🏆 Winners</button>`:''}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function createEvent() {
+    const data = {
+        title: document.getElementById('evTitle').value.trim(),
+        activity_type: selActivity,
+        category: document.getElementById('evCat').value.trim(),
+        event_date: document.getElementById('evDate').value,
+        registration_deadline: document.getElementById('evDeadline').value,
+        venue: document.getElementById('evVenue').value.trim(),
+        max_participants: parseInt(document.getElementById('evMax').value) || null,
+        description: document.getElementById('evDesc').value.trim(),
+        eligible_classes: document.getElementById('evClasses').value.trim() ? document.getElementById('evClasses').value.split(',').map(c=>c.trim()) : null,
+    };
+    if (!data.title) { alert('Enter title'); return; }
+    try {
+        const res = await fetch('/api/school/activities', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        if (!res.ok) throw new Error();
+        alert('✅ Event created!');
+        ['evTitle','evCat','evDate','evDeadline','evVenue','evMax','evDesc','evClasses'].forEach(id=>document.getElementById(id).value='');
+        loadEvents();
+        switchTab('events', document.querySelectorAll('.act-tab')[0]);
+    } catch(e) { alert('Failed to create event'); }
+}
+
+async function openParticipants(actId, title) {
+    document.getElementById('modalTitle').textContent = '👥 ' + title + ' — Participants';
+    document.getElementById('partModal').classList.add('show');
+    try {
+        const res = await fetch(`/api/school/activities/${actId}/participants`, {credentials:'same-origin'});
+        const d = await res.json();
+        const parts = d.participants || [];
+        if (!parts.length) { document.getElementById('modalBody').innerHTML = '<p style="color:var(--text-light);text-align:center;padding:20px;">No participants yet.</p>'; return; }
+        document.getElementById('modalBody').innerHTML = parts.map(p => `<div class="p-item"><div class="p-avatar">${p.name.charAt(0)}</div><div class="p-name">${p.name} <span style="font-size:0.68rem;color:var(--text-light);">${p.class_name||''}</span></div><div class="p-pos"><select onchange="updatePosition('${actId}','${p.id}',this.value)"><option value="participant" ${p.position==='participant'?'selected':''}>Participant</option><option value="1st" ${p.position==='1st'?'selected':''}>🥇 1st</option><option value="2nd" ${p.position==='2nd'?'selected':''}>🥈 2nd</option><option value="3rd" ${p.position==='3rd'?'selected':''}>🥉 3rd</option></select></div></div>`).join('');
+    } catch(e) { document.getElementById('modalBody').innerHTML = '<p>Failed to load.</p>'; }
+}
+
+function closeModal() { document.getElementById('partModal').classList.remove('show'); }
+async function addNominations(actId) { alert('Coming: Select students from class list to nominate for this event.'); }
+async function updatePosition(actId, partId, pos) { try { await fetch(`/api/school/activities/${actId}/participants/${partId}`, {method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:pos})}); } catch(e){} }
+async function viewWinners(actId) { openParticipants(actId, 'Winners'); }
+
+loadEvents();
+</script>
+{% endblock %}

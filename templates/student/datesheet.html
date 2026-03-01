@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Datesheet{% endblock %}
+{% block page_title %}📋 Exam Datesheet{% endblock %}
+{% block page_subtitle %}Upcoming and past exam schedules{% endblock %}
+{% block content %}
+{% if datesheets %}
+{% for ds in datesheets %}
+<div class="card mb-3">
+    <div class="card-header">
+        <h2>{{ ds.exam.name }}</h2>
+        {% if ds.exam.start_date %}<span class="badge badge-info">{{ ds.exam.start_date.strftime('%d %b') }} — {{ ds.exam.end_date.strftime('%d %b %Y') if ds.exam.end_date else '' }}</span>{% endif %}
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Subject</th><th>Date</th><th>Time</th><th>Max Marks</th></tr></thead><tbody>
+        {% for p in ds.papers %}
+        <tr>
+            <td><strong>{{ p.subject }}</strong></td>
+            <td>{{ p.date.strftime('%d %b %Y') if p.date else 'TBA' }}</td>
+            <td>{{ p.time or '—' }}</td>
+            <td>{{ p.max_marks }}</td>
+        </tr>
+        {% endfor %}
+        </tbody></table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-clipboard-list"></i><h3>No Exams Scheduled</h3><p>Datesheet will appear here when exams are announced.</p></div></div></div>
+{% endif %}
+{% endblock %}

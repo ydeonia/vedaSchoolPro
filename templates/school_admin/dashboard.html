@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}Principal Dashboard{% endblock %}
+{% block page_title %}Command Center{% endblock %}
+{% block page_subtitle %}Welcome back, {{ user.first_name }}! Here's what needs your attention today.{% endblock %}
+
+{% block extra_css %}
+<style>
+    .live-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .live-card { background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 18px 20px; position: relative; overflow: hidden; border:1px solid var(--border-light, #f1f5f9); transition:all 0.3s; }
+    .live-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(0,0,0,0.08);}
+    .live-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+    .live-card.green::before { background: linear-gradient(90deg, #22C55E, #4ADE80); }
+    .live-card.red::before { background: linear-gradient(90deg, #EF4444, #F87171); }
+    .live-card.blue::before { background: linear-gradient(90deg, #3B82F6, #60A5FA); }
+    .live-card.orange::before { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
+    .live-card.purple::before { background: linear-gradient(90deg, #8B5CF6, #A78BFA); }
+    .live-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light); font-weight: 700; }
+    .live-value { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 4px 0; }
+    .live-sub { font-size: 0.78rem; color: var(--text-secondary); }
+    .live-icon { position: absolute; top: 16px; right: 16px; font-size: 1.4rem; opacity: 0.15; }
+    .live-pulse { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E; margin-right: 6px; animation: pulse-dot 1.5s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .ring-container { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+    .ring-svg { width: 52px; height: 52px; transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: var(--border, #E5E7EB); stroke-width: 6; }
+    .ring-fg { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+    .alerts-strip { margin-bottom: 20px; }
+    .alert-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: transform 0.15s; text-decoration: none; }
+    .alert-item:hover { transform: translateX(4px); }
+    .alert-item.danger { background: rgba(220,38,38,0.08); color: #EF4444; border-left: 4px solid #EF4444; }
+    .alert-item.warning { background: rgba(217,119,6,0.08); color: #D97706; border-left: 4px solid #F59E0B; }
+    .alert-item.info { background: rgba(37,99,235,0.08); color: #3B82F6; border-left: 4px solid #3B82F6; }
+    .alert-item i { width: 18px; text-align: center; }
+    .alert-item .alert-go { margin-left: auto; font-size: 0.72rem; opacity: 0.5; }
+    .cmd-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 20px; }
+    .cmd-card { background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; border:1px solid var(--border-light, #f1f5f9); }
+    .cmd-card h3 { font-size: 0.88rem; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; color: var(--text-primary); }
+    .traffic-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-left: 6px; }
+    .traffic-dot.green { background: #22C55E; }
+    .traffic-dot.yellow { background: #F59E0B; }
+    .traffic-dot.red { background: #EF4444; }
+    .fee-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-light); font-size: 0.82rem; }
+    .fee-row:last-child { border: none; }
+    .fee-row .fee-label { color: var(--text-secondary); }
+    .fee-row .fee-val { font-weight: 800; }
+    .fee-val.green { color: var(--success); }
+    .fee-val.red { color: var(--danger); }
+    .fee-val.orange { color: var(--warning); }
+    .qa-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+    .qa-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 10px; border-radius: var(--radius); background: var(--bg-secondary); text-align: center; cursor: pointer; transition: all 0.2s; text-decoration: none; color: var(--text-primary); }
+    .qa-card:hover { background: var(--primary-50, rgba(99,102,241,0.1)); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+    .qa-card i { font-size: 1.3rem; color: var(--primary); }
+    .qa-card span { font-size: 0.72rem; font-weight: 600; }
+    /* Pending action links - dark mode safe */
+    .pending-action { text-decoration:none; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); background:var(--bg-secondary); transition:all 0.2s; }
+    .pending-action:hover { transform:translateX(3px); }
+    .pending-action.has-items { background:rgba(217,119,6,0.08); }
+    .pending-action.has-danger { background:rgba(220,38,38,0.08); }
+    .pending-action span.pa-label { flex:1; font-size:0.82rem; font-weight:600; color:var(--text-primary); }
+    .pending-badge { padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:800; background:var(--border); color:var(--text-light); }
+    .pending-badge.active { background:var(--warning); color:white; }
+    .pending-badge.danger { background:var(--danger); color:white; }
+    /* Milestones */
+    .achievement-badge { padding:8px 14px; border-radius:10px; font-size:0.78rem; font-weight:700; }
+    .achievement-badge.gold { background:rgba(245,158,11,0.12); color:#D97706; }
+    .achievement-badge.green { background:rgba(34,197,94,0.12); color:#059669; }
+    @media (max-width: 1024px) { .live-grid { grid-template-columns: repeat(2, 1fr); } .cmd-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .live-grid { grid-template-columns: 1fr; } .qa-grid { grid-template-columns: repeat(3, 1fr); } }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if alerts %}
+<div class="alerts-strip">
+    {% for a in alerts %}
+    <a href="{{ a.link }}" class="alert-item {{ a.type }}">
+        <i class="fas {{ a.icon }}"></i>
+        <span>{{ a.text }}</span>
+        <span class="alert-go">Fix →</span>
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="live-grid">
+    <div class="live-card green">
+        <i class="fas fa-user-graduate live-icon"></i>
+        <div class="live-label"><span class="live-pulse"></span>Student Attendance Today</div>
+        <div class="live-value" style="color:{% if live.att_pct >= 85 %}var(--success){% elif live.att_pct >= 70 %}var(--warning){% else %}var(--danger){% endif %};">{{ live.att_pct }}%<span class="traffic-dot {% if live.att_pct >= 85 %}green{% elif live.att_pct >= 70 %}yellow{% else %}red{% endif %}"></span></div>
+        <div class="live-sub">{{ live.students_present }} present · {{ live.students_absent }} absent{% if live.students_marked == 0 %} · <strong style="color:var(--danger);">Not marked yet</strong>{% endif %}</div>
+    </div>
+    <div class="live-card blue">
+        <i class="fas fa-chalkboard-teacher live-icon"></i>
+        <div class="live-label"><span class="live-pulse"></span>Teachers Today</div>
+        <div class="live-value" style="color:var(--primary);">{{ live.teachers_present }}<span style="font-size:0.9rem;color:var(--text-light);">/{{ stats.total_teachers }}</span></div>
+        <div class="live-sub">{% if live.teachers_absent > 0 %}<span style="color:var(--danger);font-weight:700;">{{ live.teachers_absent }} absent</span> · {% endif %}{% if live.teachers_on_leave > 0 %}{{ live.teachers_on_leave }} on leave · {% endif %}{{ live.teachers_present }} present</div>
+    </div>
+    <div class="live-card purple">
+        <i class="fas fa-clock live-icon"></i>
+        <div class="live-label">Periods Completed Today</div>
+        <div class="ring-container">
+            {% set pct = ((live.periods_done / live.periods_expected * 100) if live.periods_expected > 0 else 0)|round|int %}
+            <svg class="ring-svg" viewBox="0 0 36 36">
+                <circle class="ring-bg" cx="18" cy="18" r="15.91"></circle>
+                <circle class="ring-fg" cx="18" cy="18" r="15.91" stroke="{% if pct >= 80 %}#22C55E{% elif pct >= 50 %}#F59E0B{% else %}#8B5CF6{% endif %}" stroke-dasharray="{{ pct }}, 100"></circle>
+            </svg>
+            <div>
+                <div style="font-size:1.4rem;font-weight:800;">{{ live.periods_done }}<span style="font-size:0.8rem;color:var(--text-light);">/{{ live.periods_expected }}</span></div>
+                <div style="font-size:0.72rem;color:var(--text-light);">periods taken</div>
+            </div>
+        </div>
+    </div>
+    <div class="live-card orange">
+        <i class="fas fa-rupee-sign live-icon"></i>
+        <div class="live-label">Fee Collection</div>
+        <div class="live-value" style="color:var(--success);">₹{{ "{:,.0f}".format(live.fee_today) }}</div>
+        <div class="live-sub">collected today{% if live.fee_overdue_students > 0 %} · <span style="color:var(--danger);font-weight:700;">{{ live.fee_overdue_students }} defaulters</span>{% endif %}</div>
+    </div>
+</div>
+
+<div class="cmd-grid">
+    <div class="cmd-card">
+        <h3><i class="fas fa-indian-rupee-sign" style="color:var(--success);"></i> Fee Summary — This Month{% if live.fee_overdue_students > 0 %}<span class="traffic-dot red"></span>{% else %}<span class="traffic-dot green"></span>{% endif %}</h3>
+        <div class="fee-row"><span class="fee-label">Collected Today</span><span class="fee-val green">₹{{ "{:,.0f}".format(live.fee_today) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Collected This Month</span><span class="fee-val green">₹{{ "{:,.0f}".format(live.fee_month) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Total Pending</span><span class="fee-val orange">₹{{ "{:,.0f}".format(live.fee_pending) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Students with Overdue</span><span class="fee-val red">{{ live.fee_overdue_students }}</span></div>
+        <a href="/school/fee-collection" class="btn btn-primary btn-sm mt-2" style="width:100%;"><i class="fas fa-hand-holding-usd"></i> Collect Fees</a>
+    </div>
+
+    <div class="cmd-card">
+        <h3><i class="fas fa-clipboard-check" style="color:var(--primary);"></i> Attendance Snapshot{% if live.att_pct >= 85 %}<span class="traffic-dot green"></span>{% elif live.att_pct >= 70 %}<span class="traffic-dot yellow"></span>{% else %}<span class="traffic-dot red"></span>{% endif %}</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;text-align:center;margin:12px 0;">
+            <div><div style="font-size:1.8rem;font-weight:800;color:var(--success);">{{ live.students_present }}</div><div style="font-size:0.72rem;color:var(--text-light);">Present</div></div>
+            <div><div style="font-size:1.8rem;font-weight:800;color:var(--danger);">{{ live.students_absent }}</div><div style="font-size:0.72rem;color:var(--text-light);">Absent</div></div>
+            <div><div style="font-size:1.8rem;font-weight:800;color:var(--text-secondary);">{{ stats.total_students - live.students_marked }}</div><div style="font-size:0.72rem;color:var(--text-light);">Not Marked</div></div>
+        </div>
+        <div style="height:8px;border-radius:4px;background:var(--border, #E5E7EB);overflow:hidden;">
+            {% if stats.total_students > 0 %}<div style="height:100%;width:{{ (live.students_present / stats.total_students * 100)|round }}%;background:linear-gradient(90deg,#22C55E,#4ADE80);border-radius:4px;transition:width 1s;"></div>{% endif %}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-light);margin-top:6px;text-align:center;">{{ live.students_marked }}/{{ stats.total_students }} students marked today</div>
+        <a href="/school/attendance" class="btn btn-secondary btn-sm mt-2" style="width:100%;"><i class="fas fa-clipboard-check"></i> Mark Attendance</a>
+    </div>
+
+    <div class="cmd-card">
+        <h3><i class="fas fa-tasks" style="color:var(--warning);"></i> Pending Actions</h3>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+            <a href="/school/leave-management" class="pending-action {% if live.pending_leaves > 0 %}has-items{% endif %}">
+                <i class="fas fa-calendar-minus" style="color:var(--warning);width:18px;"></i>
+                <span class="pa-label">Leave Requests</span>
+                <span class="pending-badge {% if live.pending_leaves > 0 %}active{% endif %}">{{ live.pending_leaves }}</span>
+            </a>
+            <a href="/school/teacher-attendance" class="pending-action {% if live.teachers_absent > 0 %}has-danger{% endif %}">
+                <i class="fas fa-user-times" style="color:var(--danger);width:18px;"></i>
+                <span class="pa-label">Absent Teachers</span>
+                <span class="pending-badge {% if live.teachers_absent > 0 %}danger{% endif %}">{{ live.teachers_absent }}</span>
+            </a>
+            <a href="/school/fee-collection" class="pending-action {% if live.fee_overdue_students > 0 %}has-danger{% endif %}">
+                <i class="fas fa-rupee-sign" style="color:var(--danger);width:18px;"></i>
+                <span class="pa-label">Fee Defaulters</span>
+                <span class="pending-badge {% if live.fee_overdue_students > 0 %}danger{% endif %}">{{ live.fee_overdue_students }}</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="cmd-card">
+        <h3><i class="fas fa-school" style="color:var(--primary);"></i> School Overview</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;text-align:center;">
+            <div><div style="font-size:2rem;font-weight:800;color:var(--primary);">{{ stats.total_students }}</div><div style="font-size:0.72rem;color:var(--text-light);">Students</div></div>
+            <div><div style="font-size:2rem;font-weight:800;color:var(--success);">{{ stats.total_teachers }}</div><div style="font-size:0.72rem;color:var(--text-light);">Teachers</div></div>
+            <div><div style="font-size:2rem;font-weight:800;color:var(--warning);">{{ stats.total_classes }}</div><div style="font-size:0.72rem;color:var(--text-light);">Classes</div></div>
+        </div>
+        {% if academic_year %}
+        <div style="text-align:center;margin-top:14px;"><span class="badge badge-success"><i class="fas fa-calendar"></i> {{ academic_year.label }}</span></div>
+        {% else %}
+        <div style="text-align:center;margin-top:14px;"><a href="/school/academic-years" class="badge badge-warning" style="text-decoration:none;"><i class="fas fa-exclamation-triangle"></i> Set Academic Year</a></div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Milestones & Streaks -->
+<div class="card" style="border-left: 4px solid #F59E0B;">
+    <div class="card-header"><h2><i class="fas fa-fire" style="color:#F59E0B;"></i> Today's Milestones</h2></div>
+    <div class="card-body" style="display:flex; flex-wrap:wrap; gap:10px;">
+        {% if live.att_pct >= 95 %}
+        <div class="achievement-badge gold">🏆 95%+ Attendance Today</div>
+        {% elif live.att_pct >= 85 %}
+        <div class="achievement-badge green">✅ 85%+ Attendance — Great!</div>
+        {% endif %}
+        {% if live.periods_done > 0 and live.periods_expected > 0 and live.periods_done == live.periods_expected %}
+        <div class="achievement-badge gold">⚡ All Periods Completed!</div>
+        {% elif live.periods_done > 0 and live.periods_expected > 0 and (live.periods_done / live.periods_expected * 100) >= 80 %}
+        <div class="achievement-badge green">📚 80%+ Periods Done</div>
+        {% endif %}
+        {% if live.pending_leaves == 0 %}
+        <div class="achievement-badge green">📋 Zero Pending Leaves</div>
+        {% endif %}
+        {% if live.fee_today > 0 %}
+        <div class="achievement-badge gold">💰 ₹{{ "{:,.0f}".format(live.fee_today) }} Collected Today!</div>
+        {% endif %}
+        {% if live.att_pct < 85 and (live.periods_done == 0 or live.periods_expected == 0) and live.pending_leaves > 0 %}
+        <div style="font-size:0.82rem; color:var(--text-light);"><i class="fas fa-info-circle"></i> Complete tasks to unlock milestones! Mark attendance, complete periods, clear leaves.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2><i class="fas fa-bolt" style="color:var(--warning);"></i> Quick Actions</h2></div>
+    <div class="card-body">
+        <div class="qa-grid">
+            <a href="/school/attendance" class="qa-card"><i class="fas fa-clipboard-check"></i><span>Mark Attendance</span></a>
+            <a href="/school/timetable" class="qa-card"><i class="fas fa-calendar-week"></i><span>Timetable</span></a>
+            <a href="/school/fee-collection" class="qa-card"><i class="fas fa-hand-holding-usd"></i><span>Collect Fees</span></a>
+            <a href="/school/marks-entry" class="qa-card"><i class="fas fa-pen"></i><span>Enter Marks</span></a>
+            <a href="/school/teacher-attendance" class="qa-card"><i class="fas fa-user-check"></i><span>Teacher Att.</span></a>
+            <a href="/school/leave-management" class="qa-card"><i class="fas fa-calendar-minus"></i><span>Leaves</span></a>
+            <a href="/school/students" class="qa-card"><i class="fas fa-user-graduate"></i><span>Students</span></a>
+            <a href="/school/exams" class="qa-card"><i class="fas fa-file-alt"></i><span>Exams</span></a>
+            <a href="/school/results" class="qa-card"><i class="fas fa-trophy"></i><span>Results</span></a>
+            <a href="/school/payment-settings" class="qa-card"><i class="fas fa-credit-card"></i><span>Payment Config</span></a>
+        </div>
+    </div>
+</div>
+{% endblock %}

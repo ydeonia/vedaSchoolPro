@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Employees{% endblock %}
+{% block page_title %}👥 Employee Management{% endblock %}
+{% block page_subtitle %}All staff — Teaching & Non-Teaching{% endblock %}
+{% block extra_css %}
+<style>
+.emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.emp-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:16px;border-left:4px solid var(--primary);transition:all 0.15s;}
+.emp-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
+.emp-name{font-weight:900;font-size:0.95rem;}.emp-desig{font-size:0.82rem;color:var(--primary);font-weight:700;}
+.emp-meta{font-size:0.72rem;color:var(--text-light);margin-top:2px;}
+.emp-detail{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+.emp-tag{padding:2px 6px;border-radius:4px;font-size:0.62rem;font-weight:700;background:var(--bg);}
+.emp-actions{display:flex;gap:6px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border-light);}
+.ea-btn{padding:5px 10px;border-radius:8px;font-size:0.70rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;display:flex;align-items:center;gap:4px;text-decoration:none;color:inherit;}
+.ea-btn:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
+.ea-btn.danger:hover{background:#FEE2E2;border-color:#DC2626;color:#DC2626;}
+.form-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.60rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select,.f-grp textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.btn-secondary{padding:10px 20px;border-radius:10px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);font-weight:700;cursor:pointer;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;}
+.modal-box{background:white;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;}
+.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.filter-bar select,.filter-bar input{padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;}
+@media(max-width:768px){.f-grid{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="form-card">
+    <div style="display:flex;align-items:center;">
+        <h2 style="flex:1;font-size:1rem;">Add Employee</h2>
+        <button class="btn-primary" onclick="document.getElementById('addForm').style.display=document.getElementById('addForm').style.display==='none'?'block':'none'"><i class="fas fa-plus"></i> New Employee</button>
+    </div>
+    <div id="addForm" style="display:none;margin-top:14px;">
+        <div class="f-grid">
+            <div class="f-grp"><label>First Name *</label><input id="eFname"></div>
+            <div class="f-grp"><label>Last Name</label><input id="eLname"></div>
+            <div class="f-grp"><label>Phone</label><input id="ePhone"></div>
+            <div class="f-grp"><label>Email</label><input id="eEmail" type="email"></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Type</label><select id="eType"><option value="non_teaching">Non-Teaching</option><option value="teaching">Teaching</option><option value="admin">Admin</option><option value="support">Support</option></select></div>
+            <div class="f-grp"><label>Designation</label><input id="eDesig" placeholder="Clerk, Driver..."></div>
+            <div class="f-grp"><label>Department</label><input id="eDept"></div>
+            <div class="f-grp"><label>Gender</label><select id="eGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Blood Group</label><select id="eBlood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+            <div class="f-grp"><label>Date of Joining</label><input id="eDOJ" type="date"></div>
+            <div class="f-grp"><label>Date of Birth</label><input id="eDOB" type="date"></div>
+            <div class="f-grp"><label>Basic Salary ₹</label><input id="eBasic" type="number"></div>
+        </div>
+        <div class="f-grid" style="grid-template-columns:1fr 1fr;"><div class="f-grp"><label>Address</label><input id="eAddr"></div><div class="f-grp"><label>Emergency Phone</label><input id="eEmPhone"></div></div>
+        <button class="btn-primary" onclick="addEmployee()"><i class="fas fa-save"></i> Save</button>
+    </div>
+</div>
+<div class="filter-bar">
+    <select id="filterType" onchange="filterEmp()"><option value="">All Types</option><option value="teaching">Teaching</option><option value="non_teaching">Non-Teaching</option><option value="admin">Admin</option><option value="support">Support</option></select>
+    <input id="filterSearch" placeholder="🔍 Search name..." oninput="filterEmp()">
+</div>
+<div class="emp-grid" id="empGrid">
+    {% for e in employees %}
+    <div class="emp-card" data-type="{{ e.employee_type.value }}" data-name="{{ e.full_name|lower }}">
+        <div class="emp-name">{{ e.full_name }}</div>
+        <div class="emp-desig">{{ e.designation or 'Staff' }}</div>
+        <div class="emp-meta">{{ e.department or '' }} · {{ e.employee_type.value|replace('_',' ')|title }} · {{ e.employee_code or '' }}</div>
+        <div class="emp-detail">
+            {% if e.phone %}<span class="emp-tag">📞 {{ e.phone }}</span>{% endif %}
+            {% if e.blood_group %}<span class="emp-tag">🩸 {{ e.blood_group }}</span>{% endif %}
+            {% if e.gender %}<span class="emp-tag">{{ e.gender }}</span>{% endif %}
+            {% if e.date_of_joining %}<span class="emp-tag">📅 {{ e.date_of_joining.strftime('%d %b %Y') }}</span>{% endif %}
+        </div>
+        {% if e.address %}<div class="emp-meta" style="margin-top:4px;">📍 {{ e.address[:60] }}{% if e.address|length > 60 %}...{% endif %}</div>{% endif %}
+        <div class="emp-actions">
+            <button class="ea-btn" onclick="openEdit('{{ e.id }}')"><i class="fas fa-edit"></i> Edit</button>
+            <a href="/api/school/hr/employee-id-card/{{ e.id }}" target="_blank" class="ea-btn"><i class="fas fa-id-card"></i> ID Card</a>
+            <button class="ea-btn danger" onclick="if(confirm('Remove?'))apiCall('/api/school/hr/employees/{{ e.id }}','DELETE').then(()=>location.reload())"><i class="fas fa-trash"></i></button>
+        </div>
+    </div>
+    {% endfor %}
+    {% if not employees %}<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--text-light);"><i class="fas fa-users" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No employees yet.</div>{% endif %}
+</div>
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <div style="display:flex;align-items:center;margin-bottom:16px;"><h3 style="flex:1;">✏️ Edit Employee</h3><button style="background:none;border:none;font-size:1.3rem;cursor:pointer;" onclick="closeEdit()">✕</button></div>
+        <input type="hidden" id="editId">
+        <div class="f-grid">
+            <div class="f-grp"><label>First Name</label><input id="edFname"></div>
+            <div class="f-grp"><label>Last Name</label><input id="edLname"></div>
+            <div class="f-grp"><label>Phone</label><input id="edPhone"></div>
+            <div class="f-grp"><label>Email</label><input id="edEmail" type="email"></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Type</label><select id="edType"><option value="non_teaching">Non-Teaching</option><option value="teaching">Teaching</option><option value="admin">Admin</option><option value="support">Support</option></select></div>
+            <div class="f-grp"><label>Designation</label><input id="edDesig"></div>
+            <div class="f-grp"><label>Department</label><input id="edDept"></div>
+            <div class="f-grp"><label>Gender</label><select id="edGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Blood Group</label><select id="edBlood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+            <div class="f-grp"><label>Date of Joining</label><input id="edDOJ" type="date"></div>
+            <div class="f-grp"><label>Date of Birth</label><input id="edDOB" type="date"></div>
+            <div class="f-grp"><label>Basic Salary ₹</label><input id="edBasic" type="number"></div>
+        </div>
+        <div class="f-grid" style="grid-template-columns:1fr;"><div class="f-grp"><label>Address</label><textarea id="edAddr" rows="2"></textarea></div></div>
+        <div class="f-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>PAN</label><input id="edPan"></div>
+            <div class="f-grp"><label>Aadhaar</label><input id="edAadhaar"></div>
+        </div>
+        <div class="f-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>Bank Account</label><input id="edBank"></div>
+            <div class="f-grp"><label>IFSC</label><input id="edIFSC"></div>
+        </div>
+        <div class="f-grid" style="grid-template-columns:1fr 1fr;">
+            <div class="f-grp"><label>Emergency Name</label><input id="edEmName"></div>
+            <div class="f-grp"><label>Emergency Phone</label><input id="edEmPhone"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button class="btn-primary" onclick="saveEdit()"><i class="fas fa-save"></i> Save</button>
+            <button class="btn-secondary" onclick="closeEdit()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function filterEmp(){const t=document.getElementById('filterType').value,s=document.getElementById('filterSearch').value.toLowerCase();
+document.querySelectorAll('.emp-card').forEach(c=>{c.style.display=(!t||c.dataset.type===t)&&(!s||c.dataset.name.includes(s))?'block':'none';});}
+
+async function addEmployee(){
+    const d={first_name:document.getElementById('eFname').value,last_name:document.getElementById('eLname').value,phone:document.getElementById('ePhone').value,email:document.getElementById('eEmail').value,employee_type:document.getElementById('eType').value,designation:document.getElementById('eDesig').value,department:document.getElementById('eDept').value,gender:document.getElementById('eGender').value,blood_group:document.getElementById('eBlood').value,date_of_joining:document.getElementById('eDOJ').value||null,date_of_birth:document.getElementById('eDOB').value||null,address:document.getElementById('eAddr').value,emergency_contact_phone:document.getElementById('eEmPhone').value,basic_salary:parseFloat(document.getElementById('eBasic').value)||0};
+    if(!d.first_name){showToast('error','First name required');return;}
+    await apiCall('/api/school/hr/employees/create','POST',d);showToast('success','Employee Added');setTimeout(()=>location.reload(),800);}
+
+async function openEdit(id){
+    try{const r=await fetch('/api/school/hr/employees/'+id,{credentials:'same-origin'});const d=await r.json();const e=d.employee;if(!e)return;
+    document.getElementById('editId').value=id;
+    ['Fname','Lname','Phone','Email','Desig','Dept'].forEach(f=>{const el=document.getElementById('ed'+f);if(el)el.value=e[{Fname:'first_name',Lname:'last_name',Phone:'phone',Email:'email',Desig:'designation',Dept:'department'}[f]]||'';});
+    document.getElementById('edType').value=e.employee_type||'non_teaching';
+    document.getElementById('edGender').value=e.gender||'';
+    document.getElementById('edBlood').value=e.blood_group||'';
+    document.getElementById('edDOJ').value=e.date_of_joining||'';
+    document.getElementById('edDOB').value=e.date_of_birth||'';
+    document.getElementById('edBasic').value=e.basic_salary||'';
+    document.getElementById('edAddr').value=e.address||'';
+    document.getElementById('edPan').value=e.pan_number||'';
+    document.getElementById('edAadhaar').value=e.aadhaar_number||'';
+    document.getElementById('edBank').value=e.bank_account||'';
+    document.getElementById('edIFSC').value=e.bank_ifsc||'';
+    document.getElementById('edEmName').value=e.emergency_contact_name||'';
+    document.getElementById('edEmPhone').value=e.emergency_contact_phone||'';
+    document.getElementById('editModal').style.display='flex';}catch(e){showToast('error','Load failed');}}
+
+function closeEdit(){document.getElementById('editModal').style.display='none';}
+
+async function saveEdit(){
+    const id=document.getElementById('editId').value;
+    const d={first_name:document.getElementById('edFname').value,last_name:document.getElementById('edLname').value,phone:document.getElementById('edPhone').value,email:document.getElementById('edEmail').value,employee_type:document.getElementById('edType').value,designation:document.getElementById('edDesig').value,department:document.getElementById('edDept').value,gender:document.getElementById('edGender').value,blood_group:document.getElementById('edBlood').value,date_of_joining:document.getElementById('edDOJ').value||null,date_of_birth:document.getElementById('edDOB').value||null,address:document.getElementById('edAddr').value,basic_salary:parseFloat(document.getElementById('edBasic').value)||0,pan_number:document.getElementById('edPan').value,aadhaar_number:document.getElementById('edAadhaar').value,bank_account:document.getElementById('edBank').value,bank_ifsc:document.getElementById('edIFSC').value,emergency_contact_name:document.getElementById('edEmName').value,emergency_contact_phone:document.getElementById('edEmPhone').value};
+    await apiCall('/api/school/hr/employees/'+id,'PUT',d);showToast('success','Updated');closeEdit();setTimeout(()=>location.reload(),500);}
+</script>
+{% endblock %}

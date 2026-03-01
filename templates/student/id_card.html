@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}My ID Card{% endblock %}
+{% block page_title %}🪪 My ID Card{% endblock %}
+{% block page_subtitle %}Digital student identity card{% endblock %}
+{% block extra_css %}
+<style>
+.id-card{max-width:400px;margin:0 auto;background:linear-gradient(135deg,#1a1a2e,#16213e);color:white;border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.25);}
+.id-header{background:linear-gradient(90deg,#e94560,#0f3460);padding:16px;text-align:center;}
+.id-header h3{margin:0;font-size:1rem;letter-spacing:1px;}
+.id-header p{margin:2px 0 0;font-size:0.75rem;opacity:0.9;}
+.id-body{padding:20px;display:flex;gap:16px;align-items:center;}
+.id-photo{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:2rem;border:3px solid white;}
+.id-info{flex:1;}
+.id-info .name{font-size:1.2rem;font-weight:800;}
+.id-info .detail{font-size:0.8rem;opacity:0.85;margin-top:2px;}
+.id-footer{background:rgba(255,255,255,0.08);padding:12px 20px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.78rem;}
+.id-footer .label{opacity:0.6;}
+.id-footer .value{font-weight:700;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="id-card">
+    <div class="id-header">
+        <h3>{{ branch.name if branch else 'School' }}</h3>
+        <p>{{ branch.city if branch else '' }} · {{ branch.affiliation_number if branch else '' }}</p>
+    </div>
+    <div class="id-body">
+        <div class="id-photo">{{ student.first_name[0] }}</div>
+        <div class="id-info">
+            <div class="name">{{ student.full_name }}</div>
+            <div class="detail">{{ student.class_.name if student.class_ else '' }} — {{ student.section.name if student.section else '' }}</div>
+            <div class="detail">Roll: {{ student.roll_number or '—' }}</div>
+        </div>
+    </div>
+    <div class="id-footer">
+        <div><div class="label">Admission No</div><div class="value">{{ student.admission_number or '—' }}</div></div>
+        <div><div class="label">Blood Group</div><div class="value">{{ student.blood_group or '—' }}</div></div>
+        <div><div class="label">Father's Name</div><div class="value">{{ student.father_name or '—' }}</div></div>
+        <div><div class="label">Contact</div><div class="value">{{ student.father_phone or student.mother_phone or '—' }}</div></div>
+        <div><div class="label">DOB</div><div class="value">{{ student.date_of_birth.strftime('%d %b %Y') if student.date_of_birth else '—' }}</div></div>
+        <div><div class="label">Address</div><div class="value">{{ student.city or '' }}, {{ student.pincode or '' }}</div></div>
+    </div>
+</div>
+<div style="text-align:center;margin-top:16px;"><button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Print ID Card</button></div>
+{% endblock %}

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Leave{% endblock %}
+{% block page_title %}Leave Management{% endblock %}
+{% block page_subtitle %}Apply for leave and track requests{% endblock %}
+
+{% block extra_css %}
+<style>
+.leave-layout { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+/* Apply form */
+.leave-form { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; }
+.leave-form h3 { font-size:0.92rem; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.lf-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.lf-group { display:flex; flex-direction:column; gap:3px; }
+.lf-group label { font-size:0.68rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.3px; }
+.lf-group input,.lf-group select,.lf-group textarea { padding:9px 12px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; }
+.lf-group input:focus,.lf-group select:focus,.lf-group textarea:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+.lf-group textarea { resize:vertical; min-height:60px; }
+/* Type chips */
+.type-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+.type-chip { padding:6px 12px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:white; transition:all 0.15s; }
+.type-chip:hover { border-color:var(--primary); background:var(--primary-50); }
+.type-chip.active { background:var(--primary); color:white; border-color:var(--primary); }
+.lf-submit { width:100%; padding:10px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; font-size:0.85rem; cursor:pointer; margin-top:6px; }
+.lf-submit:hover { background:#4F46E5; }
+.lf-submit:disabled { opacity:0.5; cursor:not-allowed; }
+/* Days counter */
+.days-badge { display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:10px; background:#EEF2FF; color:#6366F1; font-weight:700; font-size:0.82rem; margin-bottom:10px; }
+/* History */
+.leave-history { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; max-height:calc(100vh - 200px); overflow-y:auto; }
+.leave-history h3 { font-size:0.92rem; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.leave-item { display:flex; align-items:flex-start; gap:12px; padding:12px; border-radius:10px; margin-bottom:8px; background:var(--bg); transition:background 0.15s; }
+.leave-item:hover { background:var(--bg-secondary); }
+.li-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:0.88rem; flex-shrink:0; }
+.li-icon.pending { background:#FEF3C7; } .li-icon.approved { background:#D1FAE5; }
+.li-icon.rejected { background:#FEE2E2; } .li-icon.cancelled { background:#F1F5F9; }
+.li-info { flex:1; min-width:0; }
+.li-type { font-weight:700; font-size:0.82rem; display:flex; align-items:center; gap:6px; }
+.li-dates { font-size:0.72rem; color:var(--text-secondary); margin-top:2px; }
+.li-reason { font-size:0.72rem; color:var(--text-light); margin-top:2px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.li-admin { font-size:0.68rem; color:var(--primary); margin-top:2px; }
+.status-pill { padding:3px 10px; border-radius:12px; font-size:0.65rem; font-weight:700; flex-shrink:0; }
+.status-pill.pending { background:#FEF3C7; color:#D97706; } .status-pill.approved { background:#D1FAE5; color:#059669; }
+.status-pill.rejected { background:#FEE2E2; color:#DC2626; } .status-pill.cancelled { background:#F1F5F9; color:#94A3B8; }
+.cancel-btn { font-size:0.65rem; color:var(--danger); cursor:pointer; border:none; background:none; font-weight:700; padding:2px 0; }
+.cancel-btn:hover { text-decoration:underline; }
+.empty-history { text-align:center; padding:40px 20px; color:var(--text-light); }
+.empty-history i { font-size:2rem; opacity:0.2; margin-bottom:8px; display:block; }
+.toast { position:fixed; bottom:20px; right:20px; padding:12px 24px; border-radius:10px; color:white; font-weight:700; z-index:999; animation:slideIn 0.3s; }
+.toast.success { background:#059669; } .toast.error { background:#DC2626; }
+@keyframes slideIn { from { opacity:0; transform:translateY(20px); } }
+@media(max-width:768px) { .leave-layout { grid-template-columns:1fr; } .lf-row { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="leave-layout">
+    <!-- Apply Form -->
+    <div class="leave-form">
+        <h3>📝 Apply for Leave</h3>
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">Leave Type</div>
+        <div class="type-chips" id="typeChips">
+            <div class="type-chip active" data-val="casual" onclick="selectType(this)">🏖️ Casual</div>
+            <div class="type-chip" data-val="sick" onclick="selectType(this)">🤒 Sick</div>
+            <div class="type-chip" data-val="earned" onclick="selectType(this)">💰 Earned</div>
+            <div class="type-chip" data-val="compensatory" onclick="selectType(this)">🔄 Comp-Off</div>
+            <div class="type-chip" data-val="unpaid" onclick="selectType(this)">📋 Unpaid</div>
+            <div class="type-chip" data-val="other" onclick="selectType(this)">📌 Other</div>
+        </div>
+        <div class="lf-row">
+            <div class="lf-group"><label>From Date</label><input type="date" id="leaveStart" onchange="calcDays()"></div>
+            <div class="lf-group"><label>To Date</label><input type="date" id="leaveEnd" onchange="calcDays()"></div>
+        </div>
+        <div class="days-badge" id="daysBadge" style="display:none;">📅 <span id="daysCount">0</span> day(s)</div>
+        <div class="lf-group" style="margin-bottom:10px;">
+            <label>Reason</label>
+            <textarea id="leaveReason" placeholder="Brief reason for your leave..."></textarea>
+        </div>
+        <button class="lf-submit" onclick="applyLeave()" id="applyBtn"><i class="fas fa-paper-plane"></i> Submit Leave Request</button>
+    </div>
+
+    <!-- History -->
+    <div class="leave-history">
+        <h3>📋 My Requests <span id="histCount" style="font-size:0.72rem;color:var(--text-light);font-weight:400;"></span></h3>
+        <div id="leaveHistory"><div class="empty-history"><i class="fas fa-spinner fa-spin"></i>Loading...</div></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedType = 'casual';
+const ICONS = {casual:'🏖️',sick:'🤒',earned:'💰',compensatory:'🔄',maternity:'🤰',paternity:'👶',unpaid:'📋',other:'📌'};
+const STATUS_IC = {pending:'⏳',approved:'✅',rejected:'❌',cancelled:'🚫'};
+
+// Default dates
+const tmr = new Date(); tmr.setDate(tmr.getDate()+1);
+document.getElementById('leaveStart').value = tmr.toISOString().split('T')[0];
+document.getElementById('leaveEnd').value = tmr.toISOString().split('T')[0];
+calcDays();
+
+function selectType(el) { document.querySelectorAll('.type-chip').forEach(c=>c.classList.remove('active')); el.classList.add('active'); selectedType = el.dataset.val; }
+
+function calcDays() {
+    const s = document.getElementById('leaveStart').value, e = document.getElementById('leaveEnd').value;
+    if (s && e) {
+        const diff = Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1;
+        if (diff > 0) { document.getElementById('daysBadge').style.display = 'inline-flex'; document.getElementById('daysCount').textContent = diff; }
+        else document.getElementById('daysBadge').style.display = 'none';
+    }
+}
+
+async function applyLeave() {
+    const start = document.getElementById('leaveStart').value, end = document.getElementById('leaveEnd').value, reason = document.getElementById('leaveReason').value.trim();
+    if (!start || !end) { alert('Select dates'); return; }
+    if (!reason) { alert('Enter reason'); return; }
+    const btn = document.getElementById('applyBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    try {
+        const r = await apiCall('/api/teacher/leave/apply', 'POST', {leave_type:selectedType, start_date:start, end_date:end, reason});
+        showToast('success', 'Leave Applied! 📝', r.message);
+        document.getElementById('leaveReason').value = '';
+        loadHistory();
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Leave Request';
+}
+
+async function loadHistory() {
+    try {
+        const r = await apiCall('/api/teacher/leave/my-requests');
+        if (!r.leaves.length) { document.getElementById('leaveHistory').innerHTML = '<div class="empty-history"><i class="fas fa-calendar-check"></i>No leave requests yet</div>'; document.getElementById('histCount').textContent=''; return; }
+        document.getElementById('histCount').textContent = `(${r.leaves.length})`;
+        document.getElementById('leaveHistory').innerHTML = r.leaves.map(l => `
+            <div class="leave-item">
+                <div class="li-icon ${l.status}">${STATUS_IC[l.status]||'📋'}</div>
+                <div class="li-info">
+                    <div class="li-type">${ICONS[l.type]||'📋'} ${l.type.charAt(0).toUpperCase()+l.type.slice(1)} — ${l.days} day${l.days>1?'s':''}</div>
+                    <div class="li-dates">📅 ${fmtDate(l.start)} → ${fmtDate(l.end)}</div>
+                    <div class="li-reason">"${l.reason}"</div>
+                    ${l.admin_remarks?`<div class="li-admin">💬 Admin: ${l.admin_remarks}</div>`:''}
+                </div>
+                <div style="text-align:right;">
+                    <span class="status-pill ${l.status}">${l.status.toUpperCase()}</span>
+                    ${l.status==='pending'?`<br><button class="cancel-btn" onclick="cancelLeave('${l.id}')">✕ Cancel</button>`:''}
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {}
+}
+
+async function cancelLeave(id) { if(!confirm('Cancel this leave?'))return; try{await apiCall(`/api/teacher/leave/cancel/${id}`,'DELETE');loadHistory();}catch(e){} }
+function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
+loadHistory();
+</script>
+{% endblock %}

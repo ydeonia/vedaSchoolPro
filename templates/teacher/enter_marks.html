@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Enter Marks{% endblock %}
+{% block page_title %}📝 Enter Marks{% endblock %}
+{% block page_subtitle %}Select exam and subject, then enter marks{% endblock %}
+
+{% block extra_css %}
+<style>
+.marks-controls { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
+.marks-controls select { padding:10px 14px; border-radius:10px; border:1px solid var(--border); background:white; font-size:0.85rem; font-weight:600; min-width:160px; }
+.marks-summary { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.marks-pill { padding:6px 14px; border-radius:20px; font-size:0.78rem; font-weight:700; }
+.marks-pill.blue { background:#EEF2FF; color:#6366F1; } .marks-pill.green { background:#D1FAE5; color:#059669; }
+.marks-pill.yellow { background:#FEF3C7; color:#D97706; } .marks-pill.red { background:#FEE2E2; color:#DC2626; }
+.marks-table { width:100%; border-collapse:collapse; background:white; border-radius:14px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.07); }
+.marks-table thead { background:var(--bg); }
+.marks-table th { padding:12px 14px; text-align:left; font-size:0.72rem; text-transform:uppercase; color:var(--text-light); font-weight:700; letter-spacing:0.5px; }
+.marks-table td { padding:10px 14px; border-bottom:1px solid var(--border-light); font-size:0.85rem; }
+.marks-table tr:hover { background:#FAFBFC; }
+.marks-input { width:70px; padding:8px; border-radius:8px; border:1px solid var(--border); text-align:center; font-weight:700; font-size:0.88rem; }
+.marks-input:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+.marks-input.high { background:#D1FAE5; border-color:#10B981; color:#059669; }
+.marks-input.mid { background:#FEF9C3; border-color:#F59E0B; color:#D97706; }
+.marks-input.low { background:#FEE2E2; border-color:#EF4444; color:#DC2626; }
+.marks-input.absent { background:#F1F5F9; border-color:#CBD5E1; color:#94A3B8; }
+.absent-check { accent-color:#EF4444; cursor:pointer; }
+.grade-cell { font-weight:800; font-size:0.82rem; min-width:40px; text-align:center; }
+.save-bar { position:sticky; bottom:0; background:white; padding:14px 20px; box-shadow:0 -2px 10px rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; border-radius:14px 14px 0 0; margin-top:12px; z-index:10; }
+.save-btn { padding:12px 32px; border-radius:10px; background:var(--primary); color:white; font-weight:700; font-size:0.88rem; border:none; cursor:pointer; }
+.save-btn:hover { background:#4F46E5; }
+.empty-state { text-align:center; padding:60px; color:var(--text-light); }
+.toast { position:fixed; bottom:20px; right:20px; padding:12px 24px; border-radius:10px; color:white; font-weight:700; z-index:999; animation:slideIn 0.3s; }
+.toast.success { background:#059669; } .toast.error { background:#DC2626; }
+@keyframes slideIn { from { opacity:0; transform:translateY(20px); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="marks-controls">
+    <select id="examSelect" onchange="loadSubjects()"><option value="">Select Exam</option></select>
+    <select id="classSelect" onchange="loadSubjects()"><option value="">Select Class</option></select>
+    <select id="subjectSelect" onchange="loadMarks()"><option value="">Select Subject</option></select>
+</div>
+
+<div id="summaryBar" class="marks-summary" style="display:none;"></div>
+<div id="marksContent">
+    <div class="empty-state"><i class="fas fa-pen" style="font-size:2.5rem;opacity:0.2;"></i><div style="margin-top:12px;">Select exam, class, and subject to start entering marks</div></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let marksData = {}, maxMarks = 100, examSubjectId = null;
+
+async function init() {
+    // Load teacher's classes
+    const cRes = await fetch('/api/teacher/my-classes', {credentials:'same-origin'});
+    if (cRes.ok) {
+        const cd = await cRes.json();
+        const cs = document.getElementById('classSelect');
+        const unique = [...new Map(cd.classes.map(c=>[c.class_id+'-'+c.section_id, c])).values()];
+        unique.forEach(c => { const o=document.createElement('option'); o.value=c.class_id+'|'+c.section_id; o.textContent=c.class_name+' '+c.section_name; cs.appendChild(o); });
+    }
+    // Load exams
+    const eRes = await fetch('/api/teacher/available-exams', {credentials:'same-origin'});
+    if (eRes.ok) {
+        const ed = await eRes.json();
+        const es = document.getElementById('examSelect');
+        ed.exams.forEach(e => { const o=document.createElement('option'); o.value=e.id; o.textContent=e.name; es.appendChild(o); });
+    }
+}
+
+async function loadSubjects() {
+    const examId = document.getElementById('examSelect').value;
+    const classVal = document.getElementById('classSelect').value;
+    if (!examId || !classVal) return;
+    const [classId] = classVal.split('|');
+    const res = await fetch(`/api/teacher/exam-subjects?exam_id=${examId}&class_id=${classId}`, {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    const ss = document.getElementById('subjectSelect');
+    ss.innerHTML = '<option value="">Select Subject</option>';
+    data.subjects.forEach(s => { const o=document.createElement('option'); o.value=s.exam_subject_id+'|'+s.max_marks; o.textContent=s.subject_name+' (Max: '+s.max_marks+')'; ss.appendChild(o); });
+}
+
+async function loadMarks() {
+    const subjVal = document.getElementById('subjectSelect').value;
+    const classVal = document.getElementById('classSelect').value;
+    if (!subjVal || !classVal) return;
+    const [esId, mm] = subjVal.split('|');
+    const [classId, sectionId] = classVal.split('|');
+    examSubjectId = esId; maxMarks = parseInt(mm);
+
+    const res = await fetch(`/api/teacher/marks-entry?exam_subject_id=${esId}&class_id=${classId}&section_id=${sectionId}`, {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    marksData = {};
+
+    let html = `<table class="marks-table"><thead><tr>
+        <th>#</th><th>Student</th><th>Marks (/${maxMarks})</th><th>Absent</th><th>%</th><th>Grade</th>
+    </tr></thead><tbody>`;
+
+    data.students.forEach((s, i) => {
+        marksData[s.id] = {marks: s.marks ?? '', absent: s.is_absent || false};
+        const mc = getMarksClass(s.marks, maxMarks, s.is_absent);
+        html += `<tr id="mrow-${s.id}">
+            <td style="font-weight:700;color:var(--text-light);width:40px;">${s.roll || (i+1)}</td>
+            <td><strong>${s.name}</strong></td>
+            <td><input type="number" class="marks-input ${mc}" id="mi-${s.id}" min="0" max="${maxMarks}" value="${s.is_absent?'':s.marks??''}" placeholder="—" ${s.is_absent?'disabled':''} oninput="onMarksChange('${s.id}')"></td>
+            <td><input type="checkbox" class="absent-check" id="ab-${s.id}" ${s.is_absent?'checked':''} onchange="toggleAbsent('${s.id}')"> <label for="ab-${s.id}" style="font-size:0.72rem;color:var(--text-light);">Absent</label></td>
+            <td id="pct-${s.id}" style="font-weight:700;">${s.is_absent?'AB':s.marks!=null?Math.round(s.marks/maxMarks*100)+'%':'—'}</td>
+            <td class="grade-cell" id="gr-${s.id}" style="color:${gradeColor(s.marks,maxMarks)}">${s.is_absent?'AB':calcGrade(s.marks,maxMarks)}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    html += `<div class="save-bar"><div style="font-size:0.82rem;"><span style="font-weight:700;">${data.students.length}</span> students · Max marks: <strong>${maxMarks}</strong></div><button class="save-btn" onclick="saveMarks()"><i class="fas fa-save"></i> Save Marks</button></div>`;
+    document.getElementById('marksContent').innerHTML = html;
+    document.getElementById('summaryBar').style.display = 'flex';
+    updateSummary(data.students);
+}
+
+function getMarksClass(m, max, absent) {
+    if (absent) return 'absent';
+    if (m==null||m==='') return '';
+    const p=m/max*100;
+    return p>=75?'high':p>=40?'mid':'low';
+}
+
+function onMarksChange(sid) {
+    const inp = document.getElementById('mi-'+sid);
+    let v = parseFloat(inp.value);
+    if (v > maxMarks) { inp.value = maxMarks; v = maxMarks; }
+    if (v < 0) { inp.value = 0; v = 0; }
+    marksData[sid].marks = isNaN(v) ? '' : v;
+    marksData[sid].absent = false;
+    inp.className = 'marks-input '+getMarksClass(v,maxMarks,false);
+    document.getElementById('pct-'+sid).textContent = isNaN(v)?'—':Math.round(v/maxMarks*100)+'%';
+    const gr = calcGrade(v,maxMarks);
+    document.getElementById('gr-'+sid).textContent = gr;
+    document.getElementById('gr-'+sid).style.color = gradeColor(v,maxMarks);
+}
+
+function toggleAbsent(sid) {
+    const checked = document.getElementById('ab-'+sid).checked;
+    const inp = document.getElementById('mi-'+sid);
+    marksData[sid].absent = checked;
+    if (checked) { inp.value=''; inp.disabled=true; inp.className='marks-input absent'; marksData[sid].marks=''; document.getElementById('pct-'+sid).textContent='AB'; document.getElementById('gr-'+sid).textContent='AB'; document.getElementById('gr-'+sid).style.color='#94A3B8'; }
+    else { inp.disabled=false; inp.className='marks-input'; document.getElementById('pct-'+sid).textContent='—'; document.getElementById('gr-'+sid).textContent='—'; }
+}
+
+function calcGrade(m,max) { if(m==null||m==='')return '—'; const p=m/max*100; return p>=90?'A+':p>=80?'A':p>=70?'B+':p>=60?'B':p>=50?'C':p>=35?'D':'F'; }
+function gradeColor(m,max) { if(m==null||m==='')return '#94A3B8'; const p=m/max*100; return p>=75?'#059669':p>=50?'#6366F1':p>=35?'#D97706':'#DC2626'; }
+
+function updateSummary(students) {
+    const sb = document.getElementById('summaryBar');
+    const entered = Object.values(marksData).filter(v=>v.marks!==''||v.absent).length;
+    const absent = Object.values(marksData).filter(v=>v.absent).length;
+    const marked = Object.values(marksData).filter(v=>v.marks!==''&&!v.absent);
+    const avg = marked.length>0 ? Math.round(marked.reduce((a,v)=>a+v.marks,0)/marked.length) : 0;
+    const pass = marked.filter(v=>v.marks/maxMarks*100>=35).length;
+    sb.innerHTML = `<span class="marks-pill blue">📝 ${entered}/${students?.length||Object.keys(marksData).length} entered</span><span class="marks-pill green">📊 Avg: ${avg}/${maxMarks}</span><span class="marks-pill yellow">✅ Pass: ${pass}</span><span class="marks-pill red">❌ Absent: ${absent}</span>`;
+}
+
+async function saveMarks() {
+    const records = Object.entries(marksData).map(([sid, v])=>({student_id:sid, marks:v.marks===''?null:v.marks, is_absent:v.absent}));
+    try {
+        const res = await fetch('/api/teacher/save-marks', {
+            method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({exam_subject_id:examSubjectId, records})
+        });
+        if (!res.ok) throw new Error();
+        showToast('✅ Marks saved!','success');
+    } catch(e) { showToast('❌ Failed to save','error'); }
+}
+
+function showToast(msg,type) { const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

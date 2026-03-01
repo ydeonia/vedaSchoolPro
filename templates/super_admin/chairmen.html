@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% block title %}Chairmen / Trustees{% endblock %}
+{% block page_title %}👑 Chairmen / Trustees{% endblock %}
+{% block page_subtitle %}Manage organization-level oversight users{% endblock %}
+{% block extra_css %}
+<style>
+.ch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;margin-bottom:20px;}
+.ch-card{background:var(--bg-card,white);border-radius:14px;border:1px solid var(--border-light,#f1f5f9);padding:18px;transition:all 0.2s;}
+.ch-card:hover{border-color:var(--primary);box-shadow:0 4px 16px rgba(0,0,0,0.06);}
+.ch-top{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.ch-avatar{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1rem;}
+.ch-name{font-weight:800;font-size:0.9rem;color:var(--text-primary);}.ch-email{font-size:0.68rem;color:var(--text-light);}
+.ch-org-badge{font-size:0.6rem;padding:3px 10px;border-radius:6px;background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700;display:inline-block;margin-top:4px;}
+.ch-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light);}
+.ch-meta-item{font-size:0.68rem;}.ch-meta-label{color:var(--text-light);font-weight:600;}.ch-meta-val{font-weight:700;color:var(--text-primary);}
+.ch-actions{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;}
+.ch-btn{padding:6px 12px;border-radius:8px;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;transition:all 0.15s;}
+.ch-btn:hover{transform:translateY(-1px);}
+.ch-btn.primary{background:#6366f1;color:white;}.ch-btn.amber{background:rgba(217,119,6,0.1);color:#D97706;border:1px solid rgba(217,119,6,0.2);}
+.ch-btn.danger{background:rgba(220,38,38,0.1);color:#DC2626;border:1px solid rgba(220,38,38,0.2);}
+.ch-btn.green{background:rgba(5,150,105,0.1);color:#059669;border:1px solid rgba(5,150,105,0.2);}
+.ch-btn.ghost{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);}
+
+.add-card{background:var(--bg-card,white);border-radius:14px;border:2px dashed var(--border);padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all 0.2s;min-height:200px;}
+.add-card:hover{border-color:var(--primary);background:var(--primary-50,rgba(99,102,241,0.05));}
+.add-card i{font-size:1.5rem;color:var(--primary);}.add-card span{font-size:0.78rem;font-weight:700;color:var(--text-secondary);}
+
+.ch-status{font-size:0.55rem;padding:2px 8px;border-radius:5px;font-weight:700;}
+.ch-status.active{background:rgba(5,150,105,0.1);color:#059669;}.ch-status.inactive{background:rgba(220,38,38,0.1);color:#DC2626;}
+</style>
+{% endblock %}
+{% block content %}
+
+<div class="ch-grid">
+    {% for c in chairmen %}
+    <div class="ch-card" id="chCard_{{ c.id }}">
+        <div class="ch-top">
+            <div class="ch-avatar">{{ c.first_name[0]|upper }}{{ (c.last_name or ' ')[0]|upper }}</div>
+            <div style="flex:1;">
+                <div class="ch-name">{{ c.first_name }} {{ c.last_name or '' }} <span class="ch-status {{ 'active' if c.is_active else 'inactive' }}">{{ 'Active' if c.is_active else 'Disabled' }}</span></div>
+                <div class="ch-email">{{ c.email }}{% if c.phone %} · {{ c.phone }}{% endif %}</div>
+                <span class="ch-org-badge">🏢 {{ c._org_name }}</span>
+            </div>
+        </div>
+        <div class="ch-meta">
+            <div class="ch-meta-item"><div class="ch-meta-label">Role</div><div class="ch-meta-val">👑 Chairman / Trustee</div></div>
+            <div class="ch-meta-item"><div class="ch-meta-label">Created</div><div class="ch-meta-val">{{ c.created_at.strftime('%d %b %Y') if c.created_at else '—' }}</div></div>
+            <div class="ch-meta-item"><div class="ch-meta-label">Last Login</div><div class="ch-meta-val">{{ c.last_login.strftime('%d %b %Y') if c.last_login else 'Never' }}</div></div>
+            <div class="ch-meta-item"><div class="ch-meta-label">Status</div><div class="ch-meta-val">{{ '✅ Active' if c.is_active else '🔒 Disabled' }}</div></div>
+        </div>
+        <div class="ch-actions">
+            <button class="ch-btn primary" onclick="editChairman('{{ c.id }}','{{ c.first_name }}','{{ c.last_name or '' }}','{{ c.email }}','{{ c.phone or '' }}','{{ c.org_id }}')"><i class="fas fa-edit"></i> Edit</button>
+            <button class="ch-btn amber" onclick="resetChPassword('{{ c.id }}','{{ c.first_name }}')"><i class="fas fa-key"></i> Reset Password</button>
+            {% if c.is_active %}
+            <button class="ch-btn danger" onclick="toggleChairman('{{ c.id }}','{{ c.first_name }}',true)"><i class="fas fa-ban"></i> Disable</button>
+            {% else %}
+            <button class="ch-btn green" onclick="toggleChairman('{{ c.id }}','{{ c.first_name }}',false)"><i class="fas fa-check-circle"></i> Enable</button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Add card -->
+    <div class="add-card" onclick="document.getElementById('addChModal').style.display='flex'">
+        <i class="fas fa-plus-circle"></i>
+        <span>Add Chairman / Trustee</span>
+    </div>
+</div>
+
+{% if not chairmen %}
+<div style="text-align:center;padding:40px;color:var(--text-light);">
+    <i class="fas fa-crown" style="font-size:2.5rem;opacity:0.15;"></i>
+    <p style="margin-top:10px;font-size:0.85rem;">No chairmen created yet.</p>
+    <p style="font-size:0.72rem;">Click the "+" card above to create the first Chairman / Trustee.</p>
+</div>
+{% endif %}
+
+<!-- Add Chairman Modal -->
+<div id="addChModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:460px;max-width:90vw;border:1px solid var(--border);">
+        <h3 style="font-weight:900;margin:0 0 4px 0;font-size:0.95rem;color:var(--text-primary);">👑 Create Chairman / Trustee</h3>
+        <p style="font-size:0.68rem;color:var(--text-light);margin:0 0 16px 0;">This person gets a read-only Command Tower view of all branches in their organization.</p>
+        <div style="margin-bottom:10px;">
+            <label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Organization</label>
+            <select id="chOrg" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;">
+                <option value="">— Select Organization —</option>
+                {% for org in orgs %}<option value="{{ org.id }}">{{ org.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">First Name</label>
+            <input id="chFirst" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+            <div><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Last Name</label>
+            <input id="chLast" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        </div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Email</label>
+        <input id="chEmail" type="email" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Phone</label>
+        <input id="chPhone" type="tel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:16px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Password</label>
+        <input id="chPwd" value="Chairman@123" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="document.getElementById('addChModal').style.display='none'" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="createChairman()" style="padding:8px 16px;border-radius:8px;background:#6366f1;color:white;border:none;font-weight:700;cursor:pointer;">Create Chairman</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Chairman Modal -->
+<div id="editChModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:460px;max-width:90vw;border:1px solid var(--border);">
+        <h3 style="font-weight:900;margin:0 0 4px 0;font-size:0.95rem;color:var(--text-primary);">✏️ Edit Chairman</h3>
+        <p style="font-size:0.68rem;color:var(--text-light);margin:0 0 16px 0;" id="editChInfo"></p>
+        <input type="hidden" id="editChId">
+        <div style="margin-bottom:10px;">
+            <label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Organization</label>
+            <select id="editChOrg" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;">
+                {% for org in orgs %}<option value="{{ org.id }}">{{ org.name }}</option>{% endfor %}
+            </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">First Name</label>
+            <input id="editChFirst" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+            <div><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Last Name</label>
+            <input id="editChLast" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        </div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Email</label>
+        <input id="editChEmail" type="email" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:16px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Phone</label>
+        <input id="editChPhone" type="tel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="document.getElementById('editChModal').style.display='none'" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="saveChairman()" style="padding:8px 16px;border-radius:8px;background:#6366f1;color:white;border:none;font-weight:700;cursor:pointer;">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="resetChPwdModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:400px;max-width:90vw;border:1px solid var(--border);">
+        <h3 style="font-weight:900;margin:0 0 4px 0;font-size:0.95rem;color:var(--text-primary);">🔑 Reset Password</h3>
+        <p style="font-size:0.68rem;color:var(--text-light);margin:0 0 16px 0;" id="resetChPwdInfo"></p>
+        <input type="hidden" id="resetChPwdId">
+        <div style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">New Password</label>
+        <input id="resetChNewPwd" type="password" placeholder="Min 6 characters" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:16px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Confirm Password</label>
+        <input id="resetChConfirmPwd" type="password" placeholder="Type again" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="document.getElementById('resetChPwdModal').style.display='none'" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="doResetChPwd()" style="padding:8px 16px;border-radius:8px;background:#D97706;color:white;border:none;font-weight:700;cursor:pointer;">Reset Password</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+// CREATE
+async function createChairman(){
+    const data={
+        org_id:document.getElementById('chOrg').value,
+        first_name:document.getElementById('chFirst').value,
+        last_name:document.getElementById('chLast').value,
+        email:document.getElementById('chEmail').value,
+        phone:document.getElementById('chPhone').value,
+        password:document.getElementById('chPwd').value,
+    };
+    if(!data.org_id){showToast('error','Select an organization');return;}
+    if(!data.email||!data.first_name){showToast('error','Name and email required');return;}
+    const r=await apiCall('/api/super-admin/chairman','POST',data);
+    if(r.success){showToast('success',r.message);setTimeout(()=>location.reload(),1500);}
+    else showToast('error',r.detail||r.error||'Failed');
+}
+
+// EDIT
+function editChairman(id,first,last,email,phone,orgId){
+    document.getElementById('editChId').value=id;
+    document.getElementById('editChFirst').value=first;
+    document.getElementById('editChLast').value=last;
+    document.getElementById('editChEmail').value=email;
+    document.getElementById('editChPhone').value=phone;
+    document.getElementById('editChOrg').value=orgId;
+    document.getElementById('editChInfo').textContent='Editing '+first+' '+last;
+    document.getElementById('editChModal').style.display='flex';
+}
+async function saveChairman(){
+    const id=document.getElementById('editChId').value;
+    const data={
+        first_name:document.getElementById('editChFirst').value,
+        last_name:document.getElementById('editChLast').value,
+        email:document.getElementById('editChEmail').value,
+        phone:document.getElementById('editChPhone').value,
+        org_id:document.getElementById('editChOrg').value,
+    };
+    const r=await apiCall('/api/super-admin/chairman/'+id,'PUT',data);
+    if(r.success){showToast('success',r.message);document.getElementById('editChModal').style.display='none';setTimeout(()=>location.reload(),1200);}
+    else showToast('error',r.detail||r.error||'Failed');
+}
+
+// RESET PASSWORD
+function resetChPassword(id,name){
+    document.getElementById('resetChPwdId').value=id;
+    document.getElementById('resetChPwdInfo').textContent='Set new password for '+name;
+    document.getElementById('resetChNewPwd').value='';
+    document.getElementById('resetChConfirmPwd').value='';
+    document.getElementById('resetChPwdModal').style.display='flex';
+}
+async function doResetChPwd(){
+    const id=document.getElementById('resetChPwdId').value;
+    const pwd=document.getElementById('resetChNewPwd').value;
+    const confirm=document.getElementById('resetChConfirmPwd').value;
+    if(pwd.length<6){showToast('error','Min 6 characters');return;}
+    if(pwd!==confirm){showToast('error','Passwords do not match');return;}
+    const r=await apiCall('/api/super-admin/admins/'+id+'/reset-password','POST',{password:pwd});
+    if(r.success){showToast('success',r.message);document.getElementById('resetChPwdModal').style.display='none';}
+    else showToast('error',r.error||'Failed');
+}
+
+// TOGGLE
+async function toggleChairman(id,name,isActive){
+    const action=isActive?'Disable':'Enable';
+    showConfirm(action+' Chairman',action+' <strong>'+name+'</strong>?<br>'+
+        (isActive?'They will no longer be able to login.':'They will be able to login and see the Command Tower.'),
+    async()=>{
+        const r=await apiCall('/api/super-admin/chairman/'+id+'/toggle','PUT');
+        if(r.success){showToast('success',r.message);setTimeout(()=>location.reload(),1200);}
+        else showToast('error',r.error||r.detail||'Failed');
+    },{icon:isActive?'🔒':'🔓'});
+}
+</script>
+{% endblock %}

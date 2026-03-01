@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Hostel Management{% endblock %}
+{% block page_title %}🏨 Hostel Management{% endblock %}
+{% block page_subtitle %}Manage hostels, rooms, and student allocations{% endblock %}
+{% block extra_css %}
+<style>
+.h-tabs{display:flex;gap:4px;background:white;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
+.h-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.h-tab.active{background:var(--primary);color:white;}
+.add-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.f-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.h-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
+.h-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.h-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+.h-icon.boys{background:#DBEAFE;}.h-icon.girls{background:#FCE7F3;}
+.h-name{font-weight:900;font-size:1rem;}.h-meta{font-size:0.72rem;color:var(--text-light);}
+.h-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
+.hd-label{font-size:0.62rem;color:var(--text-light);text-transform:uppercase;font-weight:700;}
+.hd-val{font-size:0.82rem;font-weight:700;}
+/* Room grid */
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-top:8px;}
+.room-pill{padding:8px;border-radius:8px;text-align:center;font-size:0.72rem;font-weight:700;border:1px solid var(--border-light);}
+.room-pill.available{background:#D1FAE5;color:#059669;border-color:#6EE7B7;}
+.room-pill.full{background:#FEE2E2;color:#DC2626;border-color:#FCA5A5;}
+.room-pill.partial{background:#FEF3C7;color:#D97706;border-color:#FCD34D;}
+.room-num{font-size:0.85rem;font-weight:800;}.room-info{font-size:0.60rem;opacity:0.8;}
+.v-btn{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;}
+@media(max-width:768px){.f-row{grid-template-columns:1fr 1fr;}.h-grid{grid-template-columns:1fr 1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="h-tabs">
+    <div class="h-tab active" onclick="switchTab('hostels',this)">🏨 Hostels</div>
+    <div class="h-tab" onclick="switchTab('rooms',this)">🚪 Rooms</div>
+    <div class="h-tab" onclick="switchTab('allocate',this)">👨‍🎓 Allocate</div>
+</div>
+
+<!-- Hostels Tab -->
+<div id="hostelsTab">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">➕ Add Hostel</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Hostel Name</label><input id="hName" placeholder="Boys Hostel A"></div>
+            <div class="f-grp"><label>Type</label><select id="hType"><option value="boys">🧑 Boys</option><option value="girls">👩 Girls</option><option value="co_ed">👥 Co-Ed</option></select></div>
+            <div class="f-grp"><label>Warden Name</label><input id="hWarden" placeholder="Warden name"></div>
+            <div class="f-grp"><label>Warden Phone</label><input id="hWardenPh" placeholder="9876543210"></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Total Rooms</label><input type="number" id="hRooms" value="20"></div>
+            <div class="f-grp"><label>Total Beds</label><input type="number" id="hBeds" value="80"></div>
+            <div class="f-grp"><label>Monthly Fee (₹)</label><input type="number" id="hFee" value="3000"></div>
+            <div class="f-grp"><label>Mess Fee (₹)</label><input type="number" id="hMess" value="2000"></div>
+        </div>
+        <button class="btn-primary" onclick="addHostel()"><i class="fas fa-plus"></i> Add Hostel</button>
+    </div>
+    <div id="hostelList"><div style="padding:30px;text-align:center;color:var(--text-light);">Loading...</div></div>
+</div>
+
+<!-- Rooms Tab -->
+<div id="roomsTab" style="display:none;">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">➕ Add Room</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Hostel</label><select id="rHostel"></select></div>
+            <div class="f-grp"><label>Room Number</label><input id="rNumber" placeholder="101"></div>
+            <div class="f-grp"><label>Floor</label><input id="rFloor" placeholder="1st"></div>
+            <div class="f-grp"><label>Beds</label><input type="number" id="rBeds" value="4"></div>
+        </div>
+        <button class="btn-primary" onclick="addRoom()"><i class="fas fa-plus"></i> Add Room</button>
+    </div>
+    <div id="roomList"></div>
+</div>
+
+<!-- Allocate Tab -->
+<div id="allocateTab" style="display:none;">
+    <div class="add-card">
+        <h3 style="font-size:0.92rem;margin-bottom:12px;">🛏️ Allocate Student to Room</h3>
+        <div class="f-row">
+            <div class="f-grp"><label>Student</label><select id="aStudent"></select></div>
+            <div class="f-grp"><label>Hostel</label><select id="aHostel" onchange="loadAvailableRooms()"></select></div>
+            <div class="f-grp"><label>Room</label><select id="aRoom"></select></div>
+            <div class="f-grp"><label>Bed Number</label><input id="aBed" placeholder="B1"></div>
+        </div>
+        <button class="btn-primary" onclick="allocateStudent()"><i class="fas fa-check"></i> Allocate</button>
+    </div>
+    <div id="allocationList"></div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function switchTab(t,btn){document.querySelectorAll('.h-tab').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+document.getElementById('hostelsTab').style.display=t==='hostels'?'block':'none';document.getElementById('roomsTab').style.display=t==='rooms'?'block':'none';document.getElementById('allocateTab').style.display=t==='allocate'?'block':'none';}
+
+async function init(){loadHostels();
+    try{const r=await fetch('/api/school/students',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('aStudent').innerHTML='<option value="">Select</option>'+(d.students||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}}
+
+async function loadHostels(){
+    try{const r=await fetch('/api/school/hostels',{credentials:'same-origin'});const d=await r.json();
+    const hostels=d.hostels||[];
+    // Populate dropdowns
+    const opts=hostels.map(h=>`<option value="${h.id}">${h.name}</option>`).join('');
+    document.getElementById('rHostel').innerHTML='<option value="">Select</option>'+opts;
+    document.getElementById('aHostel').innerHTML='<option value="">Select</option>'+opts;
+    // Render cards
+    const el=document.getElementById('hostelList');
+    if(!hostels.length){el.innerHTML='<div style="padding:40px;text-align:center;color:var(--text-light);">No hostels yet.</div>';return;}
+    el.innerHTML=hostels.map(h=>`<div class="h-card">
+        <div class="h-header"><div class="h-icon ${h.hostel_type}">${h.hostel_type==='boys'?'🧑':'👩'}</div>
+        <div style="flex:1;"><div class="h-name">${h.name}</div><div class="h-meta">${h.hostel_type} · ${h.total_rooms} rooms · ${h.total_beds} beds</div></div></div>
+        <div class="h-grid"><div><div class="hd-label">Warden</div><div class="hd-val">${h.warden_name||'—'}</div></div>
+        <div><div class="hd-label">Phone</div><div class="hd-val">${h.warden_phone||'—'}</div></div>
+        <div><div class="hd-label">Monthly Fee</div><div class="hd-val">₹${h.monthly_fee}</div></div>
+        <div><div class="hd-label">Mess Fee</div><div class="hd-val">₹${h.mess_fee}</div></div></div>
+    </div>`).join('');}catch(e){}}
+
+async function addHostel(){
+    const d={name:g('hName'),hostel_type:g('hType'),warden_name:g('hWarden'),warden_phone:g('hWardenPh'),total_rooms:parseInt(g('hRooms'))||20,total_beds:parseInt(g('hBeds'))||80,monthly_fee:parseFloat(g('hFee'))||0,mess_fee:parseFloat(g('hMess'))||0};
+    if(!d.name){alert('Enter hostel name');return;}
+    await apiCall('/api/school/hostels','POST',d);showToast('success','Hostel added');loadHostels();
+}
+async function addRoom(){
+    const d={hostel_id:g('rHostel'),room_number:g('rNumber'),floor:g('rFloor'),bed_count:parseInt(g('rBeds'))||4};
+    if(!d.hostel_id||!d.room_number){alert('Select hostel and enter room number');return;}
+    await apiCall('/api/school/hostel-rooms','POST',d);showToast('success','Room added');
+}
+async function loadAvailableRooms(){
+    const hid=document.getElementById('aHostel').value;if(!hid)return;
+    try{const r=await fetch('/api/school/hostel-rooms?hostel_id='+hid,{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('aRoom').innerHTML='<option value="">Select</option>'+(d.rooms||[]).filter(r=>r.status!=='full').map(r=>`<option value="${r.id}">Room ${r.room_number} (${r.occupied_beds}/${r.bed_count})</option>`).join('');}catch(e){}
+}
+async function allocateStudent(){
+    const d={student_id:g('aStudent'),hostel_id:g('aHostel'),room_id:g('aRoom'),bed_number:g('aBed')};
+    if(!d.student_id||!d.room_id){alert('Select student and room');return;}
+    await apiCall('/api/school/hostel-allocations','POST',d);showToast('success','Student allocated');
+}
+function g(id){return document.getElementById(id).value.trim();}
+init();
+</script>
+{% endblock %}

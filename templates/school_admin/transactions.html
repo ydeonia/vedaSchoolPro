@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block page_title %}Online Transactions{% endblock %}
+{% block page_subtitle %}All online payments, refunds, and payment links{% endblock %}
+
+{% block extra_css %}
+<style>
+    .txn-stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+    .txn-stat{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:14px;padding:14px 20px;flex:1;min-width:140px;}
+    .txn-stat .val{font-size:1.2rem;font-weight:900;color:var(--text);}
+    .txn-stat .lbl{font-size:0.62rem;color:var(--text-light);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+    .txn-filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+    .txn-filters select,.txn-filters input{padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;}
+    .txn-row{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:14px;align-items:center;padding:14px 18px;background:var(--bg-card,white);border:1px solid var(--border);border-radius:12px;margin-bottom:6px;font-size:0.8rem;}
+    .txn-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:0.9rem;}
+    .txn-name{font-weight:700;color:var(--text);}
+    .txn-meta{font-size:0.68rem;color:var(--text-light);margin-top:2px;}
+    .txn-amount{font-weight:800;font-size:0.95rem;}
+    .txn-amount.success{color:#16a34a;}
+    .txn-amount.failed{color:#dc2626;text-decoration:line-through;opacity:0.6;}
+    .txn-amount.pending{color:#d97706;}
+    .txn-amount.refunded{color:#6366f1;}
+    .txn-badge{font-size:0.58rem;padding:3px 10px;border-radius:20px;font-weight:700;text-transform:uppercase;}
+    .txn-badge.success{background:rgba(34,197,94,0.1);color:#16a34a;}
+    .txn-badge.failed{background:rgba(220,38,38,0.1);color:#dc2626;}
+    .txn-badge.pending{background:rgba(245,158,11,0.1);color:#d97706;}
+    .txn-badge.refunded{background:rgba(99,102,241,0.1);color:#6366f1;}
+    .txn-gw{font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);}
+    @media(max-width:768px){.txn-row{grid-template-columns:1fr auto;}.txn-row>:nth-child(3),.txn-row>:nth-child(5){display:none;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="txn-stats" id="txnStats"></div>
+
+<div class="txn-filters">
+    <select id="fStatus" onchange="loadTxns()"><option value="">All Status</option><option value="success">Success</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select>
+    <select id="fPurpose" onchange="loadTxns()"><option value="">All Types</option><option value="fee">Fee</option><option value="fine">Fine</option><option value="donation">Donation</option><option value="transport">Transport</option><option value="admission">Admission</option></select>
+    <input type="text" id="fSearch" placeholder="Search payer..." oninput="renderTxns()">
+</div>
+
+<div id="txnList"><div style="text-align:center;padding:40px;color:var(--text-light);">Loading...</div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const BRANCH_ID='{{ branch_id }}';
+let allTxns=[];
+const GW_ICONS={razorpay:'💳',phonepe:'📱',paytm:'💰',cashfree:'🏦',stripe:'🌍',upi_direct:'📲',cash:'💵'};
+const GW_COLORS={razorpay:'#2563eb',phonepe:'#632d91',paytm:'#1a237e',cashfree:'#16a34a',stripe:'#6366f1'};
+
+async function loadTxns(){
+    const status=document.getElementById('fStatus').value;
+    const purpose=document.getElementById('fPurpose').value;
+    let url='/api/payments/transactions/'+BRANCH_ID+'?limit=100';
+    if(status)url+='&status='+status;
+    if(purpose)url+='&purpose='+purpose;
+    try{
+        const r=await fetch(url);const d=await r.json();
+        allTxns=d.transactions||[];
+        renderStats(d);
+        renderTxns();
+    }catch(e){document.getElementById('txnList').innerHTML='<div style="color:var(--danger);">Failed to load</div>';}
+}
+
+function renderStats(d){
+    const success=allTxns.filter(t=>t.status==='success');
+    const totalSuccess=success.reduce((s,t)=>s+t.amount,0);
+    const pending=allTxns.filter(t=>t.status==='pending').length;
+    const failed=allTxns.filter(t=>t.status==='failed').length;
+    document.getElementById('txnStats').innerHTML=`
+        <div class="txn-stat"><div class="val">₹${totalSuccess.toLocaleString('en-IN')}</div><div class="lbl">Total Collected</div></div>
+        <div class="txn-stat"><div class="val">${success.length}</div><div class="lbl">Successful</div></div>
+        <div class="txn-stat"><div class="val" style="color:#d97706;">${pending}</div><div class="lbl">Pending</div></div>
+        <div class="txn-stat"><div class="val" style="color:#dc2626;">${failed}</div><div class="lbl">Failed</div></div>
+    `;
+}
+
+function renderTxns(){
+    const q=(document.getElementById('fSearch').value||'').toLowerCase();
+    const filtered=q?allTxns.filter(t=>(t.payer_name||'').toLowerCase().includes(q)||(t.description||'').toLowerCase().includes(q)):allTxns;
+    if(!filtered.length){document.getElementById('txnList').innerHTML='<div style="text-align:center;padding:40px;color:var(--text-light);">No transactions found</div>';return;}
+    document.getElementById('txnList').innerHTML=filtered.map(t=>{
+        const color=GW_COLORS[t.gateway]||'#6366f1';
+        const dt=t.created_at?new Date(t.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+        return `<div class="txn-row">
+            <div class="txn-icon" style="background:${color}15;color:${color};">${GW_ICONS[t.gateway]||'💳'}</div>
+            <div><div class="txn-name">${t.payer_name||t.description||'Payment'}</div><div class="txn-meta">${dt} · ${t.receipt_number||'—'}</div></div>
+            <div class="txn-amount ${t.status}">₹${t.amount.toLocaleString('en-IN')}</div>
+            <div class="txn-badge ${t.status}">${t.status}</div>
+            <div class="txn-gw">${t.gateway}</div>
+        </div>`;
+    }).join('');
+}
+
+loadTxns();
+</script>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+{% block page_title %}Announcements{% endblock %}
+{% block page_subtitle %}School updates and notices{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ann-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px 20px; margin-bottom: 8px; border-left: 4px solid var(--primary); }
+    .ann-card.pinned { border-left-color: #F59E0B; background: #FFFBEB; }
+    .ann-card.emergency { border-left-color: #7C3AED; background: #F5F3FF; }
+    .ann-title { font-weight: 700; font-size: 0.92rem; }
+    .ann-content { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.5; margin-top: 6px; }
+    .ann-meta { font-size: 0.68rem; color: var(--text-light); margin-top: 8px; }
+    .priority-badge { padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; margin-left: 8px; }
+    .priority-badge.important { background: #FEF3C7; color: #D97706; }
+    .priority-badge.urgent { background: #FEE2E2; color: #DC2626; }
+    .priority-badge.emergency { background: #EDE9FE; color: #7C3AED; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if announcements %}
+{% for a in announcements %}
+<div class="ann-card {{ 'pinned' if a.is_pinned }} {{ 'emergency' if a.is_emergency }}">
+    <div style="display:flex; align-items:center;">
+        {% if a.is_pinned %}<span style="margin-right:6px;">📌</span>{% endif %}
+        {% if a.is_emergency %}<span style="margin-right:6px;">🚨</span>{% endif %}
+        <span class="ann-title">{{ a.title }}</span>
+        {% if a.priority and a.priority.value != 'normal' %}<span class="priority-badge {{ a.priority.value }}">{{ a.priority.value | upper }}</span>{% endif %}
+    </div>
+    <div class="ann-content">{{ a.content }}</div>
+    <div class="ann-meta">{{ a.created_at.strftime('%d %b %Y, %I:%M %p') if a.created_at else '' }}</div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><div class="card-body"><div class="empty-state">
+    <i class="fas fa-bullhorn"></i><h3>No Announcements</h3><p>School announcements will appear here.</p>
+</div></div></div>
+{% endif %}
+{% endblock %}

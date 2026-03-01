@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Library{% endblock %}
+{% block page_title %}📚 Library Management{% endblock %}
+{% block page_subtitle %}Book catalog, issue, return, and fine management{% endblock %}
+{% block content %}
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;">
+    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--primary);">{{ total_books }}</div><div style="font-size:0.72rem; color:var(--text-light);">Total Books</div></div>
+    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--success);">{{ available }}</div><div style="font-size:0.72rem; color:var(--text-light);">Available</div></div>
+    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--warning);">{{ issued_count }}</div><div style="font-size:0.72rem; color:var(--text-light);">Issued</div></div>
+</div>
+<div class="card mb-3">
+    <div class="card-header"><h2>Add Book</h2><button class="btn btn-primary btn-sm" onclick="document.getElementById('bookForm').style.display=document.getElementById('bookForm').style.display==='none'?'block':'none'"><i class="fas fa-plus"></i> Add</button></div>
+    <div class="card-body" id="bookForm" style="display:none;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <input type="text" id="bTitle" class="form-input" placeholder="Book Title *">
+            <input type="text" id="bAuthor" class="form-input" placeholder="Author">
+            <input type="text" id="bISBN" class="form-input" placeholder="ISBN">
+            <select id="bCat" class="form-select"><option value="fiction">Fiction</option><option value="science">Science</option><option value="math">Math</option><option value="english">English</option><option value="hindi">Hindi</option><option value="reference">Reference</option><option value="general">General</option></select>
+            <input type="text" id="bRack" class="form-input" placeholder="Rack Number">
+            <input type="number" id="bCopies" class="form-input" placeholder="Copies" value="1">
+        </div>
+        <button class="btn btn-primary mt-2" onclick="addBook()"><i class="fas fa-save"></i> Add Book</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Rack</th><th>Total</th><th>Available</th></tr></thead>
+        <tbody>{% for b in books %}<tr><td><strong>{{ b.title }}</strong></td><td>{{ b.author or '—' }}</td><td>{{ b.category or '—' }}</td><td>{{ b.rack_number or '—' }}</td><td>{{ b.total_copies }}</td><td style="font-weight:700; color:{% if b.available_copies > 0 %}var(--success){% else %}var(--danger){% endif %};">{{ b.available_copies }}</td></tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function addBook(){const d={title:document.getElementById('bTitle').value,author:document.getElementById('bAuthor').value,isbn:document.getElementById('bISBN').value,category:document.getElementById('bCat').value,rack_number:document.getElementById('bRack').value,total_copies:parseInt(document.getElementById('bCopies').value)||1};if(!d.title){showToast('error','Title required');return;}await apiCall('/api/school/library/books/create','POST',d);showToast('success','Book Added');setTimeout(()=>location.reload(),800);}
+</script>
+{% endblock %}

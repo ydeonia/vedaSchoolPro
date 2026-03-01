@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Syllabus Progress{% endblock %}
+{% block page_title %}Syllabus Progress{% endblock %}
+{% block page_subtitle %}Track your syllabus completion across all subjects{% endblock %}
+
+{% block extra_css %}
+<style>
+    .subject-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 16px; overflow: hidden; }
+    .subject-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; transition: background 0.15s; }
+    .subject-header:hover { background: #FAFBFF; }
+    .subject-title { font-weight: 700; font-size: 1rem; }
+    .subject-class { font-size: 0.82rem; color: var(--text-secondary); }
+    .subject-pct { font-weight: 800; font-size: 1.2rem; }
+
+    .progress-bar-wrap { height: 6px; background: var(--border-light); border-radius: 3px; overflow: hidden; flex: 1; margin: 0 16px; }
+    .progress-bar-fill { height: 100%; border-radius: 3px; transition: width 0.8s ease; }
+    .pct-green { background: var(--success); }
+    .pct-yellow { background: var(--warning); }
+    .pct-red { background: var(--danger); }
+
+    .chapters-body { display: none; border-top: 1px solid var(--border-light); padding: 0; }
+    .chapters-body.open { display: block; }
+
+    .ch-row { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--border-light); transition: background 0.15s; cursor: pointer; }
+    .ch-row:last-child { border-bottom: none; }
+    .ch-row:hover { background: #FAFBFF; }
+    .ch-row.done { background: #F0FDF4; }
+    .ch-row.done .ch-name { text-decoration: line-through; color: var(--text-light); }
+
+    .ch-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+    .ch-check.checked { background: var(--success); border-color: var(--success); color: white; }
+    .ch-num { width: 32px; height: 32px; border-radius: 50%; background: var(--primary-50); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.78rem; flex-shrink: 0; }
+    .ch-name { font-weight: 600; font-size: 0.88rem; flex: 1; }
+
+    .overall-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .os-card { background: white; padding: 24px; border-radius: var(--radius); box-shadow: var(--shadow-sm); text-align: center; }
+    .os-card .os-val { font-size: 2.2rem; font-weight: 800; }
+    .os-card .os-label { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; }
+
+    .empty-syllabus { text-align: center; padding: 60px 20px; color: var(--text-light); }
+    .empty-syllabus i { font-size: 3rem; margin-bottom: 12px; color: var(--border); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if progress|length == 0 %}
+<div class="card">
+    <div class="card-body">
+        <div class="empty-syllabus">
+            <i class="fas fa-book-open"></i>
+            <h3>No Syllabus Data</h3>
+            <p>Syllabus chapters haven't been added for your subjects yet.<br>Ask your school admin to configure the syllabus.</p>
+        </div>
+    </div>
+</div>
+{% else %}
+
+<!-- Overall Stats -->
+<div class="overall-stats">
+    <div class="os-card">
+        <div class="os-val" style="color: var(--primary);">{{ progress|length }}</div>
+        <div class="os-label">Subjects</div>
+    </div>
+    <div class="os-card">
+        <div class="os-val" style="color: var(--success);" id="totalDone">
+            {{ progress | sum(attribute='completed_chapters') }}
+        </div>
+        <div class="os-label">Chapters Completed</div>
+    </div>
+    <div class="os-card">
+        <div class="os-val" style="color: #2563EB;">{{ progress | sum(attribute='total_chapters') }}</div>
+        <div class="os-label">Total Chapters</div>
+    </div>
+    <div class="os-card">
+        {% set total_ch = progress | sum(attribute='total_chapters') %}
+        {% set done_ch = progress | sum(attribute='completed_chapters') %}
+        {% set overall_pct = (done_ch / total_ch * 100)|round if total_ch > 0 else 0 %}
+        <div class="os-val" style="color: {{ 'var(--success)' if overall_pct >= 75 else ('var(--warning)' if overall_pct >= 40 else 'var(--danger)') }};">{{ overall_pct }}%</div>
+        <div class="os-label">Overall Progress</div>
+    </div>
+</div>
+
+<!-- Subject Cards -->
+{% for item in progress %}
+<div class="subject-card" id="subj-{{ loop.index }}">
+    <div class="subject-header" onclick="toggleSubject({{ loop.index }})">
+        <div>
+            <div class="subject-title">{{ item.subject_name }}</div>
+            <div class="subject-class">{{ item.class_name }} · {{ item.completed_chapters }}/{{ item.total_chapters }} chapters</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; flex: 0.5;">
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill {{ 'pct-green' if item.percentage >= 75 else ('pct-yellow' if item.percentage >= 40 else 'pct-red') }}" style="width: {{ item.percentage }}%;"></div>
+            </div>
+            <div class="subject-pct" style="color: {{ 'var(--success)' if item.percentage >= 75 else ('var(--warning)' if item.percentage >= 40 else 'var(--danger)') }};">{{ item.percentage }}%</div>
+            <i class="fas fa-chevron-down" style="color: var(--text-light); transition: transform 0.2s;" id="arrow-{{ loop.index }}"></i>
+        </div>
+    </div>
+    <div class="chapters-body" id="chapters-{{ loop.index }}">
+        {% set outer_idx = loop.index %}
+        {% if item.chapters|length == 0 %}
+        <div style="padding: 20px; text-align: center; color: var(--text-light);">No chapters defined</div>
+        {% else %}
+            {% for ch in item.chapters %}
+            <div class="ch-row {{ 'done' if ch.completed else '' }}" onclick="toggleChapter('{{ ch.id }}', this, {{ outer_idx }})">
+                <div class="ch-check {{ 'checked' if ch.completed else '' }}">
+                    {% if ch.completed %}<i class="fas fa-check"></i>{% endif %}
+                </div>
+                <div class="ch-num">{{ ch.number or loop.index }}</div>
+                <div class="ch-name">{{ ch.name }}</div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const progressData = {{ progress_json | safe }};
+
+function toggleSubject(idx) {
+    const body = document.getElementById('chapters-' + idx);
+    const arrow = document.getElementById('arrow-' + idx);
+    body.classList.toggle('open');
+    arrow.style.transform = body.classList.contains('open') ? 'rotate(180deg)' : '';
+}
+
+async function toggleChapter(chapterId, el, subjIdx) {
+    try {
+        const result = await apiCall(`/api/teacher/syllabus/toggle/${chapterId}`, 'POST');
+        const isDone = result.completed;
+
+        // Update UI
+        el.classList.toggle('done', isDone);
+        const checkEl = el.querySelector('.ch-check');
+        checkEl.classList.toggle('checked', isDone);
+        checkEl.innerHTML = isDone ? '<i class="fas fa-check"></i>' : '';
+
+        // Update counts in header
+        const card = document.getElementById('subj-' + subjIdx);
+        const doneCount = card.querySelectorAll('.ch-row.done').length;
+        const totalCount = card.querySelectorAll('.ch-row').length;
+        const pct = totalCount > 0 ? Math.round(doneCount / totalCount * 100) : 0;
+
+        const header = card.querySelector('.subject-class');
+        const subjName = progressData[subjIdx - 1].class_name;
+        header.textContent = `${subjName} · ${doneCount}/${totalCount} chapters`;
+
+        const pctEl = card.querySelector('.subject-pct');
+        pctEl.textContent = pct + '%';
+        pctEl.style.color = pct >= 75 ? 'var(--success)' : (pct >= 40 ? 'var(--warning)' : 'var(--danger)');
+
+        const bar = card.querySelector('.progress-bar-fill');
+        bar.style.width = pct + '%';
+        bar.className = 'progress-bar-fill ' + (pct >= 75 ? 'pct-green' : (pct >= 40 ? 'pct-yellow' : 'pct-red'));
+
+        // Update overall total
+        const allDone = document.querySelectorAll('.ch-row.done').length;
+        document.getElementById('totalDone').textContent = allDone;
+
+        showToast(isDone ? 'success' : 'info', isDone ? 'Chapter Completed ✅' : 'Chapter Unmarked', '');
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+}
+</script>
+{% endblock %}

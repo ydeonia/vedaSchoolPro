@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}Plans & Billing{% endblock %}
+{% block page_title %}Plans & Billing{% endblock %}
+{% block page_subtitle %}Manage subscription plans and school billing{% endblock %}
+{% block extra_css %}
+<style>
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border-light);margin-bottom:18px;overflow-x:auto;}
+.tab{padding:10px 20px;font-weight:800;font-size:0.75rem;cursor:pointer;border-bottom:3px solid transparent;color:var(--text-light);white-space:nowrap;transition:all 0.15s;}
+.tab:hover{color:var(--text);}.tab.active{color:#4338CA;border-bottom-color:#4338CA;}
+.tab .bcnt{background:#4338CA;color:white;font-size:0.52rem;padding:1px 6px;border-radius:8px;margin-left:5px;}
+.tp{display:none;}.tp.active{display:block;}
+.toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
+.toolbar input,.toolbar select{padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.75rem;}
+.toolbar input{min-width:220px;}.toolbar select{min-width:130px;}
+.dt{width:100%;border-collapse:collapse;font-size:0.75rem;}
+.dt th{font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);padding:8px 10px;text-align:left;border-bottom:2px solid var(--border-light);position:sticky;top:0;background:var(--bg-card);}
+.dt td{padding:10px;border-bottom:1px solid var(--border-light);vertical-align:middle;}
+.dt tr:hover{background:rgba(67,56,202,0.03);}
+.dt .sn{font-weight:800;}
+.pill{padding:2px 8px;border-radius:6px;font-size:0.58rem;font-weight:800;display:inline-block;}
+.pg{background:#D1FAE5;color:#065F46;}.py{background:#FEF3C7;color:#92400E;}.pr{background:#FEE2E2;color:#991B1B;}.pb{background:#DBEAFE;color:#1D4ED8;}.pp{background:#EDE9FE;color:#7C3AED;}
+.sc{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:18px;}
+.sc>div{background:var(--bg-card);border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,0.04);}
+.sv{font-size:1.5rem;font-weight:900;}.sl{font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);margin-top:2px;}
+.tw{background:var(--bg-card);border-radius:14px;padding:18px;box-shadow:0 1px 6px rgba(0,0,0,0.04);overflow-x:auto;max-height:65vh;overflow-y:auto;}
+.pn{display:flex;justify-content:space-between;align-items:center;padding:10px 0;font-size:0.7rem;color:var(--text-light);}
+.pn button{padding:5px 12px;border-radius:6px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-weight:700;font-size:0.68rem;cursor:pointer;}
+.pn button.act{background:#4338CA;color:white;border-color:#4338CA;}
+.em{text-align:center;padding:40px;color:var(--text-light);font-size:0.82rem;}
+.ef{margin-bottom:6px;}.ef label{font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);display:block;margin-bottom:2px;}
+.ef input,.ef select{width:100%;padding:7px 10px;border-radius:7px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;box-sizing:border-box;}
+.due-soon{background:#FEF3C7;}.overdue{background:#FEE2E2;}
+.pg2{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px;}
+.pc{background:var(--bg-card);border-radius:14px;padding:18px;box-shadow:0 1px 6px rgba(0,0,0,0.05);position:relative;display:flex;flex-direction:column;}
+.pn2{font-size:1rem;font-weight:900;margin:0 0 4px 0;}.pt{font-size:0.65rem;color:var(--text-light);margin:0 0 10px 0;}
+.pp2{font-size:1.6rem;font-weight:900;color:#4338CA;}.pps{font-size:0.65rem;color:var(--text-light);}
+.py2{font-size:0.68rem;color:#059669;font-weight:700;margin:4px 0 12px 0;}
+.pl{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;}
+.pl>div{text-align:center;padding:6px;background:var(--bg);border-radius:6px;}.pl .n{font-size:1rem;font-weight:900;}.pl .l{font-size:0.5rem;font-weight:700;text-transform:uppercase;color:var(--text-light);}
+.pf{font-size:0.68rem;padding:3px 0;display:flex;align-items:center;gap:5px;}.pf .y{color:#059669;}.pf .x{color:#DC2626;}
+.ribbon{position:absolute;top:12px;right:-6px;background:linear-gradient(135deg,#7C3AED,#4338CA);color:white;font-size:0.52rem;font-weight:900;padding:3px 12px 3px 8px;border-radius:4px 0 0 4px;text-transform:uppercase;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="tabs">
+    <div class="tab active" data-tab="plans"><i class="fas fa-box"></i> Plans</div>
+    <div class="tab" data-tab="subs"><i class="fas fa-file-invoice"></i> Subscriptions<span class="bcnt" id="subCnt">0</span></div>
+    <div class="tab" data-tab="upcoming"><i class="fas fa-clock"></i> Upcoming Payments</div>
+    <div class="tab" data-tab="history"><i class="fas fa-receipt"></i> Payment History</div>
+</div>
+
+<!-- PLANS -->
+<div class="tp active" id="tp-plans">
+{% if plans %}
+<div class="toolbar" style="justify-content:flex-end;">
+    <button onclick="openPlanModal()" style="padding:8px 16px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-plus"></i> Add New Plan</button>
+    <button onclick="seedPlans()" style="padding:8px 16px;border-radius:8px;background:#D97706;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-magic"></i> Reset Defaults</button>
+</div>
+<div class="pg2">
+{% for p in plans %}
+<div class="pc">
+    {% if p.name == 'Growth' %}<div class="ribbon">Most Popular</div>{% endif %}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <h3 class="pn2">{{ p.name }}</h3>
+        <button onclick="editPlan({id:'{{ p.id }}',name:'{{ p.name }}',tier:'{{ p.tier.value }}',tagline:'{{ (p.tagline or '')|e }}',display_order:{{ p.display_order or 1 }},price_monthly:{{ p.price_monthly or 0 }},price_yearly:{{ p.price_yearly or 0 }},max_students:{{ p.max_students or 300 }},max_teachers:{{ p.max_teachers or 15 }},max_branches:{{ p.max_branches or 1 }},max_storage_gb:{{ p.max_storage_gb or 5 }},sms_credits_monthly:{{ p.sms_credits_monthly or 0 }},backup_frequency:'{{ p.backup_frequency or 'weekly' }}',whatsapp_enabled:{{ 'true' if p.whatsapp_enabled else 'false' }},online_fee_payment:{{ 'true' if p.online_fee_payment else 'false' }},transport_module:{{ 'true' if p.transport_module else 'false' }},hostel_module:{{ 'true' if p.hostel_module else 'false' }},library_module:{{ 'true' if p.library_module else 'false' }},hr_payroll:{{ 'true' if p.hr_payroll else 'false' }},advanced_analytics:{{ 'true' if p.advanced_analytics else 'false' }},priority_support:{{ 'true' if p.priority_support else 'false' }},api_access:{{ 'true' if p.api_access else 'false' }},custom_branding:{{ 'true' if p.custom_branding else 'false' }},id_card_generator:{{ 'true' if p.id_card_generator else 'false' }},complaints_system:{{ 'true' if p.complaints_system else 'false' }},data_export:{{ 'true' if p.data_export else 'false' }},parent_app:{{ 'true' if p.parent_app else 'false' }},teacher_app:{{ 'true' if p.teacher_app else 'false' }},messaging_system:{{ 'true' if p.messaging_system else 'false' }},email_notifications:{{ 'true' if p.email_notifications else 'false' }}})" style="padding:4px 8px;border-radius:6px;background:#EDE9FE;color:#7C3AED;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;" title="Edit"><i class="fas fa-pen"></i></button>
+    </div>
+    <p class="pt">{{ p.tagline or '' }}</p>
+    {% if p.price_monthly > 0 %}
+    <div><span class="pp2">₹{{ '{:,.0f}'.format(p.price_monthly) }}</span><span class="pps">/month</span></div>
+    <div class="py2">or ₹{{ '{:,.0f}'.format(p.price_yearly) }}/year (save 20%)</div>
+    {% else %}<div class="pp2" style="color:#059669;">Custom Pricing</div><div class="py2">Contact for enterprise quote</div>{% endif %}
+    <div class="pl">
+        <div><div class="n">{{ '{:,}'.format(p.max_students) }}</div><div class="l">Students</div></div>
+        <div><div class="n">{{ p.max_teachers }}</div><div class="l">Teachers</div></div>
+        <div><div class="n">{{ p.max_branches }}</div><div class="l">Branches</div></div>
+        <div><div class="n">{{ p.max_storage_gb }}GB</div><div class="l">Storage</div></div>
+    </div>
+    <div style="flex:1;">
+        <div class="pf"><span class="{{ 'y' if p.whatsapp_enabled else 'x' }}">{{ '✓' if p.whatsapp_enabled else '✗' }}</span> WhatsApp</div>
+        <div class="pf"><span class="{{ 'y' if p.online_fee_payment else 'x' }}">{{ '✓' if p.online_fee_payment else '✗' }}</span> Online Fee Payment</div>
+        <div class="pf"><span class="{{ 'y' if p.transport_module else 'x' }}">{{ '✓' if p.transport_module else '✗' }}</span> Transport</div>
+        <div class="pf"><span class="{{ 'y' if p.hr_payroll else 'x' }}">{{ '✓' if p.hr_payroll else '✗' }}</span> HR & Payroll</div>
+        <div class="pf"><span class="{{ 'y' if p.advanced_analytics else 'x' }}">{{ '✓' if p.advanced_analytics else '✗' }}</span> Analytics</div>
+        <div class="pf"><span class="{{ 'y' if p.priority_support else 'x' }}">{{ '✓' if p.priority_support else '✗' }}</span> Priority Support</div>
+    </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div style="background:var(--bg-card);border-radius:12px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+    <div><strong>No plans configured yet.</strong> <span style="font-size:0.72rem;color:var(--text-light);">Create the default 4 plans.</span></div>
+    <button onclick="seedPlans()" style="padding:8px 16px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-magic"></i> Create Default Plans</button>
+</div>
+{% endif %}
+</div>
+
+<!-- SUBSCRIPTIONS -->
+<div class="tp" id="tp-subs">
+<div class="sc">
+    <div><div class="sv" style="color:#059669;" id="sA">—</div><div class="sl">Active</div></div>
+    <div><div class="sv" style="color:#D97706;" id="sT">—</div><div class="sl">Trial</div></div>
+    <div><div class="sv" style="color:#DC2626;" id="sE">—</div><div class="sl">Expired</div></div>
+    <div><div class="sv" style="color:#7C3AED;" id="sMRR">—</div><div class="sl">Est. MRR</div></div>
+</div>
+<div class="toolbar">
+    <input type="text" id="ss" placeholder="🔍 Search school or branch..." oninput="fS()">
+    <select id="sf1" onchange="fS()"><option value="">All Status</option><option value="active">Active</option><option value="trial">Trial</option><option value="grace">Grace</option><option value="expired">Expired</option></select>
+    <select id="sf2" onchange="fS()"><option value="">All Plans</option>{% for p in plans %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select>
+    <select id="sf3" onchange="fS()"><option value="">All Cycles</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
+</div>
+<div class="tw"><table class="dt"><thead><tr><th>Branch</th><th>Organization</th><th>Plan</th><th>Status</th><th>Cycle</th><th>Expires</th><th>Students</th><th>Amount</th></tr></thead><tbody id="sTB"><tr><td colspan="8" class="em">Loading...</td></tr></tbody></table></div>
+<div class="pn" id="sPn"></div>
+</div>
+
+<!-- UPCOMING PAYMENTS -->
+<div class="tp" id="tp-upcoming">
+<div class="sc">
+    <div><div class="sv" style="color:#DC2626;" id="u7">—</div><div class="sl">Due in 7 days</div></div>
+    <div><div class="sv" style="color:#D97706;" id="u30">—</div><div class="sl">Due in 30 days</div></div>
+    <div><div class="sv" style="color:#7C3AED;" id="uO">—</div><div class="sl">Overdue</div></div>
+    <div><div class="sv" style="color:#059669;" id="uA">—</div><div class="sl">Upcoming Revenue</div></div>
+</div>
+<div class="toolbar">
+    <input type="text" id="us" placeholder="🔍 Search school..." oninput="fU()">
+    <select id="uf" onchange="fU()"><option value="">All</option><option value="overdue">Overdue</option><option value="7">Due in 7 days</option><option value="30">Due in 30 days</option></select>
+    <button onclick="showConfirm('Send Reminders','Send email reminders to all schools due in 7 days?',()=>showToast('info','Email integration needed'),{icon:'📧'})" style="padding:8px 16px;border-radius:8px;background:#D97706;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-bell"></i> Send Reminders</button>
+</div>
+<div class="tw"><table class="dt"><thead><tr><th>Branch</th><th>Plan</th><th>Cycle</th><th>Amount</th><th>Due Date</th><th>Days Left</th><th>Urgency</th><th>Action</th></tr></thead><tbody id="uTB"><tr><td colspan="8" class="em">Loading...</td></tr></tbody></table></div>
+</div>
+
+<!-- PAYMENT HISTORY -->
+<div class="tp" id="tp-history">
+<div class="toolbar">
+    <input type="text" id="hs" placeholder="🔍 Search..." oninput="fH()">
+    <select id="hf" onchange="fH()"><option value="">All</option><option value="completed">Completed</option><option value="pending">Pending</option></select>
+    <button onclick="showToast('info','Export feature coming soon')" style="padding:8px 16px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-download"></i> Export CSV</button>
+</div>
+<div class="tw"><table class="dt"><thead><tr><th>Date</th><th>Branch</th><th>Plan</th><th>Amount</th><th>Cycle</th><th>Method</th><th>Reference</th><th>Status</th></tr></thead><tbody id="hTB"><tr><td colspan="8" class="em">Payment history appears as subscriptions are renewed</td></tr></tbody></table></div>
+</div>
+
+<!-- PLAN CREATE/EDIT MODAL -->
+<div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;overflow-y:auto;">
+<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:20px auto;">
+    <h3 style="font-weight:900;margin:0 0 14px 0;" id="planModalTitle">➕ Create New Plan</h3>
+    <input type="hidden" id="pm_id" value="">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="ef"><label>Plan Name</label><input id="pm_name" placeholder="e.g. Premium"></div>
+        <div class="ef"><label>Tier</label><select id="pm_tier"><option value="free">Free</option><option value="trial">Trial</option><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
+        <div class="ef"><label>Tagline</label><input id="pm_tagline" placeholder="Short description"></div>
+        <div class="ef"><label>Display Order</label><input id="pm_order" type="number" value="1"></div>
+        <div class="ef"><label>Price Monthly (₹)</label><input id="pm_price_m" type="number" value="999"></div>
+        <div class="ef"><label>Price Yearly (₹)</label><input id="pm_price_y" type="number" value="9590"></div>
+        <div class="ef"><label>Max Students</label><input id="pm_students" type="number" value="300"></div>
+        <div class="ef"><label>Max Teachers</label><input id="pm_teachers" type="number" value="15"></div>
+        <div class="ef"><label>Max Branches</label><input id="pm_branches" type="number" value="1"></div>
+        <div class="ef"><label>Max Storage (GB)</label><input id="pm_storage" type="number" value="5"></div>
+        <div class="ef"><label>SMS Credits/Month</label><input id="pm_sms" type="number" value="100"></div>
+        <div class="ef"><label>Backup Frequency</label><select id="pm_backup"><option value="weekly">Weekly</option><option value="daily">Daily</option><option value="realtime">Real-time</option></select></div>
+    </div>
+    <h4 style="font-size:0.72rem;font-weight:800;margin:14px 0 8px 0;">Features</h4>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_whatsapp"> WhatsApp</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_online_fee"> Online Fee Payment</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_transport"> Transport</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_hostel"> Hostel</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_library"> Library</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_hr"> HR & Payroll</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_analytics"> Advanced Analytics</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_priority"> Priority Support</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_api"> API Access</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_branding"> Custom Branding</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_idcard"> ID Card Generator</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_complaints"> Complaints System</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_data_export" checked> Data Export</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_parent_app" checked> Parent App</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_teacher_app" checked> Teacher App</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_messaging" checked> Messaging</label>
+        <label style="font-size:0.7rem;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="pm_email" checked> Email Notifications</label>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+        <button onclick="savePlan()" style="padding:10px 24px;border-radius:10px;background:#4338CA;color:white;font-weight:800;border:none;cursor:pointer;flex:1;"><i class="fas fa-save"></i> Save Plan</button>
+        <button onclick="document.getElementById('planModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+    </div>
+</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+let AS=[],AU=[];const PS=25;let sp=1;
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function(){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    this.classList.add('active');
+    document.querySelectorAll('.tp').forEach(p=>p.classList.remove('active'));
+    document.getElementById('tp-'+this.dataset.tab).classList.add('active');
+    if(this.dataset.tab==='subs')lS();
+    if(this.dataset.tab==='upcoming')lU();
+}));
+
+async function seedPlans(){showConfirm('Create Plans','Create 4 default plans: Starter, Growth, Pro, Enterprise?',async()=>{const d=await apiCall('/api/super-admin/plans/seed','POST');if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1500);}else showToast('error',d.error||d.message||'Failed');},{icon:'📋',yesText:'Create'});}
+
+function openPlanModal(data){
+    document.getElementById('planModalTitle').textContent=data?'✏️ Edit Plan':'➕ Create New Plan';
+    document.getElementById('pm_id').value=data?data.id:'';
+    document.getElementById('pm_name').value=data?data.name:'';
+    document.getElementById('pm_tier').value=data?(data.tier||'starter'):'starter';
+    document.getElementById('pm_tagline').value=data?data.tagline||'':'';
+    document.getElementById('pm_order').value=data?data.display_order||1:1;
+    document.getElementById('pm_price_m').value=data?data.price_monthly||0:999;
+    document.getElementById('pm_price_y').value=data?data.price_yearly||0:9590;
+    document.getElementById('pm_students').value=data?data.max_students||300:300;
+    document.getElementById('pm_teachers').value=data?data.max_teachers||15:15;
+    document.getElementById('pm_branches').value=data?data.max_branches||1:1;
+    document.getElementById('pm_storage').value=data?data.max_storage_gb||5:5;
+    document.getElementById('pm_sms').value=data?data.sms_credits_monthly||100:100;
+    document.getElementById('pm_backup').value=data?data.backup_frequency||'weekly':'weekly';
+    document.getElementById('pm_whatsapp').checked=data?data.whatsapp_enabled:false;
+    document.getElementById('pm_online_fee').checked=data?data.online_fee_payment:false;
+    document.getElementById('pm_transport').checked=data?data.transport_module:false;
+    document.getElementById('pm_hostel').checked=data?data.hostel_module:false;
+    document.getElementById('pm_library').checked=data?data.library_module:false;
+    document.getElementById('pm_hr').checked=data?data.hr_payroll:false;
+    document.getElementById('pm_analytics').checked=data?data.advanced_analytics:false;
+    document.getElementById('pm_priority').checked=data?data.priority_support:false;
+    document.getElementById('pm_api').checked=data?data.api_access:false;
+    document.getElementById('pm_branding').checked=data?data.custom_branding:false;
+    document.getElementById('pm_idcard').checked=data?data.id_card_generator:false;
+    document.getElementById('pm_complaints').checked=data?data.complaints_system:false;
+    document.getElementById('pm_data_export').checked=data?data.data_export!==false:true;
+    document.getElementById('pm_parent_app').checked=data?data.parent_app!==false:true;
+    document.getElementById('pm_teacher_app').checked=data?data.teacher_app!==false:true;
+    document.getElementById('pm_messaging').checked=data?data.messaging_system!==false:true;
+    document.getElementById('pm_email').checked=data?data.email_notifications!==false:true;
+    document.getElementById('planModal').style.display='flex';
+}
+function editPlan(p){openPlanModal(p);}
+
+async function savePlan(){
+    const id=document.getElementById('pm_id').value;
+    const data={
+        name:document.getElementById('pm_name').value,
+        tier:document.getElementById('pm_tier').value,
+        tagline:document.getElementById('pm_tagline').value,
+        display_order:parseInt(document.getElementById('pm_order').value)||1,
+        price_monthly:parseFloat(document.getElementById('pm_price_m').value)||0,
+        price_yearly:parseFloat(document.getElementById('pm_price_y').value)||0,
+        max_students:parseInt(document.getElementById('pm_students').value)||300,
+        max_teachers:parseInt(document.getElementById('pm_teachers').value)||15,
+        max_branches:parseInt(document.getElementById('pm_branches').value)||1,
+        max_storage_gb:parseInt(document.getElementById('pm_storage').value)||5,
+        sms_credits_monthly:parseInt(document.getElementById('pm_sms').value)||0,
+        backup_frequency:document.getElementById('pm_backup').value,
+        whatsapp_enabled:document.getElementById('pm_whatsapp').checked,
+        online_fee_payment:document.getElementById('pm_online_fee').checked,
+        transport_module:document.getElementById('pm_transport').checked,
+        hostel_module:document.getElementById('pm_hostel').checked,
+        library_module:document.getElementById('pm_library').checked,
+        hr_payroll:document.getElementById('pm_hr').checked,
+        advanced_analytics:document.getElementById('pm_analytics').checked,
+        priority_support:document.getElementById('pm_priority').checked,
+        api_access:document.getElementById('pm_api').checked,
+        custom_branding:document.getElementById('pm_branding').checked,
+        id_card_generator:document.getElementById('pm_idcard').checked,
+        complaints_system:document.getElementById('pm_complaints').checked,
+        data_export:document.getElementById('pm_data_export').checked,
+        parent_app:document.getElementById('pm_parent_app').checked,
+        teacher_app:document.getElementById('pm_teacher_app').checked,
+        messaging_system:document.getElementById('pm_messaging').checked,
+        email_notifications:document.getElementById('pm_email').checked,
+    };
+    if(!data.name){showToast('error','Plan name required');return;}
+    const url=id?`/api/super-admin/plans/${id}`:'/api/super-admin/plans';
+    const method=id?'PUT':'POST';
+    const d=await apiCall(url,method,data);
+    if(d.success){showToast('success',d.message);document.getElementById('planModal').style.display='none';setTimeout(()=>location.reload(),1200);}
+    else showToast('error',d.error||'Failed');
+}
+
+async function lS(){
+    const d=await apiCall('/api/super-admin/subscriptions');AS=d.subscriptions||[];
+    document.getElementById('subCnt').textContent=AS.length;
+    document.getElementById('sA').textContent=AS.filter(s=>s.status==='active').length;
+    document.getElementById('sT').textContent=AS.filter(s=>s.status==='trial').length;
+    document.getElementById('sE').textContent=AS.filter(s=>s.status==='expired').length;
+    const mrr=AS.filter(s=>s.status==='active').reduce((a,s)=>a+(s.billing_cycle==='yearly'?Math.round(23990/12):999),0);
+    document.getElementById('sMRR').textContent='₹'+mrr.toLocaleString();
+    rS(AS);
+}
+function fS(){
+    const q=document.getElementById('ss').value.toLowerCase(),st=document.getElementById('sf1').value,pl=document.getElementById('sf2').value,cy=document.getElementById('sf3').value;
+    let f=AS.filter(s=>{if(q&&!s.branch_name.toLowerCase().includes(q)&&!s.org_name.toLowerCase().includes(q))return false;if(st&&s.status!==st)return false;if(pl&&s.plan_name!==pl)return false;if(cy&&s.billing_cycle!==cy)return false;return true;});
+    sp=1;rS(f);
+}
+function rS(d){
+    const tb=document.getElementById('sTB'),s=(sp-1)*PS,e=s+PS,pg=d.slice(s,e);
+    if(!pg.length){tb.innerHTML='<tr><td colspan="8" class="em">No subscriptions found</td></tr>';return;}
+    tb.innerHTML=pg.map(s=>`<tr><td class="sn">${s.branch_name}</td><td>${s.org_name}</td>
+    <td><span class="pill pp">${s.plan_name}</span></td>
+    <td><span class="pill ${s.status==='active'?'pg':s.status==='trial'?'pb':s.status==='grace'?'py':'pr'}">${s.status.toUpperCase()}</span></td>
+    <td>${s.billing_cycle}</td><td>${s.current_period_end||'—'}</td><td>${s.student_count||0}</td>
+    <td style="font-weight:700;">${s.billing_cycle==='yearly'?'₹23,990':'₹999'}</td></tr>`).join('');
+    const tp=Math.ceil(d.length/PS),pn=document.getElementById('sPn');
+    pn.innerHTML=`<span>${s+1}–${Math.min(e,d.length)} of ${d.length}</span><div style="display:flex;gap:4px;">${Array.from({length:Math.min(tp,10)},(_,i)=>`<button class="${i+1===sp?'act':''}" onclick="sp=${i+1};rS(AS)">${i+1}</button>`).join('')}</div>`;
+}
+
+async function lU(){
+    const d=await apiCall('/api/super-admin/subscriptions');const now=new Date();
+    AU=(d.subscriptions||[]).filter(s=>s.status==='active'||s.status==='grace').map(s=>{
+        let due=null;try{const p=s.current_period_end;if(p){const[d,m,y]=p.split(' ');due=new Date(`${d} ${m} ${y}`);}}catch(e){}
+        const dl=due?Math.ceil((due-now)/(864e5)):999;
+        return{...s,due_date:s.current_period_end,dl,amt:s.billing_cycle==='yearly'?23990:999};
+    }).sort((a,b)=>a.dl-b.dl);
+    document.getElementById('u7').textContent=AU.filter(s=>s.dl<=7&&s.dl>=0).length;
+    document.getElementById('u30').textContent=AU.filter(s=>s.dl<=30&&s.dl>=0).length;
+    document.getElementById('uO').textContent=AU.filter(s=>s.dl<0).length;
+    document.getElementById('uA').textContent='₹'+AU.filter(s=>s.dl<=30).reduce((a,s)=>a+s.amt,0).toLocaleString();
+    rU(AU);
+}
+function fU(){
+    const q=document.getElementById('us').value.toLowerCase(),f=document.getElementById('uf').value;
+    let d=AU.filter(s=>{if(q&&!s.branch_name.toLowerCase().includes(q))return false;if(f==='overdue'&&s.dl>=0)return false;if(f==='7'&&(s.dl<0||s.dl>7))return false;if(f==='30'&&(s.dl<0||s.dl>30))return false;return true;});
+    rU(d);
+}
+function rU(d){
+    const tb=document.getElementById('uTB');
+    if(!d.length){tb.innerHTML='<tr><td colspan="8" class="em">No upcoming payments</td></tr>';return;}
+    tb.innerHTML=d.map(s=>{
+        const c=s.dl<0?'overdue':s.dl<=7?'due-soon':'';
+        const b=s.dl<0?'pr':s.dl<=7?'py':'pg';
+        const l=s.dl<0?'OVERDUE':s.dl<=7?'DUE SOON':'OK';
+        return`<tr class="${c}"><td class="sn">${s.branch_name}</td><td><span class="pill pp">${s.plan_name}</span></td>
+        <td>${s.billing_cycle}</td><td style="font-weight:800;">₹${s.amt.toLocaleString()}</td><td>${s.due_date||'—'}</td>
+        <td style="font-weight:800;">${s.dl<0?Math.abs(s.dl)+'d overdue':s.dl+'d'}</td>
+        <td><span class="pill ${b}">${l}</span></td>
+        <td><button onclick="showToast('info','Email reminder for ${s.branch_name}')" style="padding:4px 10px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;font-size:0.6rem;font-weight:700;border:none;cursor:pointer;"><i class="fas fa-envelope"></i></button></td></tr>`;
+    }).join('');
+}
+function fH(){}
+(async()=>{try{const d=await apiCall('/api/super-admin/subscriptions');document.getElementById('subCnt').textContent=(d.subscriptions||[]).length;}catch(e){}})();
+</script>
+{% endblock %}

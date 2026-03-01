@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Exams{% endblock %}
+{% block page_title %}Exam Management{% endblock %}
+{% block page_subtitle %}Create exams, define subjects and marks structure{% endblock %}
+
+{% block extra_css %}
+<style>
+    .exam-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 12px; overflow: hidden; transition: all 0.2s; }
+    .exam-card:hover { box-shadow: var(--shadow); }
+    .exam-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; }
+    .exam-name { font-weight: 700; font-size: 1rem; }
+    .exam-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; }
+    .exam-badges { display: flex; gap: 6px; }
+    .exam-body { display: none; border-top: 1px solid var(--border-light); padding: 16px 20px; }
+    .exam-body.open { display: block; }
+    .sub-row { display: grid; grid-template-columns: 1fr 90px 90px 60px; gap: 8px; padding: 8px 0; align-items: center; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
+    .sub-row.header { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+{% if not academic_year %}
+<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i><h3>No Active Academic Year</h3><p>Set an academic year before creating exams</p></div></div></div>
+{% else %}
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h2>Create New Exam</h2>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end;">
+            <div class="form-group" style="margin:0;"><label class="form-label">Exam Name</label><input type="text" id="examName" class="form-input" placeholder="e.g. Mid-Term Exam"></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">Start Date</label><input type="date" id="examStart" class="form-input"></div>
+            <div class="form-group" style="margin:0;"><label class="form-label">End Date</label><input type="date" id="examEnd" class="form-input"></div>
+            <button class="btn btn-primary" onclick="createExam()"><i class="fas fa-plus"></i> Create</button>
+        </div>
+    </div>
+</div>
+
+<!-- Exam List -->
+<div id="examList">
+    {% for exam in exams %}
+    <div class="exam-card" id="exam-{{ exam.id }}">
+        <div class="exam-header" onclick="toggleExam('{{ exam.id }}')">
+            <div>
+                <div class="exam-name">{{ exam.name }}</div>
+                <div class="exam-meta">
+                    {% if exam.start_date %}{{ exam.start_date.strftime('%d %b') }}{% endif %}
+                    {% if exam.end_date %} — {{ exam.end_date.strftime('%d %b %Y') }}{% endif %}
+                    · {{ exam.exam_subjects|length }} subjects configured
+                </div>
+            </div>
+            <div class="exam-badges">
+                {% if exam.is_published %}
+                <span class="badge badge-success">Published</span>
+                {% else %}
+                <span class="badge badge-gray">Draft</span>
+                {% endif %}
+                <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); publishExam('{{ exam.id }}', {{ 'true' if exam.is_published else 'false' }})">
+                    <i class="fas fa-{{ 'eye-slash' if exam.is_published else 'eye' }}"></i>
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteExam('{{ exam.id }}')" style="color: var(--danger);"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+        <div class="exam-body" id="exam-body-{{ exam.id }}">
+            <h4 style="margin-bottom: 12px;">Add Subject to Exam</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 80px 80px auto; gap: 8px; align-items: end; margin-bottom: 16px;">
+                <select class="form-select" id="es-class-{{ exam.id }}">
+                    <option value="">Class</option>
+                    {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+                </select>
+                <select class="form-select" id="es-subject-{{ exam.id }}">
+                    <option value="">Subject</option>
+                    {% for s in subjects %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+                </select>
+                <input type="number" class="form-input" id="es-max-{{ exam.id }}" value="100" placeholder="Max" style="text-align:center;">
+                <input type="number" class="form-input" id="es-pass-{{ exam.id }}" value="33" placeholder="Pass" style="text-align:center;">
+                <button class="btn btn-primary btn-sm" onclick="addSubject('{{ exam.id }}')"><i class="fas fa-plus"></i></button>
+            </div>
+            <div id="exam-subjects-{{ exam.id }}">Loading...</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not exams %}
+<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-file-alt"></i><h3>No Exams Yet</h3><p>Create your first exam above</p></div></div></div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function createExam() {
+    const name = document.getElementById('examName').value.trim();
+    if (!name) { showToast('warning', 'Enter exam name', ''); return; }
+    try {
+        const result = await apiCall('/api/school/exams/create', 'POST', {
+            name, start_date: document.getElementById('examStart').value || null,
+            end_date: document.getElementById('examEnd').value || null,
+        });
+        showToast('success', 'Exam Created! 🎓', result.message);
+        setTimeout(() => location.reload(), 800);
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+
+function toggleExam(id) {
+    const body = document.getElementById('exam-body-' + id);
+    body.classList.toggle('open');
+    if (body.classList.contains('open')) loadExamSubjects(id);
+}
+
+async function loadExamSubjects(examId) {
+    try {
+        const result = await apiCall(`/api/school/exams/${examId}/subjects`);
+        const area = document.getElementById('exam-subjects-' + examId);
+        if (result.subjects.length === 0) {
+            area.innerHTML = '<div style="color: var(--text-light); font-size: 0.82rem;">No subjects added yet</div>';
+            return;
+        }
+        area.innerHTML = `<div class="sub-row header"><div>Subject</div><div>Max</div><div>Pass</div><div></div></div>` +
+            result.subjects.map(s => `<div class="sub-row"><div style="font-weight:600;">${s.subject_name}</div><div>${s.max_marks}</div><div>${s.passing_marks}</div><div></div></div>`).join('');
+    } catch(e) {}
+}
+
+async function addSubject(examId) {
+    const classId = document.getElementById('es-class-' + examId).value;
+    const subjectId = document.getElementById('es-subject-' + examId).value;
+    const max = parseFloat(document.getElementById('es-max-' + examId).value) || 100;
+    const pass = parseFloat(document.getElementById('es-pass-' + examId).value) || 33;
+    if (!classId || !subjectId) { showToast('warning', 'Select class & subject', ''); return; }
+    try {
+        await apiCall('/api/school/exams/add-subject', 'POST', { exam_id: examId, class_id: classId, subject_id: subjectId, max_marks: max, passing_marks: pass });
+        showToast('success', 'Subject Added', '');
+        loadExamSubjects(examId);
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+
+async function deleteExam(id) {
+    if (!confirm('Delete this exam and all marks?')) return;
+    try { await apiCall(`/api/school/exams/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+}
+
+async function publishExam(id, current) {
+    const action = current ? 'unpublish (hide from students)' : 'publish (make visible to students)';
+    if (!confirm(`Are you sure you want to ${action} this exam's results?`)) return;
+    try {
+        const result = await apiCall(`/api/school/exams/${id}/publish`, 'POST');
+        showToast('success', result.message, '');
+        setTimeout(() => location.reload(), 500);
+    } catch(e) {}
+}
+</script>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block title %}QR Attendance{% endblock %}
+{% block page_title %}📱 QR Code Attendance{% endblock %}
+{% block page_subtitle %}Scan student QR codes to mark attendance instantly{% endblock %}
+
+{% block extra_css %}
+<style>
+.qr-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;min-height:60vh;}
+/* Scanner */
+.scan-card{background:white;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;display:flex;flex-direction:column;align-items:center;}
+.scan-card h3{font-size:0.92rem;margin-bottom:14px;align-self:flex-start;}
+#scanArea{width:100%;max-width:320px;aspect-ratio:1;background:#1a1a2e;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+#scanArea video{width:100%;height:100%;object-fit:cover;border-radius:14px;}
+.scan-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+.scan-box{width:200px;height:200px;border:3px solid rgba(255,255,255,0.5);border-radius:12px;position:relative;}
+.scan-box::before,.scan-box::after{content:'';position:absolute;width:30px;height:30px;border:3px solid #00ff88;}
+.scan-box::before{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:4px 0 0 0;}
+.scan-box::after{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 4px 0;}
+.manual-input{margin-top:14px;display:flex;gap:8px;width:100%;max-width:320px;}
+.manual-input input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:0.85rem;}
+.manual-input button{padding:10px 18px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+/* Log */
+.log-card{background:white;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;}
+.log-card h3{font-size:0.92rem;margin-bottom:14px;}
+.log-stats{display:flex;gap:10px;margin-bottom:14px;}
+.ls{padding:8px 16px;border-radius:10px;text-align:center;}
+.ls-val{font-size:1.4rem;font-weight:900;}.ls-lbl{font-size:0.62rem;text-transform:uppercase;font-weight:700;color:var(--text-light);}
+.ls.green{background:#D1FAE5;}.ls.green .ls-val{color:#059669;}
+.ls.red{background:#FEE2E2;}.ls.red .ls-val{color:#DC2626;}
+.ls.blue{background:#DBEAFE;}.ls.blue .ls-val{color:#2563EB;}
+/* Log entries */
+.log-entry{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light);}
+.log-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.72rem;}
+.log-name{font-weight:700;font-size:0.82rem;}
+.log-meta{font-size:0.68rem;color:var(--text-light);}
+.log-time{margin-left:auto;font-size:0.72rem;color:var(--text-light);}
+.log-status{padding:3px 8px;border-radius:6px;font-size:0.65rem;font-weight:700;margin-left:8px;}
+.log-status.present{background:#D1FAE5;color:#059669;}
+.success-flash{animation:flash 0.5s ease;}
+@keyframes flash{0%{background:#D1FAE5;}100%{background:transparent;}}
+/* Config */
+.config-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.config-row select{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;}
+.btn-scan{padding:12px 24px;border-radius:12px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;font-size:0.92rem;margin-top:10px;}
+.btn-scan.active{background:#059669;}
+@media(max-width:768px){.qr-layout{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="config-row">
+    <select id="qrClass" onchange="loadSections()"><option value="">Select Class</option></select>
+    <select id="qrSection"><option value="">All Sections</option></select>
+    <select id="qrDate"><option value="">Today</option></select>
+</div>
+
+<div class="qr-layout">
+    <!-- Scanner Side -->
+    <div class="scan-card">
+        <h3>📷 Scan QR Code</h3>
+        <div id="scanArea">
+            <div id="scanPlaceholder" style="color:white;text-align:center;padding:20px;">
+                <i class="fas fa-qrcode" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:10px;"></i>
+                <div style="font-size:0.82rem;opacity:0.7;">Click "Start Camera" to scan</div>
+            </div>
+        </div>
+        <button class="btn-scan" id="scanBtn" onclick="toggleCamera()"><i class="fas fa-camera"></i> Start Camera</button>
+        <div class="manual-input">
+            <input id="manualId" placeholder="Or enter roll number / student ID">
+            <button onclick="markManual()"><i class="fas fa-check"></i> Mark</button>
+        </div>
+        <div id="lastScanned" style="margin-top:12px;padding:10px;border-radius:10px;background:#D1FAE5;display:none;text-align:center;font-weight:700;color:#059669;width:100%;max-width:320px;">
+            ✅ <span id="lastName"></span> marked present!
+        </div>
+    </div>
+
+    <!-- Log Side -->
+    <div class="log-card">
+        <h3>📋 Attendance Log</h3>
+        <div class="log-stats">
+            <div class="ls green"><div class="ls-val" id="presentCount">0</div><div class="ls-lbl">Present</div></div>
+            <div class="ls blue"><div class="ls-val" id="totalScanned">0</div><div class="ls-lbl">Scanned</div></div>
+            <div class="ls red"><div class="ls-val" id="pendingCount">0</div><div class="ls-lbl">Pending</div></div>
+        </div>
+        <div id="logList" style="max-height:50vh;overflow-y:auto;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let scanning = false, scannedIds = new Set(), logEntries = [], videoStream = null;
+
+async function init() {
+    try {
+        const r = await fetch('/api/school/classes', {credentials:'same-origin'});
+        const d = await r.json();
+        document.getElementById('qrClass').innerHTML = '<option value="">Select Class</option>' + 
+            (d.classes||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    } catch(e){}
+}
+
+async function loadSections() {
+    const cid = document.getElementById('qrClass').value;
+    const sel = document.getElementById('qrSection');
+    sel.innerHTML = '<option value="">All Sections</option>';
+    if (!cid) return;
+    try {
+        const r = await fetch(`/api/school/classes/${cid}/sections`, {credentials:'same-origin'});
+        const d = await r.json();
+        (d.sections||[]).forEach(s => { sel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    } catch(e){}
+}
+
+async function toggleCamera() {
+    const btn = document.getElementById('scanBtn');
+    if (scanning) { stopCamera(); btn.innerHTML='<i class="fas fa-camera"></i> Start Camera'; btn.classList.remove('active'); scanning=false; return; }
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+        videoStream = stream;
+        const area = document.getElementById('scanArea');
+        area.innerHTML = '<video autoplay playsinline></video><div class="scan-overlay"><div class="scan-box"></div></div>';
+        area.querySelector('video').srcObject = stream;
+        scanning = true;
+        btn.innerHTML = '<i class="fas fa-stop"></i> Stop Camera'; btn.classList.add('active');
+        startQRDetection();
+    } catch(e) { alert('Camera access denied. Use manual input instead.'); }
+}
+
+function stopCamera() {
+    if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+    document.getElementById('scanArea').innerHTML = '<div id="scanPlaceholder" style="color:white;text-align:center;padding:20px;"><i class="fas fa-qrcode" style="font-size:3rem;opacity:0.3;display:block;margin-bottom:10px;"></i><div style="font-size:0.82rem;opacity:0.7;">Camera stopped</div></div>';
+}
+
+function startQRDetection() {
+    if (!scanning) return;
+    const video = document.querySelector('#scanArea video');
+    if (!video || !video.videoWidth) { setTimeout(startQRDetection, 500); return; }
+    // Use BarcodeDetector API if available
+    if ('BarcodeDetector' in window) {
+        const detector = new BarcodeDetector({formats:['qr_code']});
+        const scanFrame = async () => {
+            if (!scanning) return;
+            try {
+                const codes = await detector.detect(video);
+                if (codes.length > 0) processQR(codes[0].rawValue);
+            } catch(e) {}
+            requestAnimationFrame(scanFrame);
+        };
+        scanFrame();
+    } else {
+        // Fallback: show manual input message
+        console.log('BarcodeDetector not supported — use manual input');
+    }
+}
+
+async function processQR(value) {
+    if (!value || scannedIds.has(value)) return;
+    scannedIds.add(value);
+    await markAttendance(value);
+}
+
+async function markManual() {
+    const val = document.getElementById('manualId').value.trim();
+    if (!val) return;
+    await markAttendance(val);
+    document.getElementById('manualId').value = '';
+}
+
+async function markAttendance(studentIdentifier) {
+    const classId = document.getElementById('qrClass').value;
+    try {
+        const res = await fetch('/api/school/attendance/qr-mark', {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({student_identifier: studentIdentifier, class_id: classId})
+        });
+        const d = await res.json();
+        if (d.success) {
+            logEntries.unshift({name: d.student_name, time: new Date().toLocaleTimeString(), roll: d.roll || '', status:'present'});
+            renderLog();
+            showScanned(d.student_name);
+            // Play beep
+            try { new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH+JkZuTi4GBb2JfaXB/ipKXl5GFfXhyamdmaW94hIyRk5GNiIF6dXRzc3d8goeKjI2Nh4J+enl4eHp9gIOGiImJh4WCf3x7ent8foGDhoiIiIaDgH17enp7fH6BhIaHh4eFgn99fHt7fH2Ag4WGhoaEgX9+fXx8fX6AgoSFhYWEgn9+fXx8fX5/gYOEhISEg4F/fn18fH1+f4GCg4ODg4KBf359fX1+fn+BgoODg4OCgX9+fn19fn5/gIGCgoKCgYB/fn5+fn5+f4CBgoKCgoGAf35+fn5+fn+AgIGBgYGBgH9/fn5+fn5/gICBgYGBgYB/f35+fn5+f4CAgYGBgYGAf39+fn5+fn+AgIGBgYGBgIB/fn5+fn5/f4CAgYGBgQ==').play(); } catch(e){}
+        } else {
+            showToast('error', d.message || 'Student not found');
+        }
+    } catch(e) { showToast('error', 'Failed to mark attendance'); }
+}
+
+function showScanned(name) {
+    const el = document.getElementById('lastScanned');
+    document.getElementById('lastName').textContent = name;
+    el.style.display = 'block'; el.classList.remove('success-flash');
+    void el.offsetWidth; el.classList.add('success-flash');
+    setTimeout(()=>{ el.style.display='none'; }, 3000);
+}
+
+function renderLog() {
+    document.getElementById('totalScanned').textContent = logEntries.length;
+    document.getElementById('presentCount').textContent = logEntries.filter(l=>l.status==='present').length;
+    document.getElementById('logList').innerHTML = logEntries.map(l => `<div class="log-entry success-flash">
+        <div class="log-avatar">${l.name.charAt(0)}</div>
+        <div><div class="log-name">${l.name}</div><div class="log-meta">${l.roll}</div></div>
+        <span class="log-status present">✅ Present</span>
+        <div class="log-time">${l.time}</div>
+    </div>`).join('');
+}
+
+init();
+</script>
+{% endblock %}

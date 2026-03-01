@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Morning Brief{% endblock %}
+{% block page_title %}☀️ Morning Brief{% endblock %}
+{% block page_subtitle %}Your daily school intelligence · {{ today }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.brief-hero { background:linear-gradient(135deg,#1E1B4B,#4338CA); border-radius:16px; padding:24px; color:white; margin-bottom:16px; }
+.brief-hero h2 { font-size:1rem; margin-bottom:14px; opacity:0.85; }
+.pulse-row { display:flex; align-items:center; gap:20px; flex-wrap:wrap; }
+.pulse-circle { width:80px; height:80px; border-radius:50%; border:4px solid rgba(255,255,255,0.2); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.pulse-val { font-size:1.6rem; font-weight:900; line-height:1; }
+.pulse-lbl { font-size:0.6rem; opacity:0.7; text-transform:uppercase; }
+.kpi-row { display:flex; gap:12px; flex:1; flex-wrap:wrap; }
+.kpi-box { background:rgba(255,255,255,0.08); border-radius:10px; padding:10px 14px; min-width:110px; }
+.kpi-val { font-size:1.2rem; font-weight:900; } .kpi-lbl { font-size:0.65rem; opacity:0.6; }
+.kpi-delta { font-size:0.62rem; margin-top:2px; }
+.kpi-delta.up { color:#4ADE80; } .kpi-delta.down { color:#FCA5A5; }
+
+/* Action items */
+.actions-title { font-size:0.92rem; font-weight:800; margin:16px 0 12px; display:flex; align-items:center; gap:8px; color:var(--text-primary, #1e293b); }
+.action-list { display:flex; flex-direction:column; gap:10px; margin-bottom:20px; }
+.act-card { background:var(--bg-card, white); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:14px 16px; display:flex; align-items:flex-start; gap:12px; border-left:4px solid var(--primary); border:1px solid var(--border-light, #f1f5f9); border-left:4px solid var(--primary); }
+.act-card.urgent { border-left-color:#EF4444; } .act-card.warning { border-left-color:#F59E0B; }
+.act-card.good { border-left-color:#10B981; } .act-card.info { border-left-color:#6366F1; }
+.act-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:0.9rem; flex-shrink:0; }
+.act-icon.urgent { background:rgba(239,68,68,0.12); } .act-icon.warning { background:rgba(245,158,11,0.12); }
+.act-icon.good { background:rgba(16,185,129,0.12); } .act-icon.info { background:rgba(99,102,241,0.12); }
+.act-body { flex:1; }
+.act-title { font-weight:700; font-size:0.85rem; margin-bottom:2px; color:var(--text-primary, #1e293b); }
+.act-why { font-size:0.78rem; color:var(--text-secondary); line-height:1.4; }
+.act-btn { display:inline-block; margin-top:6px; padding:4px 12px; border-radius:6px; font-size:0.68rem; font-weight:700; background:var(--bg-secondary); color:var(--primary); text-decoration:none; }
+.act-btn:hover { background:var(--primary-50, rgba(99,102,241,0.1)); }
+
+/* Predictions */
+.predict-box { background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:12px; padding:14px; margin-bottom:10px; }
+.predict-label { font-size:0.62rem; font-weight:700; color:#D97706; text-transform:uppercase; letter-spacing:0.5px; }
+.predict-text { font-size:0.85rem; font-weight:700; color:var(--text-primary, #78350F); margin-top:2px; }
+.predict-reason { font-size:0.72rem; color:var(--text-secondary, #92400E); margin-top:4px; }
+
+/* Dark mode specifics */
+[data-theme="dark"] .predict-box { background:rgba(245,158,11,0.1); border-color:rgba(245,158,11,0.25); }
+[data-theme="dark"] .predict-label { color:#FBBF24; }
+[data-theme="dark"] .predict-text { color:var(--text); }
+[data-theme="dark"] .predict-reason { color:var(--text-secondary); }
+[data-theme="dark"] .act-card { background:var(--bg-card); border-color:var(--border); }
+[data-theme="dark"] .act-title { color:var(--text); }
+
+.empty-brief { text-align:center; padding:60px; color:var(--text-light); }
+@media(max-width:640px) { .pulse-row { flex-direction:column; } .kpi-row { width:100%; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="briefContent"><div class="empty-brief"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i><div style="margin-top:8px;">Analyzing school data...</div></div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function loadBrief() {
+    try {
+        const res = await fetch('/api/school/morning-brief', {credentials:'same-origin'});
+        if (!res.ok) throw new Error('API failed');
+        const d = await res.json();
+        render(d);
+    } catch(e) {
+        document.getElementById('briefContent').innerHTML = '<div class="empty-brief">Could not load brief. <a href="/school/dashboard">Go to Dashboard →</a></div>';
+    }
+}
+
+function render(d) {
+    const pc = d.pulse >= 80 ? '#4ADE80' : d.pulse >= 60 ? '#FBBF24' : '#F87171';
+    const pl = d.pulse >= 80 ? 'Healthy' : d.pulse >= 60 ? 'Needs Attention' : 'Critical';
+
+    let html = `<div class="brief-hero"><h2>📊 School Pulse</h2><div class="pulse-row">
+        <div class="pulse-circle" style="border-color:${pc}"><div class="pulse-val" style="color:${pc}">${d.pulse}</div><div class="pulse-lbl">${pl}</div></div>
+        <div class="kpi-row">
+            <div class="kpi-box"><div class="kpi-val">${d.att_today}%</div><div class="kpi-lbl">Attendance Today</div>${d.att_delta?`<div class="kpi-delta ${d.att_delta>=0?'up':'down'}">${d.att_delta>=0?'↑':'↓'} ${Math.abs(d.att_delta)}% vs last week</div>`:''}</div>
+            <div class="kpi-box"><div class="kpi-val">${d.teachers_present}/${d.teachers_total}</div><div class="kpi-lbl">Teachers Present</div>${d.teachers_absent>0?`<div class="kpi-delta down">${d.teachers_absent} absent</div>`:''}</div>
+            <div class="kpi-box"><div class="kpi-val">₹${(d.fee_collected_month/1000).toFixed(0)}K</div><div class="kpi-lbl">Fee This Month</div><div class="kpi-delta ${d.fee_pct>=50?'up':'down'}">${d.fee_pct}% of target</div></div>
+            <div class="kpi-box"><div class="kpi-val">${d.pending_leaves}</div><div class="kpi-lbl">Pending Leaves</div></div>
+        </div></div></div>`;
+
+    // Action items
+    if (d.actions.length) {
+        html += '<div class="actions-title">🎯 Actions Needed <span style="font-size:0.72rem;color:var(--text-light);font-weight:400;">('+d.actions.length+')</span></div><div class="action-list">';
+        d.actions.forEach(a => {
+            html += `<div class="act-card ${a.level}"><div class="act-icon ${a.level}">${a.icon}</div><div class="act-body"><div class="act-title">${a.title}</div><div class="act-why">${a.why}</div>${a.link?`<a href="${a.link}" class="act-btn">${a.link_text||'Take Action →'}</a>`:''}</div></div>`;
+        });
+        html += '</div>';
+    }
+
+    // Predictions
+    if (d.predictions.length) {
+        html += '<div class="actions-title">🔮 Predictions & Alerts</div>';
+        d.predictions.forEach(p => {
+            html += `<div class="predict-box"><div class="predict-label">⚡ ${p.timeframe}</div><div class="predict-text">${p.prediction}</div><div class="predict-reason">Based on: ${p.reason}</div></div>`;
+        });
+    }
+
+    // Wins
+    if (d.wins.length) {
+        html += '<div class="actions-title">🏆 Wins Today</div><div class="action-list">';
+        d.wins.forEach(w => {
+            html += `<div class="act-card good"><div class="act-icon good">🎉</div><div class="act-body"><div class="act-title">${w.title}</div><div class="act-why">${w.why}</div></div></div>`;
+        });
+        html += '</div>';
+    }
+
+    document.getElementById('briefContent').innerHTML = html;
+}
+
+loadBrief();
+</script>
+{% endblock %}

@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Teachers{% endblock %}
+{% block page_title %}Teachers{% endblock %}
+{% block page_subtitle %}Manage your school's teaching staff{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Teachers ({{ teachers | length }})</h2>
+        <button class="btn btn-primary" onclick="openModal('addTeacherModal')">
+            <i class="fas fa-plus"></i> Add Teacher
+        </button>
+    </div>
+    <div class="card-body">
+        {% if teachers %}
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Teacher</th>
+                        <th>Employee ID</th>
+                        <th>Designation</th>
+                        <th>Contact</th>
+                        <th>Qualification</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in teachers %}
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div class="student-thumb" style="background: linear-gradient(135deg, var(--primary-50), var(--primary-100)); color: var(--primary);">
+                                    {{ t.first_name[0] }}{{ (t.last_name or ' ')[0] }}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 600;">{{ t.full_name }}</div>
+                                    <div class="text-xs text-muted">{{ t.specialization or '' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="text-sm">{{ t.employee_id or '—' }}</td>
+                        <td><span class="badge badge-purple">{{ t.designation or 'Teacher' }}</span></td>
+                        <td>
+                            <div class="text-sm">{{ t.phone or '—' }}</div>
+                            <div class="text-xs text-muted">{{ t.email or '' }}</div>
+                        </td>
+                        <td class="text-sm">{{ t.qualification or '—' }}</td>
+                        <td>
+                            {% if t.is_active %}
+                            <span class="badge badge-success">Active</span>
+                            {% else %}
+                            <span class="badge badge-gray">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 6px;">
+                                <button class="btn btn-secondary btn-sm" onclick="editTeacher('{{ t.id }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-secondary btn-sm" onclick="deleteItem('/api/school/teachers/{{ t.id }}', '{{ t.full_name }}')">
+                                    <i class="fas fa-trash" style="color: var(--danger);"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-chalkboard-teacher"></i>
+            <h3>No teachers added yet</h3>
+            <p>Add your teaching staff to start building the timetable</p>
+            <button class="btn btn-primary" onclick="openModal('addTeacherModal')">
+                <i class="fas fa-plus"></i> Add Teacher
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Teacher Modal -->
+<div class="modal-overlay" id="addTeacherModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2>Add Teacher</h2>
+            <button class="modal-close" onclick="closeModal('addTeacherModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="addTeacherForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Name <span class="required">*</span></label>
+                        <input type="text" name="first_name" class="form-input" placeholder="First name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" name="last_name" class="form-input" placeholder="Last name">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Employee ID</label>
+                        <input type="text" name="employee_id" class="form-input" placeholder="e.g., EMP-001">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Designation</label>
+                        <select name="designation" class="form-select">
+                            <option value="">Select...</option>
+                            <option value="PRT">PRT (Primary Teacher)</option>
+                            <option value="TGT">TGT (Trained Graduate Teacher)</option>
+                            <option value="PGT">PGT (Post Graduate Teacher)</option>
+                            <option value="HM">Head Master/Mistress</option>
+                            <option value="VP">Vice Principal</option>
+                            <option value="Coordinator">Coordinator</option>
+                            <option value="Librarian">Librarian</option>
+                            <option value="PTI">PTI (Physical Training Instructor)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-input" placeholder="teacher@school.com">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="tel" name="phone" class="form-input" placeholder="9876543210">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Qualification</label>
+                        <input type="text" name="qualification" class="form-input" placeholder="e.g., M.Sc, B.Ed">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Specialization</label>
+                        <input type="text" name="specialization" class="form-input" placeholder="e.g., Mathematics, Physics">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Experience (Years)</label>
+                        <input type="number" name="experience_years" class="form-input" placeholder="0" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Joining Date</label>
+                        <input type="date" name="joining_date" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea name="address" class="form-textarea" rows="2" placeholder="Full address"></textarea>
+                </div>
+                <hr style="border: none; border-top: 1px solid var(--border-light); margin: 16px 0;">
+                <p class="text-sm text-muted mb-2"><i class="fas fa-info-circle"></i> A login account will be created for this teacher. They can log in with their email/phone.</p>
+                <div class="form-group">
+                    <label class="form-label">Login Password <span class="required">*</span></label>
+                    <input type="password" name="password" class="form-input" placeholder="Set initial password" required>
+                    <div class="form-hint">Teacher can change this after first login</div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addTeacherModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitTeacherForm()">
+                <i class="fas fa-plus"></i> Add Teacher
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function submitTeacherForm() {
+    const data = getFormData('addTeacherForm');
+    if (!data.first_name || !data.password) {
+        showToast('error', 'Error', 'Name and password are required');
+        return;
+    }
+    try {
+        await apiCall('/api/school/teachers', 'POST', data);
+        showToast('success', 'Teacher Added!', `${data.first_name} ${data.last_name || ''} has been added`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+function editTeacher(id) {
+    showToast('info', 'Coming Soon', 'Edit functionality will be available soon');
+}
+</script>
+{% endblock %}

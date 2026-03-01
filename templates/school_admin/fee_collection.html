@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Fee Collection{% endblock %}
+{% block page_title %}Fee Collection{% endblock %}
+{% block page_subtitle %}Generate fees, collect payments, and track balances{% endblock %}
+
+{% block extra_css %}
+<style>
+    .student-fee-row { display: grid; grid-template-columns: 40px 1fr 100px 100px 100px 100px auto; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
+    .student-fee-row.header { background: var(--bg-sidebar); color: white; font-size: 0.72rem; text-transform: uppercase; font-weight: 700; border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
+    .student-fee-row:hover:not(.header) { background: #FAFBFF; }
+    .balance-positive { color: var(--danger); font-weight: 700; }
+    .balance-zero { color: var(--success); font-weight: 700; }
+    .gen-bar { display: flex; align-items: center; gap: 12px; padding: 14px 20px; flex-wrap: wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Filters & Generate -->
+<div class="card mb-3">
+    <div class="card-body gen-bar">
+        <select id="selClass" class="form-select" onchange="onClassChange()" style="min-width:140px; padding:10px;">
+            <option value="">Select Class</option>
+            {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select>
+        <select id="selSection" class="form-select" style="min-width:120px; padding:10px;">
+            <option value="">All Sections</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadStudentFees()"><i class="fas fa-search"></i> View Fees</button>
+        <div style="flex:1;"></div>
+        <div style="display:flex; gap:6px; align-items:center;">
+            <select id="genMonth" class="form-select" style="padding:10px;">
+                {% for m in range(1,13) %}<option value="{{ m }}" {{ 'selected' if m == 2 }}>{{ ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m-1] }}</option>{% endfor %}
+            </select>
+            <input type="number" id="genYear" class="form-input" value="2026" style="width:80px; padding:10px;">
+            <button class="btn btn-secondary" onclick="generateFees()"><i class="fas fa-magic"></i> Generate Fees</button>
+            <button class="btn btn-ghost" onclick="window.open('/api/school/export/fees-csv','_blank')" title="Export all fees CSV"><i class="fas fa-download"></i></button>
+        </div>
+    </div>
+</div>
+
+<div id="feeArea">
+    <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-hand-holding-usd"></i><h3>Select a Class</h3><p>Choose a class to view student fees and collect payments</p></div></div></div>
+</div>
+
+<!-- Collect Payment Modal -->
+<div class="modal-overlay" id="collectModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2 id="collectTitle">Collect Payment</h2>
+            <button class="modal-close" onclick="closeModal('collectModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div id="studentFeeDetails"></div>
+            <div class="form-group">
+                <label class="form-label">Amount Collecting (₹)</label>
+                <input type="number" id="collectAmount" class="form-input" style="font-size: 1.2rem; font-weight: 700;">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div class="form-group"><label class="form-label">Payment Mode</label>
+                    <select id="collectMode" class="form-select">
+                        <option value="cash">💵 Cash</option><option value="upi">📱 UPI</option>
+                        <option value="bank_transfer">🏦 Bank Transfer</option><option value="cheque">📝 Cheque</option>
+                        <option value="razorpay">💳 Razorpay</option><option value="phonepe">📲 PhonePe</option>
+                    </select></div>
+                <div class="form-group"><label class="form-label">Transaction ID (optional)</label>
+                    <input type="text" id="collectTxn" class="form-input" placeholder="UTR / Reference"></div>
+            </div>
+            <div class="form-group"><label class="form-label">Discount (₹)</label>
+                <input type="number" id="collectDiscount" class="form-input" value="0"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('collectModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="collectPayment()" id="collectBtn"><i class="fas fa-check-circle"></i> Collect & Generate Receipt</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const classSections = {{ sections_json | safe }};
+let currentFeeRecordId = '';
+
+function onClassChange() {
+    const classId = document.getElementById('selClass').value;
+    const sec = document.getElementById('selSection');
+    sec.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(s => sec.innerHTML += `<option value="${s.id}">${s.name}</option>`);
+    }
+}
+
+async function generateFees() {
+    const classId = document.getElementById('selClass').value;
+    if (!classId) { showToast('warning', 'Select class first', ''); return; }
+    const month = document.getElementById('genMonth').value;
+    const year = document.getElementById('genYear').value;
+    const sectionId = document.getElementById('selSection').value;
+    try {
+        const result = await apiCall(`/api/school/fees/generate?class_id=${classId}&month=${month}&year=${year}${sectionId ? '&section_id=' + sectionId : ''}`, 'POST');
+        showToast('success', 'Fees Generated! 💰', result.message);
+        loadStudentFees();
+    } catch(e) { showToast('error', 'Error', e.message); }
+}
+
+async function loadStudentFees() {
+    const classId = document.getElementById('selClass').value;
+    const sectionId = document.getElementById('selSection').value;
+    if (!classId) { showToast('warning', 'Select class', ''); return; }
+
+    const area = document.getElementById('feeArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div>';
+
+    try {
+        const params = new URLSearchParams({ class_id: classId });
+        if (sectionId) params.append('section_id', sectionId);
+        const result = await apiCall(`/api/school/fees/student-fees?${params}`);
+
+        if (result.students.length === 0) {
+            area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-users"></i><h3>No Students</h3></div></div></div>';
+            return;
+        }
+
+        let html = '<div class="card" style="overflow-x:auto;"><div class="student-fee-row header"><div>#</div><div>Student</div><div>Total Due</div><div>Paid</div><div>Discount</div><div>Balance</div><div></div></div>';
+
+        result.students.forEach((s, i) => {
+            const hasBal = s.balance > 0;
+            html += `<div class="student-fee-row">
+                <div style="color:var(--text-light);">${i+1}</div>
+                <div><strong>${s.name}</strong><span style="color:var(--text-light); margin-left:6px; font-size:0.75rem;">${s.roll}</span></div>
+                <div>₹${s.total_due.toLocaleString('en-IN')}</div>
+                <div style="color:var(--success);">₹${s.total_paid.toLocaleString('en-IN')}</div>
+                <div style="color:var(--warning);">₹${s.discount.toLocaleString('en-IN')}</div>
+                <div class="${hasBal ? 'balance-positive' : 'balance-zero'}">₹${s.balance.toLocaleString('en-IN')}</div>
+                <div>${hasBal ? `<button class="btn btn-primary btn-sm" onclick="openCollect('${s.id}', '${s.name}', ${JSON.stringify(s.fees).replace(/"/g, '&quot;')})"><i class="fas fa-rupee-sign"></i> Collect</button>` : '<span style="color:var(--success); font-weight:700;">✅ Paid</span>'}</div>
+            </div>`;
+        });
+
+        html += '</div>';
+        area.innerHTML = html;
+    } catch(e) { area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><h3>Error</h3><p>${e.message}</p></div></div></div>`; }
+}
+
+function openCollect(studentId, name, fees) {
+    document.getElementById('collectTitle').textContent = `Collect Payment — ${name}`;
+    const pendingFees = fees.filter(f => f.status !== 'paid' && f.status !== 'waived');
+    if (pendingFees.length === 0) { showToast('info', 'All fees paid', ''); return; }
+
+    currentFeeRecordId = pendingFees[0].id;
+    const totalDue = pendingFees.reduce((s, f) => s + f.amount_due - (f.amount_paid || 0) - (f.discount || 0), 0);
+
+    document.getElementById('studentFeeDetails').innerHTML = pendingFees.map(f => `
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border-light); font-size:0.85rem;">
+            <span>${f.name || 'Fee'} (Due: ${f.due_date})</span>
+            <strong>₹${(f.amount_due - (f.amount_paid||0)).toLocaleString('en-IN')}</strong>
+        </div>
+    `).join('') + `<div style="padding:8px 0; font-weight:800; font-size:1rem; color:var(--primary); text-align:right;">Total: ₹${totalDue.toLocaleString('en-IN')}</div>`;
+
+    document.getElementById('collectAmount').value = pendingFees[0].amount_due - (pendingFees[0].amount_paid || 0);
+    document.getElementById('collectDiscount').value = 0;
+    openModal('collectModal');
+}
+
+async function collectPayment() {
+    const btn = document.getElementById('collectBtn');
+    btn.disabled = true;
+    try {
+        const result = await apiCall('/api/school/fees/collect', 'POST', {
+            fee_record_id: currentFeeRecordId,
+            amount: parseFloat(document.getElementById('collectAmount').value),
+            payment_mode: document.getElementById('collectMode').value,
+            transaction_id: document.getElementById('collectTxn').value || null,
+            discount: parseFloat(document.getElementById('collectDiscount').value) || 0,
+        });
+        closeModal('collectModal');
+        showToast('success', `Payment Collected! 🎉`, `Receipt: ${result.receipt}`);
+        // Open PDF receipt
+        window.open(`/api/school/fees/receipt-pdf/${currentFeeRecordId}`, '_blank');
+        loadStudentFees();
+    } catch(e) { showToast('error', 'Error', e.message); }
+    btn.disabled = false;
+}
+</script>
+{% endblock %}

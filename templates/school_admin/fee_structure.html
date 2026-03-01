@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}Fee Structure{% endblock %}
+{% block page_title %}Fee Structure{% endblock %}
+{% block page_subtitle %}Define fee types, amounts, and frequency per class{% endblock %}
+
+{% block extra_css %}
+<style>
+    .fee-card{display:grid;grid-template-columns:1fr auto auto auto auto;align-items:center;gap:14px;padding:16px 20px;background:var(--bg-card,white);border:1px solid var(--border,#e2e8f0);border-radius:14px;margin-bottom:8px;transition:all 0.2s;}
+    .fee-card:hover{box-shadow:0 4px 16px rgba(0,0,0,0.06);border-color:var(--primary,#6366f1);}
+    .fee-name{font-weight:700;color:var(--text,#0f172a);}
+    .fee-class{font-size:0.78rem;color:var(--text-light,#64748b);margin-top:2px;}
+    .fee-amount{font-weight:800;font-size:1.1rem;color:var(--primary,#6366f1);}
+    .fee-freq{font-size:0.68rem;padding:4px 12px;border-radius:20px;background:rgba(99,102,241,0.1);color:#6366f1;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+    .fee-actions{display:flex;gap:4px;}
+    .fee-actions button{width:32px;height:32px;border-radius:8px;border:1px solid var(--border,#e2e8f0);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.72rem;transition:all 0.2s;color:var(--text-light,#64748b);}
+    .fee-actions .btn-edit:hover{background:rgba(99,102,241,0.1);color:#6366f1;border-color:#6366f1;}
+    .fee-actions .btn-del:hover{background:rgba(220,38,38,0.1);color:#dc2626;border-color:#dc2626;}
+    .add-grid{display:grid;grid-template-columns:1fr 1fr 110px 130px 80px auto;gap:10px;align-items:end;}
+    @media(max-width:900px){.add-grid{grid-template-columns:1fr 1fr;}.fee-card{grid-template-columns:1fr auto auto;}.fee-card>div:nth-child(4){display:none;}}
+    /* Edit modal */
+    .edit-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+    .edit-modal{background:var(--bg-card,white);border-radius:16px;padding:24px 28px;width:520px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.2);}
+    .edit-modal h3{margin:0 0 16px 0;font-size:1rem;font-weight:800;color:var(--text,#0f172a);}
+    .edit-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+    .ef label{font-size:0.62rem;font-weight:700;text-transform:uppercase;color:var(--text-light,#64748b);letter-spacing:0.5px;display:block;margin-bottom:4px;}
+    .ef input,.ef select{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border,#e2e8f0);background:var(--bg-card,white);color:var(--text,#0f172a);font-size:0.82rem;box-sizing:border-box;}
+    .ef input:focus,.ef select:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,0.15);}
+    .edit-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+    .edit-footer button{padding:10px 22px;border-radius:10px;font-weight:700;font-size:0.8rem;cursor:pointer;border:none;transition:all 0.2s;}
+    .edit-footer .btn-cancel{background:var(--bg,#f1f5f9);color:var(--text,#0f172a);border:1.5px solid var(--border,#e2e8f0);}
+    .edit-footer .btn-save{background:#6366f1;color:white;}
+    .edit-footer .btn-save:hover{background:#4f46e5;}
+    /* Stats */
+    .fee-stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+    .fee-stat{background:var(--bg-card,white);border:1px solid var(--border,#e2e8f0);border-radius:12px;padding:14px 20px;flex:1;min-width:140px;}
+    .fee-stat-val{font-size:1.25rem;font-weight:900;color:var(--text,#0f172a);}
+    .fee-stat-label{font-size:0.62rem;color:var(--text-light,#64748b);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Stats -->
+<div class="fee-stats" id="feeStats"></div>
+
+<!-- Add Fee Type -->
+<div style="background:var(--bg-card,white);border:1px solid var(--border,#e2e8f0);border-radius:14px;padding:20px;margin-bottom:16px;">
+    <h3 style="margin:0 0 14px 0;font-size:0.9rem;font-weight:800;color:var(--text,#0f172a);">➕ Add Fee Type</h3>
+    <div class="add-grid">
+        <div class="ef"><label>Fee Name</label>
+            <input type="text" id="feeName" placeholder="e.g. Tuition Fee"></div>
+        <div class="ef"><label>Class</label>
+            <select id="feeClass"><option value="">All Classes</option>
+            {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+        <div class="ef"><label>Amount (₹)</label>
+            <input type="number" id="feeAmount" placeholder="5000"></div>
+        <div class="ef"><label>Frequency</label>
+            <select id="feeFreq"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option>
+            <option value="half_yearly">Half Yearly</option><option value="annually">Annually</option><option value="one_time">One Time</option></select></div>
+        <div class="ef"><label>Due Day</label>
+            <input type="number" id="feeDue" value="10" min="1" max="28"></div>
+        <button onclick="addFee()" style="padding:8px 16px;border-radius:10px;background:#6366f1;color:white;border:none;font-weight:700;cursor:pointer;height:38px;align-self:end;font-size:1rem;" title="Add"><i class="fas fa-plus"></i></button>
+    </div>
+</div>
+
+<!-- Fee List -->
+<div id="feeList"></div>
+
+<!-- Edit Modal -->
+<div class="edit-overlay" id="editModal">
+    <div class="edit-modal">
+        <h3>✏️ Edit Fee Structure</h3>
+        <input type="hidden" id="editId">
+        <div class="edit-row">
+            <div class="ef"><label>Fee Name</label>
+                <input type="text" id="editName"></div>
+            <div class="ef"><label>Class</label>
+                <select id="editClass"><option value="">All Classes</option>
+                {% for c in classes %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}</select></div>
+        </div>
+        <div class="edit-row">
+            <div class="ef"><label>Amount (₹)</label>
+                <input type="number" id="editAmount"></div>
+            <div class="ef"><label>Frequency</label>
+                <select id="editFreq"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option>
+                <option value="half_yearly">Half Yearly</option><option value="annually">Annually</option><option value="one_time">One Time</option></select></div>
+        </div>
+        <div class="edit-row">
+            <div class="ef"><label>Due Day</label>
+                <input type="number" id="editDue" min="1" max="28"></div>
+            <div class="ef"><label>Mandatory</label>
+                <select id="editMandatory"><option value="true">Yes — Required</option><option value="false">No — Optional</option></select></div>
+        </div>
+        <div class="ef"><label>Description (Optional)</label>
+            <input type="text" id="editDesc" placeholder="e.g. Includes lab charges"></div>
+        <div class="edit-footer">
+            <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+            <button class="btn-save" onclick="saveEdit()"><i class="fas fa-check"></i> Save Changes</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const FREQ_LABELS={monthly:'Monthly',quarterly:'Quarterly',half_yearly:'Half Yearly',annually:'Annual',one_time:'One Time'};
+const FREQ_MULT={monthly:12,quarterly:4,half_yearly:2,annually:1,one_time:1};
+let allFees=[];
+
+async function loadFees(){
+    try{
+        const result=await apiCall('/api/school/fee-structure/list');
+        allFees=result.fees||[];
+        renderFees();
+        renderStats();
+    }catch(e){}
+}
+
+function renderStats(){
+    const total=allFees.length;
+    const totalAnnual=allFees.reduce((s,f)=>s+f.amount*(FREQ_MULT[f.frequency]||1),0);
+    const classes=new Set(allFees.map(f=>f.class_name).filter(Boolean));
+    document.getElementById('feeStats').innerHTML=`
+        <div class="fee-stat"><div class="fee-stat-val">${total}</div><div class="fee-stat-label">Fee Types</div></div>
+        <div class="fee-stat"><div class="fee-stat-val">${classes.size||'—'}</div><div class="fee-stat-label">Classes Covered</div></div>
+        <div class="fee-stat"><div class="fee-stat-val">₹${totalAnnual.toLocaleString('en-IN')}</div><div class="fee-stat-label">Annual Per Student (avg)</div></div>
+    `;
+}
+
+function esc(s){return (s||'').replace(/'/g,"&#39;").replace(/"/g,"&quot;");}
+
+function renderFees(){
+    if(!allFees.length){
+        document.getElementById('feeList').innerHTML='<div style="background:var(--bg-card,white);border:1px solid var(--border);border-radius:14px;padding:48px;text-align:center;color:var(--text-light);"><i class="fas fa-rupee-sign" style="font-size:2.5rem;display:block;margin-bottom:12px;opacity:0.2;"></i><strong>No Fee Types Yet</strong><br><span style="font-size:0.8rem;">Add your first fee type above</span></div>';
+        return;
+    }
+    document.getElementById('feeList').innerHTML=allFees.map(f=>{
+        const cn=esc(f.class_name||'All Classes');
+        const nm=esc(f.name);
+        const desc=esc(f.description||'');
+        return `<div class="fee-card">
+            <div>
+                <div class="fee-name">${nm}</div>
+                <div class="fee-class">${cn}${f.mandatory===false?' · <span style="color:#d97706;font-weight:600;">Optional</span>':''}${desc?' · <span style="opacity:0.7;">'+desc+'</span>':''}</div>
+            </div>
+            <div class="fee-amount">₹${f.amount.toLocaleString('en-IN')}</div>
+            <div class="fee-freq">${FREQ_LABELS[f.frequency]||f.frequency}</div>
+            <div style="font-size:0.68rem;color:var(--text-light);">Due: ${f.due_day||10}th</div>
+            <div class="fee-actions">
+                <button class="btn-edit" onclick="openEdit(this)" data-id="${f.id}" data-name="${nm}" data-class="${f.class_id||''}" data-amount="${f.amount}" data-freq="${f.frequency}" data-due="${f.due_day||10}" data-mandatory="${f.mandatory!==false}" data-desc="${desc}" title="Edit"><i class="fas fa-pen"></i></button>
+                <button class="btn-del" onclick="deleteFee('${f.id}','${nm}')" title="Delete"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function addFee(){
+    const name=document.getElementById('feeName').value.trim();
+    const amount=parseFloat(document.getElementById('feeAmount').value);
+    if(!name||!amount){showToast('warning','Enter name & amount');return;}
+    try{
+        const result=await apiCall('/api/school/fee-structure/create','POST',{
+            fee_name:name,amount,
+            class_id:document.getElementById('feeClass').value||null,
+            frequency:document.getElementById('feeFreq').value,
+            due_day:parseInt(document.getElementById('feeDue').value)||10,
+        });
+        showToast('success',result.message||'Fee created!');
+        document.getElementById('feeName').value='';
+        document.getElementById('feeAmount').value='';
+        loadFees();
+    }catch(e){showToast('error',e.message);}
+}
+
+function openEdit(btn){
+    const d=btn.dataset;
+    document.getElementById('editId').value=d.id;
+    document.getElementById('editName').value=d.name;
+    document.getElementById('editClass').value=d.class;
+    document.getElementById('editAmount').value=d.amount;
+    document.getElementById('editFreq').value=d.freq;
+    document.getElementById('editDue').value=d.due;
+    document.getElementById('editMandatory').value=d.mandatory;
+    document.getElementById('editDesc').value=d.desc;
+    const m=document.getElementById('editModal');
+    m.style.display='flex';
+    setTimeout(()=>document.getElementById('editName').focus(),100);
+}
+
+function closeEdit(){document.getElementById('editModal').style.display='none';}
+
+async function saveEdit(){
+    const id=document.getElementById('editId').value;
+    const data={
+        fee_name:document.getElementById('editName').value.trim(),
+        amount:parseFloat(document.getElementById('editAmount').value),
+        class_id:document.getElementById('editClass').value||null,
+        frequency:document.getElementById('editFreq').value,
+        due_day:parseInt(document.getElementById('editDue').value)||10,
+        is_mandatory:document.getElementById('editMandatory').value==='true',
+        description:document.getElementById('editDesc').value.trim()||null,
+    };
+    if(!data.fee_name||!data.amount){showToast('warning','Name & amount required');return;}
+    try{
+        const r=await apiCall('/api/school/fee-structure/'+id,'PUT',data);
+        showToast('success',r.message||'Updated!');
+        closeEdit();
+        loadFees();
+    }catch(e){showToast('error',e.message);}
+}
+
+async function deleteFee(id,name){
+    if(typeof showConfirm==='function'){
+        showConfirm('Delete Fee','Delete <strong>'+name+'</strong>? Existing fee records are not affected.',async()=>{
+            try{await apiCall('/api/school/fee-structure/'+id,'DELETE');showToast('success','Fee deleted');loadFees();}catch(e){}
+        },{icon:'🗑️'});
+    }else{
+        if(!confirm('Delete "'+name+'"?'))return;
+        try{await apiCall('/api/school/fee-structure/'+id,'DELETE');loadFees();}catch(e){}
+    }
+}
+
+// Close modal on backdrop click or Escape
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeEdit();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeEdit();});
+
+loadFees();
+</script>
+{% endblock %}

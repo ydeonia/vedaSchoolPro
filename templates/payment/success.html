@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Payment Successful{% endblock %}
+{% block page_title %}{% endblock %}
+{% block page_subtitle %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .success-wrap{max-width:480px;margin:0 auto;text-align:center;padding:40px 20px;}
+    .success-icon{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#22c55e,#16a34a);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:2.2rem;color:white;animation:popIn 0.5s ease-out;}
+    @keyframes popIn{0%{transform:scale(0);opacity:0;}60%{transform:scale(1.2);}100%{transform:scale(1);opacity:1;}}
+    .success-title{font-size:1.4rem;font-weight:900;color:var(--text);margin-bottom:6px;}
+    .success-sub{color:var(--text-light);font-size:0.85rem;margin-bottom:24px;}
+    .receipt-card{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:16px;padding:24px;text-align:left;margin-bottom:20px;}
+    .receipt-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed var(--border);font-size:0.82rem;}
+    .receipt-row:last-child{border:none;}
+    .receipt-row .lbl{color:var(--text-light);}
+    .receipt-row .val{font-weight:700;color:var(--text);}
+    .receipt-total{font-size:1.3rem;color:var(--primary);font-weight:900;padding-top:12px;border-top:2px solid var(--primary);margin-top:8px;}
+    .success-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+    .success-actions a,.success-actions button{padding:12px 24px;border-radius:12px;font-weight:700;font-size:0.82rem;text-decoration:none;cursor:pointer;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);display:flex;align-items:center;gap:6px;transition:all 0.2s;}
+    .success-actions .btn-primary{background:#6366f1;color:white;border-color:#6366f1;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="success-wrap">
+    <div class="success-icon">✓</div>
+    <div class="success-title">Payment Successful!</div>
+    <div class="success-sub">Your payment has been received and processed.</div>
+
+    <div class="receipt-card">
+        <div style="text-align:center;font-size:0.65rem;text-transform:uppercase;font-weight:700;color:var(--text-light);letter-spacing:1px;margin-bottom:12px;">Payment Receipt</div>
+        <div class="receipt-row"><span class="lbl">Receipt No.</span><span class="val" id="rcptNo">—</span></div>
+        <div class="receipt-row"><span class="lbl">Transaction ID</span><span class="val" id="txnId" style="font-size:0.72rem;font-family:monospace;">—</span></div>
+        <div class="receipt-row"><span class="lbl">Date</span><span class="val" id="rcptDate">—</span></div>
+        <div class="receipt-row"><span class="lbl">Status</span><span class="val" style="color:#16a34a;">✅ Success</span></div>
+        <div class="receipt-row receipt-total"><span class="lbl">Amount Paid</span><span class="val" id="rcptAmount">₹0</span></div>
+    </div>
+
+    <div class="success-actions">
+        <button onclick="window.print()"><i class="fas fa-print"></i> Print Receipt</button>
+        <a href="/parent/dashboard" class="btn-primary"><i class="fas fa-home"></i> Go to Dashboard</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const params=new URLSearchParams(window.location.search);
+document.getElementById('rcptNo').textContent=params.get('receipt')||'—';
+document.getElementById('txnId').textContent=(params.get('txn_id')||'—').substring(0,16)+'...';
+document.getElementById('rcptAmount').textContent='₹'+(parseFloat(params.get('amount')||0)).toLocaleString('en-IN');
+document.getElementById('rcptDate').textContent=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+</script>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Classes & Sections{% endblock %}
+{% block page_title %}Classes & Sections{% endblock %}
+{% block page_subtitle %}Manage your school's class structure{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Classes ({{ classes | length }})</h2>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="quickAddClasses()">
+                <i class="fas fa-magic"></i> Quick Setup
+            </button>
+            <button class="btn btn-primary" onclick="openModal('addClassModal')">
+                <i class="fas fa-plus"></i> Add Class
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if classes %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+            {% for cls in classes %}
+            <div class="card" style="border: 2px solid var(--border); transition: all 0.2s;">
+                <div class="card-header" style="background: var(--primary-50); padding: 16px 20px;">
+                    <div>
+                        <h2 style="font-size: 1.05rem; color: var(--primary);">{{ cls.name }}</h2>
+                        <span class="text-xs text-muted">{{ cls.sections | length }} section(s) · {{ cls.students | length }} students</span>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="deleteItem('/api/school/classes/{{ cls.id }}', '{{ cls.name }}')">
+                        <i class="fas fa-trash" style="color: var(--danger); font-size: 0.75rem;"></i>
+                    </button>
+                </div>
+                <div class="card-body" style="padding: 16px 20px;">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                        {% for sec in cls.sections %}
+                        <span class="badge badge-purple" style="padding: 5px 12px; font-size: 0.78rem;">
+                            Section {{ sec.name }}
+                            <button onclick="deleteSection('{{ sec.id }}', '{{ cls.name }} - {{ sec.name }}')" style="background: none; border: none; color: var(--danger); margin-left: 6px; cursor: pointer; font-size: 0.7rem;">✕</button>
+                        </span>
+                        {% endfor %}
+                        {% if not cls.sections %}
+                        <span class="text-sm text-muted">No sections yet</span>
+                        {% endif %}
+                    </div>
+                    <button class="btn btn-ghost btn-sm w-full" onclick="addSection('{{ cls.id }}', '{{ cls.name }}')">
+                        <i class="fas fa-plus"></i> Add Section
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-door-open"></i>
+            <h3>Let's set up your classes! 🏫</h3>
+            <p>This is your first step. Use Quick Setup to create all classes in one click, or add them one by one.</p>
+            <div style="background:#EFF6FF; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:0.78rem; color:#2563EB; max-width:420px;">
+                <i class="fas fa-info-circle"></i> <strong>Don't worry:</strong> You can rename, reorder, or remove classes anytime. Quick Setup creates Nursery through Class 12 — just delete what you don't need.
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button class="btn btn-primary" onclick="quickAddClasses()">
+                    <i class="fas fa-magic"></i> Quick Setup (Nursery → Class 12)
+                </button>
+                <button class="btn btn-secondary" onclick="openModal('addClassModal')">
+                    <i class="fas fa-plus"></i> Add Manually
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Class Modal -->
+<div class="modal-overlay" id="addClassModal" style="display: none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Add Class</h2>
+            <button class="modal-close" onclick="closeModal('addClassModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="addClassForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Class Name <span class="required">*</span></label>
+                        <input type="text" name="name" class="form-input" placeholder="e.g., Class 10, Nursery, LKG" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sort Order</label>
+                        <input type="number" name="numeric_order" class="form-input" placeholder="e.g., 10" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Sections (comma-separated)</label>
+                    <input type="text" name="sections" class="form-input" placeholder="e.g., A, B, C" value="A">
+                    <div class="form-hint">Leave empty to add sections later</div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addClassModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitClassForm()">
+                <i class="fas fa-plus"></i> Create Class
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function submitClassForm() {
+    const data = getFormData('addClassForm');
+    if (!data.name) {
+        showToast('error', 'Error', 'Class name is required');
+        return;
+    }
+    try {
+        await apiCall('/api/school/classes', 'POST', data);
+        showToast('success', 'Success', `${data.name} created`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+async function quickAddClasses() {
+    if (!confirm('This will create Nursery, LKG, UKG, Class 1 to Class 12 with Section A. Continue?')) return;
+    try {
+        await apiCall('/api/school/classes/quick-setup', 'POST');
+        showToast('success', 'Classes Created!', 'All standard classes with Section A have been created');
+        setTimeout(() => window.location.reload(), 1000);
+    } catch (e) {}
+}
+
+async function addSection(classId, className) {
+    const name = prompt(`Add section to ${className}\nEnter section name (e.g., B, C):`);
+    if (!name) return;
+    try {
+        await apiCall('/api/school/sections', 'POST', { class_id: classId, name: name.trim().toUpperCase() });
+        showToast('success', 'Section Added', `Section ${name.toUpperCase()} added to ${className}`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+async function deleteSection(sectionId, label) {
+    if (!confirm(`Delete ${label}?`)) return;
+    try {
+        await apiCall(`/api/school/sections/${sectionId}`, 'DELETE');
+        showToast('success', 'Deleted', `${label} removed`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+</script>
+{% endblock %}

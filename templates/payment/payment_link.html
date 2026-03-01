@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pay — EduFlow</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:linear-gradient(135deg,#ede9fe 0%,#e0e7ff 50%,#dbeafe 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+        .pay-card{background:white;border-radius:24px;padding:32px;width:420px;max-width:100%;box-shadow:0 16px 48px rgba(0,0,0,0.1);}
+        .school-name{font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;color:#6366f1;font-weight:700;text-align:center;margin-bottom:4px;}
+        .pay-title{font-size:1.1rem;font-weight:900;text-align:center;color:#0f172a;margin-bottom:16px;}
+        .amount-box{background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:16px;padding:24px;text-align:center;color:white;margin-bottom:20px;}
+        .amount-box .amt{font-size:2.2rem;font-weight:900;}
+        .amount-box .desc{font-size:0.78rem;opacity:0.85;margin-top:4px;}
+        .info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f1f5f9;font-size:0.8rem;}
+        .info-row .lbl{color:#64748b;}.info-row .val{font-weight:700;color:#0f172a;}
+        .gw-btns{display:grid;gap:8px;margin:20px 0;}
+        .gw-btn{display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid #e2e8f0;border-radius:12px;background:white;cursor:pointer;transition:all 0.2s;font-size:0.82rem;font-weight:600;color:#0f172a;}
+        .gw-btn:hover{border-color:#6366f1;}.gw-btn.sel{border-color:#6366f1;background:#f5f3ff;}
+        .gw-btn .icon{font-size:1.2rem;width:32px;text-align:center;}
+        .pay-btn{width:100%;padding:16px;border:none;border-radius:14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;font-size:1rem;font-weight:800;cursor:pointer;margin-top:12px;transition:all 0.2s;}
+        .pay-btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(99,102,241,0.3);}
+        .pay-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none;}
+        .secure{text-align:center;margin-top:12px;font-size:0.65rem;color:#94a3b8;display:flex;align-items:center;justify-content:center;gap:4px;}
+        .expired{text-align:center;padding:40px;color:#dc2626;}
+        .expired i{font-size:2rem;display:block;margin-bottom:8px;}
+        .spinner{width:20px;height:20px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .powered{text-align:center;margin-top:16px;font-size:0.6rem;color:#94a3b8;}
+    </style>
+</head>
+<body>
+<div class="pay-card" id="payCard">
+    <div class="school-name" id="schoolName">Loading...</div>
+    <div class="pay-title" id="payTitle">Payment</div>
+    <div class="amount-box">
+        <div class="amt" id="payAmount">₹0</div>
+        <div class="desc" id="payDesc"></div>
+    </div>
+    <div id="payInfo"></div>
+    <div style="font-weight:700;font-size:0.78rem;margin:16px 0 8px;color:#0f172a;">Select Payment Method</div>
+    <div class="gw-btns" id="gwBtns"><div style="text-align:center;color:#94a3b8;padding:12px;">Loading...</div></div>
+    <button class="pay-btn" id="payBtn" onclick="pay()" disabled>Select a payment method</button>
+    <div class="secure"><i class="fas fa-shield-alt"></i> 256-bit SSL Encrypted · Secure</div>
+    <div class="powered">Powered by EduFlow</div>
+</div>
+
+<script>
+let sel=null,linkData={};
+const linkId=window.location.pathname.split('/').pop();
+
+async function load(){
+    try{
+        const r=await fetch('/api/payments/link-info/'+linkId);
+        const d=await r.json();
+        if(!d.success){document.getElementById('payCard').innerHTML='<div class="expired"><i class="fas fa-clock"></i><strong>Link Expired or Invalid</strong><p style="font-size:0.8rem;margin-top:8px;">This payment link is no longer valid. Please contact the school.</p></div>';return;}
+        linkData=d;
+        document.getElementById('schoolName').textContent=d.school_name||'School Fee';
+        document.getElementById('payTitle').textContent=d.description||'Payment';
+        document.getElementById('payAmount').textContent='₹'+(d.amount||0).toLocaleString('en-IN');
+        document.getElementById('payDesc').textContent=d.purpose||'';
+        if(d.student_name||d.payer_name){
+            document.getElementById('payInfo').innerHTML='<div class="info-row"><span class="lbl">For</span><span class="val">'+(d.student_name||d.payer_name)+'</span></div>';
+        }
+        renderGateways(d.gateways||[]);
+    }catch(e){document.getElementById('gwBtns').innerHTML='<div style="color:#dc2626;">Failed to load</div>';}
+}
+
+function renderGateways(gws){
+    const icons={razorpay:'💳',phonepe:'📱',paytm:'💰',cashfree:'🏦',stripe:'🌍'};
+    document.getElementById('gwBtns').innerHTML=gws.map(g=>`
+        <div class="gw-btn" onclick="selectGw('${g.name}')" id="gwb_${g.name}">
+            <span class="icon">${icons[g.name]||'💳'}</span>${g.label}
+        </div>
+    `).join('')||'<div style="text-align:center;color:#94a3b8;">No payment methods available</div>';
+}
+
+function selectGw(name){
+    sel=name;
+    document.querySelectorAll('.gw-btn').forEach(el=>el.classList.remove('sel'));
+    const el=document.getElementById('gwb_'+name);
+    if(el)el.classList.add('sel');
+    document.getElementById('payBtn').disabled=false;
+    document.getElementById('payBtn').textContent='Pay ₹'+(linkData.amount||0).toLocaleString('en-IN');
+}
+
+async function pay(){
+    if(!sel)return;
+    const btn=document.getElementById('payBtn');
+    btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Processing...';
+    try{
+        const r=await fetch('/api/payments/create-order',{method:'POST',headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({branch_id:linkData.branch_id,gateway:sel,amount:linkData.amount,purpose:linkData.purpose||'fee',fee_record_id:linkData.fee_record_id,student_id:linkData.student_id,description:linkData.description||'Payment'})
+        }).then(r=>r.json());
+        if(!r.success)throw new Error(r.detail||'Failed');
+        if(sel==='razorpay'){
+            const gd=r.gateway_data;
+            new Razorpay({key:gd.key_id,amount:gd.amount,currency:gd.currency||'INR',order_id:gd.order_id,name:linkData.school_name||'School',description:linkData.description||'Fee',
+                handler:async function(resp){
+                    const v=await fetch('/api/payments/verify',{method:'POST',headers:{'Content-Type':'application/json'},
+                        body:JSON.stringify({branch_id:linkData.branch_id,transaction_id:r.transaction_id,payment_data:resp})
+                    }).then(r=>r.json());
+                    if(v.success){
+                        document.getElementById('payCard').innerHTML='<div style="text-align:center;padding:40px;"><div style="width:60px;height:60px;border-radius:50%;background:#22c55e;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;color:white;font-size:1.5rem;">✓</div><div style="font-weight:900;font-size:1.2rem;">Payment Successful!</div><div style="color:#64748b;margin-top:6px;font-size:0.82rem;">Receipt: '+(v.receipt_number||'')+'</div><div style="color:#64748b;margin-top:4px;font-size:0.78rem;">₹'+linkData.amount.toLocaleString('en-IN')+' paid</div></div>';
+                    }else{showErr('Verification failed');btn.disabled=false;btn.textContent='Retry';}
+                },
+                modal:{ondismiss:()=>{btn.disabled=false;btn.textContent='Pay ₹'+linkData.amount.toLocaleString('en-IN');}}
+            }).open();
+        }else if(r.gateway_data?.redirect_url){window.location.href=r.gateway_data.redirect_url;}
+    }catch(e){showErr(e.message);btn.disabled=false;btn.textContent='Retry';}
+}
+
+function showErr(msg){const el=document.createElement('div');el.style.cssText='position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#dc2626;color:white;padding:12px 20px;border-radius:10px;font-size:0.8rem;font-weight:600;z-index:9999;';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3000);}
+
+load();
+</script>
+</body>
+</html>

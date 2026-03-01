@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+{% block title %}School Calendar{% endblock %}
+{% block page_title %}📅 School Calendar{% endblock %}
+{% block page_subtitle %}Holidays, exams, events — everything in one place{% endblock %}
+
+{% block extra_css %}
+<style>
+.cal-controls { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px; }
+.cal-nav { display:flex; align-items:center; gap:12px; }
+.cal-nav h3 { min-width:180px; text-align:center; font-size:1.1rem; font-weight:800; margin:0; }
+.cal-nav button { background:var(--bg); border:1px solid var(--border); border-radius:8px; width:36px; height:36px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; }
+.cal-nav button:hover { background:var(--bg-secondary); }
+.cal-legend { display:flex; gap:12px; flex-wrap:wrap; }
+.legend-item { display:flex; align-items:center; gap:4px; font-size:0.72rem; color:var(--text-light); }
+.legend-item .dot { width:10px; height:10px; border-radius:3px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.cal-head { text-align:center; font-size:0.72rem; font-weight:700; color:var(--text-light); padding:8px 0; text-transform:uppercase; }
+.cal-head.sun { color:#EF4444; }
+.cal-cell { min-height:90px; background:white; border-radius:6px; padding:4px 6px; border:1px solid transparent; transition:all 0.15s; cursor:default; position:relative; }
+.cal-cell:hover { border-color:var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+.cal-cell.other-month { opacity:0.35; }
+.cal-cell.today { border-color:#6366F1; background:#EEF2FF; }
+.cal-cell.sunday { background:#FFF5F5; }
+.cal-cell.holiday { background:#FEE2E2; }
+.cal-num { font-size:0.78rem; font-weight:700; margin-bottom:2px; }
+.cal-num.sun { color:#EF4444; }
+.cal-event { font-size:0.62rem; padding:2px 4px; border-radius:4px; margin-bottom:1px; color:white; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+.cal-event:hover { opacity:0.85; }
+.cal-cell .more { font-size:0.6rem; color:var(--text-light); cursor:pointer; }
+
+/* Upcoming list */
+.upcoming-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:16px; margin-top:16px; }
+.upcoming-card h3 { font-size:0.88rem; font-weight:800; margin:0 0 12px; }
+.upcoming-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.upcoming-item:last-child { border:none; }
+.up-date { text-align:center; min-width:50px; }
+.up-date .day { font-size:1.3rem; font-weight:900; line-height:1; }
+.up-date .month { font-size:0.62rem; text-transform:uppercase; font-weight:700; color:var(--text-light); }
+.up-info .up-title { font-weight:700; font-size:0.82rem; }
+.up-info .up-type { font-size:0.68rem; padding:2px 8px; border-radius:10px; display:inline-block; margin-top:2px; }
+.up-info .up-desc { font-size:0.72rem; color:var(--text-light); margin-top:2px; }
+
+/* Event detail popup */
+.event-popup { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; border-radius:16px; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,0.2); z-index:1000; max-width:400px; width:90%; }
+.event-popup .close-btn { position:absolute; top:10px; right:14px; cursor:pointer; font-size:1.2rem; color:var(--text-light); }
+.popup-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.3); z-index:999; }
+
+@media (max-width:768px) { .cal-cell { min-height:60px; } .cal-event { font-size:0.55rem; } }
+[data-theme="dark"] .cal-cell { background:var(--card-bg); }
+[data-theme="dark"] .cal-cell.today { background:rgba(99,102,241,0.15); }
+[data-theme="dark"] .upcoming-card { background:var(--card-bg); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cal-controls">
+    <div class="cal-nav">
+        <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+        <h3 id="monthTitle">February 2025</h3>
+        <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+        <button onclick="goToday()" style="font-size:0.72rem;width:auto;padding:0 12px;">Today</button>
+    </div>
+    <div class="cal-legend">
+        <div class="legend-item"><div class="dot" style="background:#EF4444;"></div> Holiday</div>
+        <div class="legend-item"><div class="dot" style="background:#F59E0B;"></div> Exam</div>
+        <div class="legend-item"><div class="dot" style="background:#10B981;"></div> Event</div>
+        <div class="legend-item"><div class="dot" style="background:#3B82F6;"></div> PTM</div>
+        <div class="legend-item"><div class="dot" style="background:#8B5CF6;"></div> Sports</div>
+        <div class="legend-item"><div class="dot" style="background:#EC4899;"></div> Cultural</div>
+    </div>
+</div>
+
+<div class="cal-grid" id="calGrid">
+    <div class="cal-head sun">Sun</div><div class="cal-head">Mon</div><div class="cal-head">Tue</div>
+    <div class="cal-head">Wed</div><div class="cal-head">Thu</div><div class="cal-head">Fri</div>
+    <div class="cal-head">Sat</div>
+</div>
+
+<div class="upcoming-card">
+    <h3>📌 Upcoming Events</h3>
+    <div id="upcomingList"><div style="font-size:0.78rem;color:var(--text-light);padding:10px;">Loading...</div></div>
+</div>
+
+<div class="popup-overlay" id="popupOverlay" onclick="closePopup()"></div>
+<div class="event-popup" id="eventPopup">
+    <span class="close-btn" onclick="closePopup()">&times;</span>
+    <div id="popupContent"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth();
+let allEvents = [];
+
+async function loadEvents() {
+    try {
+        const resp = await fetch('/api/sprint21/events', {credentials:'same-origin'});
+        const data = await resp.json();
+        allEvents = data.events || [];
+        renderCalendar();
+        renderUpcoming();
+    } catch(e) { console.error(e); }
+}
+
+function changeMonth(delta) {
+    currentMonth += delta;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderCalendar();
+}
+function goToday() { currentYear = new Date().getFullYear(); currentMonth = new Date().getMonth(); renderCalendar(); }
+
+function renderCalendar() {
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('monthTitle').textContent = `${months[currentMonth]} ${currentYear}`;
+
+    const grid = document.getElementById('calGrid');
+    // Keep header row (7 divs)
+    const headers = Array.from(grid.children).slice(0, 7);
+    grid.innerHTML = '';
+    headers.forEach(h => grid.appendChild(h));
+
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    // Previous month padding
+    const prevDays = new Date(currentYear, currentMonth, 0).getDate();
+    for (let i = firstDay - 1; i >= 0; i--) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell other-month';
+        cell.innerHTML = `<div class="cal-num">${prevDays - i}</div>`;
+        grid.appendChild(cell);
+    }
+
+    // Current month
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dayOfWeek = new Date(currentYear, currentMonth, d).getDay();
+        const isToday = dateStr === todayStr;
+        const isSunday = dayOfWeek === 0;
+
+        const dayEvents = allEvents.filter(e => e.start_date <= dateStr && e.end_date >= dateStr);
+        const isHoliday = dayEvents.some(e => e.is_holiday) || isSunday;
+
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell' + (isToday ? ' today' : '') + (isSunday ? ' sunday' : '') + (isHoliday && !isSunday ? ' holiday' : '');
+
+        let inner = `<div class="cal-num${isSunday ? ' sun' : ''}">${d}</div>`;
+        const maxShow = 2;
+        dayEvents.slice(0, maxShow).forEach(e => {
+            inner += `<div class="cal-event" style="background:${e.color};" onclick="showEvent('${e.id}')" title="${e.title}">${e.title}</div>`;
+        });
+        if (dayEvents.length > maxShow) {
+            inner += `<div class="more">+${dayEvents.length - maxShow} more</div>`;
+        }
+        cell.innerHTML = inner;
+        grid.appendChild(cell);
+    }
+
+    // Next month padding
+    const totalCells = grid.children.length - 7;
+    const remaining = (7 - (totalCells % 7)) % 7;
+    for (let i = 1; i <= remaining; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell other-month';
+        cell.innerHTML = `<div class="cal-num">${i}</div>`;
+        grid.appendChild(cell);
+    }
+}
+
+function renderUpcoming() {
+    const container = document.getElementById('upcomingList');
+    const today = new Date().toISOString().split('T')[0];
+    const upcoming = allEvents.filter(e => e.end_date >= today).sort((a,b) => a.start_date.localeCompare(b.start_date)).slice(0, 8);
+
+    if (upcoming.length === 0) {
+        container.innerHTML = '<div style="font-size:0.82rem;color:var(--text-light);padding:16px;text-align:center;">No upcoming events</div>';
+        return;
+    }
+
+    container.innerHTML = upcoming.map(e => {
+        const d = new Date(e.start_date + 'T00:00:00');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return `<div class="upcoming-item">
+            <div class="up-date">
+                <div class="day" style="color:${e.color};">${d.getDate()}</div>
+                <div class="month">${months[d.getMonth()]}</div>
+            </div>
+            <div class="up-info">
+                <div class="up-title">${e.title}</div>
+                <span class="up-type" style="background:${e.color}20;color:${e.color};">${e.type}${e.is_holiday ? ' · Holiday' : ''}</span>
+                ${e.description ? `<div class="up-desc">${e.description}</div>` : ''}
+                ${e.location ? `<div class="up-desc">📍 ${e.location}</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function showEvent(id) {
+    const e = allEvents.find(ev => ev.id === id);
+    if (!e) return;
+    const d = new Date(e.start_date + 'T00:00:00');
+    document.getElementById('popupContent').innerHTML = `
+        <div style="font-size:0.72rem;padding:3px 10px;background:${e.color}20;color:${e.color};border-radius:10px;display:inline-block;font-weight:700;margin-bottom:8px;">${e.type.toUpperCase()}${e.is_holiday ? ' · HOLIDAY' : ''}</div>
+        <h3 style="margin:0 0 8px;font-size:1.1rem;">${e.title}</h3>
+        <div style="font-size:0.82rem;color:var(--text-light);margin-bottom:4px;">📅 ${e.start_date}${e.end_date !== e.start_date ? ' → ' + e.end_date : ''}</div>
+        ${e.location ? `<div style="font-size:0.82rem;color:var(--text-light);margin-bottom:4px;">📍 ${e.location}</div>` : ''}
+        ${e.description ? `<div style="font-size:0.82rem;margin-top:8px;">${e.description}</div>` : ''}
+    `;
+    document.getElementById('eventPopup').style.display = 'block';
+    document.getElementById('popupOverlay').style.display = 'block';
+}
+function closePopup() {
+    document.getElementById('eventPopup').style.display = 'none';
+    document.getElementById('popupOverlay').style.display = 'none';
+}
+
+document.addEventListener('DOMContentLoaded', loadEvents);
+</script>
+{% endblock %}

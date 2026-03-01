@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}{{ org.name }}{% endblock %}
+{% block page_title %}{{ org.name }}{% endblock %}
+{% block page_subtitle %}Organization management — branches, subscriptions, and admin control{% endblock %}
+{% block extra_css %}
+<style>
+.org-hero{display:grid;grid-template-columns:1fr auto;gap:18px;padding:20px 24px;background:linear-gradient(135deg,#1E1B4B 0%,#312E81 50%,#4338CA 100%);border-radius:16px;color:white;margin-bottom:18px;}
+.org-hero h2{font-size:1.3rem;font-weight:900;margin:0 0 4px 0;}
+.org-hero .meta{font-size:0.72rem;opacity:0.8;}
+.org-hero .meta span{margin-right:14px;}
+.org-actions{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;}
+.org-actions button,.org-actions a{padding:8px 16px;border-radius:9px;font-weight:700;font-size:0.72rem;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;}
+.btn-activate{background:#059669;color:white;}.btn-deactivate{background:#DC2626;color:white;}
+.btn-outline{background:transparent;border:1.5px solid rgba(255,255,255,0.4);color:white;}
+.status-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border-radius:20px;font-size:0.65rem;font-weight:800;}
+.status-active{background:#D1FAE5;color:#065F46;}.status-inactive{background:#FEE2E2;color:#991B1B;}
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:18px;}
+.info-card{background:var(--bg-card,white);border-radius:14px;padding:18px;box-shadow:0 1px 8px rgba(0,0,0,0.04);}
+.info-card h3{font-size:0.65rem;text-transform:uppercase;color:var(--text-light);margin:0 0 8px 0;font-weight:800;}
+.info-val{font-size:1.1rem;font-weight:900;}.info-sub{font-size:0.62rem;color:var(--text-light);margin-top:2px;}
+.section-card{background:var(--bg-card,white);border-radius:16px;padding:20px;box-shadow:0 1px 8px rgba(0,0,0,0.04);margin-bottom:16px;}
+.section-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border-light,#e2e8f0);}
+.section-header h3{font-size:0.92rem;font-weight:900;margin:0;}
+.branch-row{display:grid;grid-template-columns:1fr 90px 70px 90px 80px 120px;gap:8px;padding:10px 0;border-bottom:1px solid var(--border-light);align-items:center;font-size:0.78rem;}
+.branch-name{font-weight:800;}.bb{font-size:0.6rem;padding:2px 8px;border-radius:5px;font-weight:700;}
+.branch-actions{display:flex;gap:5px;}
+.branch-actions button{padding:4px 10px;border-radius:6px;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;}
+.btn-sm-red{background:#FEE2E2;color:#991B1B;}.btn-sm-green{background:#D1FAE5;color:#065F46;}
+.admin-card{display:flex;gap:12px;padding:10px;border-radius:10px;align-items:center;}
+.admin-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#4338CA;color:white;font-weight:900;font-size:0.7rem;flex-shrink:0;}
+.admin-name{font-weight:800;font-size:0.82rem;}.admin-email{font-size:0.68rem;color:var(--text-light);}
+.admin-role{font-size:0.58rem;padding:2px 6px;border-radius:4px;background:#EEF2FF;color:#4338CA;font-weight:700;margin-left:6px;}
+.sub-banner{padding:16px 20px;border-radius:14px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.sub-active{background:linear-gradient(135deg,#D1FAE5,#A7F3D0);border:1px solid #6EE7B7;color:#065F46 !important;}
+.sub-active *{color:#065F46 !important;}
+.sub-none{background:linear-gradient(135deg,#FEF3C7,#FDE68A);border:1px solid #FCD34D;color:#92400E !important;}
+.sub-none *{color:#92400E !important;}
+.sub-info h4{font-size:0.88rem;font-weight:900;margin:0 0 2px 0;}.sub-info p{font-size:0.68rem;margin:0;opacity:0.8;}
+</style>
+{% endblock %}
+{% block content %}
+<div class="org-hero">
+    <div>
+        <h2>{{ org.name }}</h2>
+        <div class="meta">
+            <span><i class="fas fa-envelope"></i> {{ org.email or '—' }}</span>
+            <span><i class="fas fa-phone"></i> {{ org.phone or '—' }}</span>
+            <span><i class="fas fa-map-marker-alt"></i> {{ org.city or '—' }}, {{ org.state or '' }}</span>
+            <span><i class="fas fa-calendar"></i> Since {{ org.created_at.strftime('%d %b %Y') if org.created_at else '—' }}</span>
+        </div>
+        <div style="margin-top:8px;">
+            {% if org.is_active %}<span class="status-pill status-active"><i class="fas fa-circle" style="font-size:6px;"></i> Active</span>
+            {% else %}<span class="status-pill status-inactive"><i class="fas fa-circle" style="font-size:6px;"></i> Deactivated</span>{% endif %}
+        </div>
+    </div>
+    <div class="org-actions">
+        <a href="/super-admin/organizations" class="btn-outline"><i class="fas fa-arrow-left"></i> Back</a>
+        {% if org.is_active %}
+        <button class="btn-deactivate" onclick="toggleOrg('{{ org.id }}',false)"><i class="fas fa-power-off"></i> Deactivate</button>
+        {% else %}
+        <button class="btn-activate" onclick="toggleOrg('{{ org.id }}',true)"><i class="fas fa-check"></i> Reactivate</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Subscription Summary — per branch -->
+{% set sub_count = branch_subs|length %}
+{% if sub_count > 0 %}
+<div class="sub-banner sub-active">
+    <div class="sub-info">
+        <h4>📋 {{ sub_count }} Branch{{ 'es' if sub_count > 1 else '' }} with Active Plans</h4>
+        <p>Plans are assigned per branch. Each branch can have a different plan and billing cycle.</p>
+    </div>
+    <button onclick="document.getElementById('assignModal').style.display='flex'" style="padding:8px 16px;border-radius:8px;border:none;background:white;font-weight:700;font-size:0.72rem;cursor:pointer;"><i class="fas fa-arrow-up"></i> Assign / Change Plan</button>
+</div>
+{% else %}
+<div class="sub-banner sub-none">
+    <div class="sub-info"><h4>⚠️ No Subscriptions</h4><p>No branches have plans assigned yet.</p></div>
+    <button onclick="document.getElementById('assignModal').style.display='flex'" style="padding:8px 16px;border-radius:8px;border:none;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;cursor:pointer;"><i class="fas fa-plus"></i> Assign Plan</button>
+</div>
+{% endif %}
+
+<div class="grid-cards">
+    <div class="info-card"><h3>Branches</h3><div class="info-val">{{ org.branches|length }}</div></div>
+    <div class="info-card"><h3>Admins</h3><div class="info-val">{{ admins|length }}</div></div>
+    <div class="info-card"><h3>Subscribed</h3><div class="info-val">{{ branch_subs|length }} / {{ org.branches|length }}</div><div class="info-sub">branches with plans</div></div>
+    <div class="info-card"><h3>Since</h3><div class="info-val">{{ org.created_at.strftime('%d %b %Y') if org.created_at else '—' }}</div></div>
+</div>
+
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-code-branch"></i> Branches ({{ org.branches|length }})</h3>
+        <a href="/super-admin/branches?action=new" style="padding:6px 14px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;text-decoration:none;"><i class="fas fa-plus"></i> Add</a>
+    </div>
+    {% if org.branches %}
+    <div style="font-size:0.6rem;font-weight:800;color:var(--text-light);text-transform:uppercase;display:grid;grid-template-columns:1fr 90px 70px 90px 150px 80px 120px;gap:8px;padding-bottom:8px;border-bottom:1.5px solid var(--border-light);">
+        <span>Name</span><span>Code</span><span>Board</span><span>City</span><span>Plan</span><span>Status</span><span>Actions</span>
+    </div>
+    {% for b in org.branches %}
+    {% set bsub = branch_subs.get(b.id|string, {}) %}
+    <div style="display:grid;grid-template-columns:1fr 90px 70px 90px 150px 80px 120px;gap:8px;padding:10px 0;border-bottom:1px solid var(--border-light);align-items:center;font-size:0.78rem;{{ 'background:rgba(220,38,38,0.06);' if not b.is_active else '' }}">
+        <div class="branch-name">{{ b.name }}</div>
+        <div>{{ b.code or '—' }}</div>
+        <div><span class="bb" style="background:#DBEAFE;color:#1D4ED8;">{{ b.board_type.value if b.board_type else 'CBSE' }}</span></div>
+        <div>{{ b.city or '—' }}</div>
+        <div>
+            {% if bsub %}
+            <span class="bb" style="background:#D1FAE5;color:#065F46;">{{ bsub.plan_name }}</span>
+            <div style="font-size:0.55rem;color:var(--text-light);margin-top:2px;">{{ bsub.billing_cycle }} · {{ bsub.status }} · {{ bsub.period_end or '—' }}</div>
+            {% else %}
+            <span class="bb" style="background:#FEF3C7;color:#92400E;">No Plan</span>
+            {% endif %}
+        </div>
+        <div><span class="bb {{ 'status-active' if b.is_active else 'status-inactive' }}">{{ 'Active' if b.is_active else 'Off' }}</span></div>
+        <div class="branch-actions">
+            <a href="/super-admin/branches/{{ b.id }}" style="padding:4px 8px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;font-size:0.6rem;font-weight:700;text-decoration:none;"><i class="fas fa-eye"></i></a>
+            {% if b.is_active %}
+            <button class="btn-sm-red" onclick="toggleBranch('{{ b.id }}')"><i class="fas fa-power-off"></i></button>
+            {% else %}
+            <button class="btn-sm-green" onclick="toggleBranch('{{ b.id }}')"><i class="fas fa-check"></i></button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--text-light);"><p>No branches yet.</p></div>
+    {% endif %}
+</div>
+
+<!-- CHAIRMAN / TRUSTEE -->
+<div class="section-card">
+    <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <h3><i class="fas fa-crown"></i> Chairman / Trustee</h3>
+        <button onclick="document.getElementById('chairmanModal').style.display='flex'" style="padding:5px 12px;border-radius:8px;background:#6366f1;color:white;font-weight:700;font-size:0.65rem;border:none;cursor:pointer;"><i class="fas fa-plus"></i> Add Chairman</button>
+    </div>
+    <div id="chairmanList" style="padding:10px;">
+        <p style="color:var(--text-light);font-size:0.75rem;text-align:center;">Loading...</p>
+    </div>
+</div>
+
+<!-- Chairman Creation Modal -->
+<div id="chairmanModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:440px;max-width:90vw;">
+        <h3 style="font-weight:900;margin:0 0 14px 0;">👑 Create Chairman / Trustee</h3>
+        <p style="font-size:0.7rem;color:var(--text-light);margin-bottom:14px;">This person gets a read-only Command Tower view of all branches in this organization.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <div><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">First Name</label>
+            <input id="chFirstName" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+            <div><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Last Name</label>
+            <input id="chLastName" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        </div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Email</label>
+        <input id="chEmail" type="email" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Phone</label>
+        <input id="chPhone" type="tel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="margin-bottom:14px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Password</label>
+        <input id="chPassword" value="Chairman@123" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onclick="document.getElementById('chairmanModal').style.display='none'" style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-weight:700;cursor:pointer;">Cancel</button>
+            <button onclick="createChairman()" style="padding:8px 16px;border-radius:8px;background:#6366f1;color:white;border:none;font-weight:700;cursor:pointer;">Create Chairman</button>
+        </div>
+    </div>
+</div>
+
+<div class="section-card">
+    <div class="section-header">
+        <h3><i class="fas fa-user-shield"></i> Branch Admins ({{ admins|length }})</h3>
+    </div>
+    {% for a in admins %}
+    <div class="admin-card">
+        <div class="admin-avatar">{{ a.first_name[0]|upper }}{{ (a.last_name or ' ')[0]|upper }}</div>
+        <div style="flex:1;">
+            <div class="admin-name">{{ a.first_name }} {{ a.last_name or '' }}{% if a.is_first_admin %}<span class="admin-role">👑 First Admin</span>{% endif %}{% if a.designation %}<span class="admin-role">{{ a.designation }}</span>{% endif %}</div>
+            <div class="admin-email">{{ a.email }} — {{ a.branch.name if a.branch else '?' }}</div>
+        </div>
+        <span class="bb {{ 'status-active' if a.is_active else 'status-inactive' }}">{{ 'Active' if a.is_active else 'Off' }}</span>
+    </div>
+    {% endfor %}
+    {% if not admins %}<div style="text-align:center;padding:20px;color:var(--text-light);">No admins.</div>{% endif %}
+</div>
+
+<!-- ASSIGN PLAN MODAL -->
+<div id="assignModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:480px;">
+        <h3 style="font-weight:900;margin:0 0 14px 0;">📋 Assign Plan</h3>
+        <div style="margin-bottom:10px;"><label style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Plan</label>
+        <select id="planSel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;">
+            <option value="">— Choose —</option>
+            {% for p in plans %}<option value="{{ p.id }}">{{ p.name }} — ₹{{ p.price_monthly }}/mo</option>{% endfor %}
+        </select></div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Branch</label>
+        <select id="brSel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;">
+            {% for b in org.branches %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+        </select></div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Cycle</label>
+        <select id="cySel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;">
+            <option value="monthly">Monthly</option><option value="yearly">Yearly (20% off)</option>
+        </select></div>
+        <div style="margin-bottom:10px;"><label style="font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Payment Ref</label>
+        <input id="payRef" placeholder="Optional" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:8px;margin-top:14px;">
+            <button onclick="assignPlan()" style="padding:10px 20px;border-radius:10px;background:#4338CA;color:white;font-weight:700;border:none;cursor:pointer;">Assign</button>
+            <button onclick="document.getElementById('assignModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);font-weight:700;border:none;cursor:pointer;">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function toggleOrg(id,activate){
+    showConfirm(
+        activate?'Reactivate School':'Deactivate School',
+        activate?'All branches and users will be re-enabled.':'<strong>All branches and users will be locked out.</strong> They cannot login until reactivated.',
+        async()=>{
+            const d=await apiCall(`/api/super-admin/organizations/${id}/toggle`,'PUT');
+            if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1200);}else showToast('error',d.error||'Failed');
+        },
+        {icon:activate?'🟢':'🔴',yesText:activate?'Reactivate':'Deactivate',danger:!activate}
+    );
+}
+async function toggleBranch(id){
+    showConfirm('Toggle Branch','Enable or disable this branch and all its users?',async()=>{
+        const d=await apiCall(`/api/super-admin/branches/${id}/toggle`,'PUT');
+        if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1200);}else showToast('error',d.error||'Failed');
+    },{icon:'🔀'});
+}
+async function assignPlan(){
+    const plan=document.getElementById('planSel').value,branch=document.getElementById('brSel').value,cycle=document.getElementById('cySel').value,ref=document.getElementById('payRef').value;
+    if(!plan||!branch){showToast('error','Select plan and branch');return;}
+    const d=await apiCall('/api/super-admin/subscriptions/assign','POST',{plan_id:plan,branch_id:branch,billing_cycle:cycle,payment_ref:ref});
+    if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1500);}else showToast('error',d.error||'Failed');
+}
+
+// === CHAIRMAN ===
+async function createChairman(){
+    const data={
+        org_id:'{{ org.id }}',
+        first_name:document.getElementById('chFirstName').value,
+        last_name:document.getElementById('chLastName').value,
+        email:document.getElementById('chEmail').value,
+        phone:document.getElementById('chPhone').value,
+        password:document.getElementById('chPassword').value
+    };
+    if(!data.email||!data.first_name){showToast('error','Name and email required');return;}
+    const d=await apiCall('/api/super-admin/chairman','POST',data);
+    if(d.success){showToast('success',d.message);document.getElementById('chairmanModal').style.display='none';loadChairmen();}
+    else showToast('error',d.detail||d.error||'Failed');
+}
+
+async function loadChairmen(){
+    try{
+        const r=await fetch('/api/super-admin/admins?org_id={{ org.id }}&role=chairman',{credentials:'same-origin'});
+        const d=await r.json();
+        const list=document.getElementById('chairmanList');
+        const chairmen=(d.admins||[]).filter(a=>a.role==='chairman');
+        if(!chairmen.length){list.innerHTML='<p style="color:var(--text-light);font-size:0.75rem;text-align:center;">No chairman assigned. Click "Add Chairman" above.</p>';return;}
+        list.innerHTML=chairmen.map(c=>`<div class="admin-card">
+            <div class="admin-avatar" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:white;">${(c.first_name||'C')[0]}${(c.last_name||' ')[0]}</div>
+            <div style="flex:1;"><div class="admin-name">${c.first_name} ${c.last_name||''} <span class="admin-role" style="background:#FEF3C7;color:#92400E;">👑 Chairman</span></div>
+            <div class="admin-email">${c.email} · <a href="/chairman/dashboard" style="color:#6366f1;font-weight:700;">Command Tower →</a></div></div>
+            <span class="bb ${c.is_active?'status-active':'status-inactive'}">${c.is_active?'Active':'Off'}</span>
+        </div>`).join('');
+    }catch(e){document.getElementById('chairmanList').innerHTML='<p style="color:var(--text-light);font-size:0.75rem;">Could not load.</p>';}
+}
+loadChairmen();
+</script>
+{% endblock %}

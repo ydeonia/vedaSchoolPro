@@ -1,0 +1,454 @@
+{% extends "base.html" %}
+{% block title %}New Admission{% endblock %}
+{% block page_title %}🎓 New Admission Wizard{% endblock %}
+{% block page_subtitle %}Step-by-step guided admission process{% endblock %}
+{% block extra_css %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap');
+*{font-family:'DM Sans',sans-serif;}
+.wiz-wrap{max-width:860px;margin:0 auto;}
+/* Progress */
+.wiz-progress{display:flex;gap:2px;margin-bottom:20px;position:relative;}
+.wiz-step-ind{flex:1;text-align:center;padding:10px 4px;border-radius:10px;font-size:0.65rem;font-weight:700;background:var(--bg,#f1f5f9);color:var(--text-light);transition:all 0.3s;cursor:pointer;position:relative;}
+.wiz-step-ind.active{background:var(--primary);color:white;box-shadow:0 4px 15px rgba(79,70,229,0.3);}
+.wiz-step-ind.done{background:#D1FAE5;color:#059669;}
+.wiz-step-ind .step-num{display:block;font-size:1.1rem;font-weight:900;line-height:1;}
+/* Card */
+.wiz-card{background:var(--bg-card,white);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:28px;margin-bottom:16px;}
+.wiz-card h2{font-size:1.1rem;font-weight:900;margin-bottom:4px;}.wiz-card p.sub{font-size:0.75rem;color:var(--text-light);margin-bottom:16px;}
+/* Form */
+.f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.f-grid.col2{grid-template-columns:1fr 1fr;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.60rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.3px;}
+.f-grp label .req{color:var(--danger,#dc2626);}
+.f-grp input,.f-grp select,.f-grp textarea{padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.85rem;transition:border 0.2s;background:var(--bg-card,white);color:var(--text,#333);}
+.f-grp input:focus,.f-grp select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+.f-grp .f-help{font-size:0.58rem;color:var(--text-light);}
+/* Buttons */
+.wiz-nav{display:flex;justify-content:space-between;margin-top:16px;}
+.btn-wiz{padding:10px 24px;border-radius:12px;font-weight:700;font-size:0.85rem;cursor:pointer;border:none;display:flex;align-items:center;gap:6px;transition:all 0.2s;}
+.btn-next{background:var(--primary);color:white;box-shadow:0 4px 12px rgba(79,70,229,0.2);}.btn-next:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,0.3);}
+.btn-prev{background:var(--bg,#f1f5f9);color:var(--text);}
+.btn-success{background:#059669;color:white;box-shadow:0 4px 12px rgba(5,150,105,0.2);}
+/* Doc upload */
+.doc-checklist{display:grid;gap:8px;}
+.doc-item{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border-light);background:var(--bg-card,white);}
+.doc-item.mandatory{border-left:3px solid var(--danger,#dc2626);}
+.doc-item.uploaded{border-color:#059669;background:#F0FDF4;}
+.doc-icon{font-size:1.2rem;}.doc-info{}.doc-name{font-weight:700;font-size:0.82rem;}.doc-desc{font-size:0.60rem;color:var(--text-light);}
+.doc-status{font-size:0.62rem;font-weight:700;padding:3px 8px;border-radius:6px;}
+.doc-status.pending{background:#FEF3C7;color:#92400E;}.doc-status.done{background:#D1FAE5;color:#059669;}
+.doc-upload-btn{padding:4px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--primary);color:var(--primary);background:transparent;}
+.doc-upload-btn:hover{background:var(--primary);color:white;}
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.sum-section{padding:14px;border-radius:10px;background:var(--bg,#f1f5f9);}
+.sum-section h4{font-size:0.68rem;text-transform:uppercase;font-weight:700;color:var(--text-light);margin-bottom:8px;}
+.sum-row{display:flex;justify-content:space-between;font-size:0.78rem;padding:2px 0;}.sum-row .sl{color:var(--text-light);}.sum-row .sv{font-weight:700;}
+/* Age calc */
+.age-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;margin-top:4px;}
+@media(max-width:768px){.f-grid{grid-template-columns:1fr;}.summary-grid{grid-template-columns:1fr;}.wiz-step-ind .step-num{font-size:0.8rem;}.wiz-step-ind{font-size:0.55rem;padding:6px 2px;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="wiz-wrap">
+    <!-- Progress -->
+    <div class="wiz-progress" id="wizProgress"></div>
+
+    <!-- Step 1: Basic Info -->
+    <div class="wiz-card wiz-step" id="step1">
+        <h2>📝 Step 1: Student Information</h2>
+        <p class="sub">Basic details as per government records. All fields marked * are mandatory per CBSE/RTE norms.</p>
+        <div class="f-grid">
+            <div class="f-grp"><label>First Name <span class="req">*</span></label><input id="aFirstName" required></div>
+            <div class="f-grp"><label>Last Name <span class="req">*</span></label><input id="aLastName"></div>
+            <div class="f-grp"><label>Date of Birth <span class="req">*</span></label><input id="aDOB" type="date" onchange="calcAge()" required>
+                <div id="ageDisplay"></div>
+                <div class="f-help">As per Birth Certificate. CBSE: Min 5 years for Class 1 (by 31 March)</div></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Gender <span class="req">*</span></label><select id="aGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Aadhaar Number</label><input id="aAadhaar" maxlength="12" placeholder="12 digits">
+                <div class="f-help">Made compulsory by Govt. of India for school records</div></div>
+            <div class="f-grp"><label>Blood Group</label><select id="aBlood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Religion</label><select id="aReligion"><option value="">Select</option><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Buddhist</option><option>Jain</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Category</label><select id="aCategory"><option value="">Select</option><option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option></select>
+                <div class="f-help">Required for RTE 25% quota & govt reports</div></div>
+            <div class="f-grp"><label>Nationality</label><input id="aNationality" value="Indian"></div>
+        </div>
+    </div>
+
+    <!-- Step 2: Parent Details -->
+    <div class="wiz-card wiz-step" id="step2" style="display:none;">
+        <h2>👨‍👩‍👧 Step 2: Parent / Guardian Details</h2>
+        <p class="sub">Contact information is mandatory for school records and emergency use.</p>
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Father's Name <span class="req">*</span></label><input id="aFatherName"></div>
+            <div class="f-grp"><label>Father's Phone <span class="req">*</span></label><input id="aFatherPhone" type="tel"></div>
+        </div>
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Father's Occupation</label><input id="aFatherOcc"></div>
+            <div class="f-grp"><label>Father's Aadhaar</label><input id="aFatherAadhaar" maxlength="12"></div>
+        </div>
+        <hr style="margin:14px 0;border-color:var(--border-light);">
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Mother's Name <span class="req">*</span></label><input id="aMother"></div>
+            <div class="f-grp"><label>Mother's Phone</label><input id="aMotherPhone" type="tel"></div>
+        </div>
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Mother's Occupation</label><input id="aMotherOcc"></div>
+            <div class="f-grp"><label>Mother's Aadhaar</label><input id="aMotherAadhaar" maxlength="12"></div>
+        </div>
+        <hr style="margin:14px 0;border-color:var(--border-light);">
+        <div class="f-grp"><label>Residential Address <span class="req">*</span></label><textarea id="aAddress" rows="2" placeholder="House No, Street, Area, City, State, PIN"></textarea>
+            <div class="f-help">Address proof required — Aadhaar/Electricity bill/Rental agreement</div></div>
+        <div style="margin-top:8px;padding:10px 14px;border-radius:10px;background:var(--bg,#f1f5f9);">
+            <label style="font-size:0.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" id="aEmgSameParent" onchange="toggleEmergency()" checked> Use Father's phone as Emergency Contact
+            </label>
+            <div id="emgManual" style="display:none;margin-top:8px;">
+                <div class="f-grid col2">
+                    <div class="f-grp"><label>Emergency Contact Name</label><input id="aEmergency"></div>
+                    <div class="f-grp"><label>Emergency Contact Phone</label><input id="aEmergencyPhone" type="tel"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Class & Academic -->
+    <div class="wiz-card wiz-step" id="step3" style="display:none;">
+        <h2>📚 Step 3: Class & Academic Details</h2>
+        <p class="sub">Assign class, section, and roll number. For transfers, previous school info is required.</p>
+        <div class="f-grid">
+            <div class="f-grp"><label>Admitting to Class <span class="req">*</span></label><select id="aClass" onchange="loadSections()"><option value="">Select Class</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="aSection"><option value="">Select Section</option></select></div>
+            <div class="f-grp"><label>Roll Number</label><input id="aRoll" type="number" placeholder="Auto or manual"></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Admission Type</label><select id="aType"><option value="new">New Admission</option><option value="transfer">Transfer from Another School</option><option value="rte">RTE 25% Quota</option></select></div>
+            <div class="f-grp"><label>Academic Year</label><input id="aAcYear" value="2025-26"></div>
+            <div class="f-grp"><label>Date of Admission</label><input id="aAdmDate" type="date"></div>
+        </div>
+        <hr style="margin:14px 0;border-color:var(--border-light);">
+        <p style="font-size:0.72rem;font-weight:700;margin-bottom:8px;">Previous School (for transfers)</p>
+        <div class="f-grid">
+            <div class="f-grp"><label>Previous School Name</label><input id="aPrevSchool"></div>
+            <div class="f-grp"><label>Board</label><select id="aPrevBoard"><option value="">Select</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Last Class Completed</label><input id="aPrevClass"></div>
+        </div>
+    </div>
+
+    <!-- Step 4: Documents -->
+    <div class="wiz-card wiz-step" id="step4" style="display:none;">
+        <h2>📎 Step 4: Document Upload</h2>
+        <p class="sub">Upload mandatory documents as per CBSE/RTE requirements. Red border = Mandatory.</p>
+        <div class="doc-checklist" id="docChecklist"></div>
+        <input type="file" id="hiddenFileInput" style="display:none;" accept=".pdf,.jpg,.jpeg,.png" onchange="handleDocUpload()">
+    </div>
+
+    <!-- Step 5: Fee & ID Card -->
+    <div class="wiz-card wiz-step" id="step5" style="display:none;">
+        <h2>💰 Step 5: Fee Generation & ID Card</h2>
+        <p class="sub">Generate admission fee, assign house, and prepare ID card.</p>
+        <div class="f-grid">
+            <div class="f-grp"><label>Fee Structure</label><select id="aFeeStructure"><option value="">Auto from Class</option></select>
+                <div class="f-help">Fee is auto-generated based on class. You can adjust later.</div></div>
+            <div class="f-grp"><label>Assign House</label><select id="aHouse"><option value="">No House</option></select></div>
+            <div class="f-grp"><label>Transport</label><select id="aTransport" onchange="toggleRoute()"><option value="no">No Transport</option><option value="yes">School Bus</option></select></div>
+        </div>
+        <div id="routeRow" style="display:none;" class="f-grid">
+            <div class="f-grp"><label>Bus Route</label><select id="aRoute"><option value="">Select Route</option></select>
+                <div class="f-help">Optional — can be assigned later</div></div>
+            <div></div><div></div>
+        </div>
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Hostel</label><select id="aHostel"><option value="no">Day Scholar</option><option value="yes">Hostel Student</option></select></div>
+            <div class="f-grp"><label>Medical Condition (if any)</label><input id="aMedical" placeholder="Allergies, conditions..."></div>
+        </div>
+        <div style="margin-top:14px;padding:14px;border-radius:10px;background:#EEF2FF;border:1px solid #C7D2FE;">
+            <div style="font-size:0.72rem;font-weight:700;color:#4338CA;">📋 On completion, the system will:</div>
+            <ul style="font-size:0.72rem;color:#4338CA;margin:6px 0 0 16px;line-height:1.8;">
+                <li>Generate Admission Number automatically</li>
+                <li>Create fee invoice for the selected class</li>
+                <li>Generate ID Card with signed QR code</li>
+                <li>Notify the class teacher about new admission</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Step 6: Review & Submit -->
+    <div class="wiz-card wiz-step" id="step6" style="display:none;">
+        <h2>✅ Step 6: Review & Complete Admission</h2>
+        <p class="sub">Verify all details before finalizing. You can go back to any step to edit.</p>
+        <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="wiz-nav">
+        <button class="btn-wiz btn-prev" id="btnPrev" onclick="prevStep()" style="display:none;"><i class="fas fa-arrow-left"></i> Previous</button>
+        <div style="flex:1;"></div>
+        <button class="btn-wiz btn-next" id="btnNext" onclick="nextStep()">Next Step <i class="fas fa-arrow-right"></i></button>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const STEPS = [
+    {id:'step1',title:'Student Info',icon:'📝'},
+    {id:'step2',title:'Parents',icon:'👨‍👩‍👧'},
+    {id:'step3',title:'Class',icon:'📚'},
+    {id:'step4',title:'Documents',icon:'📎'},
+    {id:'step5',title:'Fee & House',icon:'💰'},
+    {id:'step6',title:'Review',icon:'✅'}
+];
+let currentStep = 0;
+let uploadedDocs = {};
+let createdStudentId = null;
+
+// Document checklist per CBSE/RTE
+const DOC_LIST = [
+    {key:'birth_certificate',name:'Birth Certificate',desc:'Issued by Municipal Authority — mandatory per CBSE',mandatory:true,icon:'📜'},
+    {key:'aadhaar_student',name:'Student Aadhaar Card',desc:'Compulsory by Govt of India for school records',mandatory:true,icon:'🪪'},
+    {key:'aadhaar_parent',name:'Parent Aadhaar Card',desc:'At least one parent — for identity verification',mandatory:true,icon:'🪪'},
+    {key:'address_proof',name:'Address Proof',desc:'Aadhaar / Electricity bill / Rental agreement',mandatory:true,icon:'📍'},
+    {key:'passport_photos',name:'Passport Size Photos',desc:'Recent photos of student (4 copies)',mandatory:true,icon:'📸'},
+    {key:'transfer_certificate',name:'Transfer Certificate (TC)',desc:'Required for Class 2+ transfers — signed by previous Head',mandatory:false,icon:'📋'},
+    {key:'prev_marksheet',name:'Previous Year Marksheet',desc:'Required for Class 2+ admissions',mandatory:false,icon:'📊'},
+    {key:'character_certificate',name:'Character Certificate',desc:'From previous school for Class 9+ transfers',mandatory:false,icon:'🎖️'},
+    {key:'caste_certificate',name:'Caste Certificate',desc:'Required for SC/ST/OBC category — for RTE & govt reports',mandatory:false,icon:'📜'},
+    {key:'income_certificate',name:'Income Certificate',desc:'Required for EWS/RTE quota admissions',mandatory:false,icon:'💰'},
+    {key:'medical_certificate',name:'Medical Fitness Certificate',desc:'Physical & mental fitness — some schools require',mandatory:false,icon:'🏥'},
+    {key:'disability_certificate',name:'Disability Certificate',desc:'If child has special needs — from Dept of Health',mandatory:false,icon:'♿'},
+    {key:'father_photo',name:'Father Passport Photo',desc:'Optional — most SaaS platforms do not require parent photos',mandatory:false,icon:'👨'},
+    {key:'mother_photo',name:'Mother Passport Photo',desc:'Optional — useful for parent verification at school gate',mandatory:false,icon:'👩'},
+];
+
+function renderProgress(){
+    document.getElementById('wizProgress').innerHTML = STEPS.map((s,i) =>
+        `<div class="wiz-step-ind ${i<currentStep?'done':''} ${i===currentStep?'active':''}" onclick="goToStep(${i})">
+            <span class="step-num">${i<currentStep?'✓':s.icon}</span>${s.title}
+        </div>`
+    ).join('');
+}
+
+function showStep(n){
+    STEPS.forEach((s,i)=>{document.getElementById(s.id).style.display=i===n?'block':'none';});
+    document.getElementById('btnPrev').style.display=n>0?'flex':'none';
+    if(n===STEPS.length-1){
+        document.getElementById('btnNext').innerHTML='<i class="fas fa-check"></i> Complete Admission';
+        document.getElementById('btnNext').className='btn-wiz btn-next btn-success';
+        buildSummary();
+    } else {
+        document.getElementById('btnNext').innerHTML='Next Step <i class="fas fa-arrow-right"></i>';
+        document.getElementById('btnNext').className='btn-wiz btn-next';
+    }
+    renderProgress();
+}
+
+function nextStep(){
+    if(currentStep===0 && !validateStep1()) return;
+    if(currentStep===1 && !validateStep2()) return;
+    if(currentStep===2 && !validateStep3()) return;
+    if(currentStep===STEPS.length-1){submitAdmission();return;}
+    currentStep++;showStep(currentStep);
+    if(currentStep===3) renderDocChecklist();
+    if(currentStep===4) loadFeeHouseData();
+}
+function prevStep(){if(currentStep>0){currentStep--;showStep(currentStep);}}
+function goToStep(n){if(n<=currentStep){currentStep=n;showStep(n);}}
+
+function validateStep1(){
+    if(!g('aFirstName')){showToast('error','First name is required');return false;}
+    if(!g('aDOB')){showToast('error','Date of birth is mandatory per CBSE');return false;}
+    if(!g('aGender')){showToast('error','Gender is required');return false;}
+    const aadhaar=g('aAadhaar');
+    if(aadhaar && aadhaar.length!==12){showToast('error','Aadhaar must be 12 digits');return false;}
+    if(aadhaar && !/^\d{12}$/.test(aadhaar)){showToast('error','Aadhaar must contain only digits');return false;}
+    return true;
+}
+function validateStep2(){
+    if(!g('aFatherName')){showToast('error',"Father's name is required");return false;}
+    if(!g('aFatherPhone')){showToast('error',"Father's phone is required");return false;}
+    if(!g('aAddress')){showToast('error','Address is mandatory');return false;}
+    // Aadhaar duplicate check
+    const fAadhaar=g('aFatherAadhaar'), mAadhaar=g('aMotherAadhaar');
+    if(fAadhaar && mAadhaar && fAadhaar===mAadhaar){showToast('error',"Father's and Mother's Aadhaar cannot be the same");return false;}
+    if(fAadhaar && fAadhaar.length!==12){showToast('error',"Father's Aadhaar must be 12 digits");return false;}
+    if(mAadhaar && mAadhaar.length!==12){showToast('error',"Mother's Aadhaar must be 12 digits");return false;}
+    return true;
+}
+
+function toggleEmergency(){
+    const same=document.getElementById('aEmgSameParent').checked;
+    document.getElementById('emgManual').style.display=same?'none':'block';
+}
+function validateStep3(){
+    if(!g('aClass')){showToast('error','Please select a class');return false;}
+    return true;
+}
+
+function calcAge(){
+    const dob=new Date(g('aDOB'));if(!dob||isNaN(dob))return;
+    const today=new Date();let age=today.getFullYear()-dob.getFullYear();
+    const m=today.getMonth()-dob.getMonth();if(m<0||(m===0&&today.getDate()<dob.getDate()))age--;
+    const ageMonths=Math.floor(((today-dob)/(1000*60*60*24*30.44)));
+    const years=Math.floor(ageMonths/12);const months=ageMonths%12;
+    let color=age>=5?'#059669':'#DC2626';
+    document.getElementById('ageDisplay').innerHTML=`<div class="age-badge" style="background:${color}20;color:${color};">Age: ${years}y ${months}m ${age<5?' — Below min age for Class 1 (CBSE: 5 years by 31 Mar)':''}</div>`;
+}
+
+// Doc checklist
+let currentDocKey='';
+function renderDocChecklist(){
+    document.getElementById('docChecklist').innerHTML=DOC_LIST.map(d=>{
+        const uploaded=!!uploadedDocs[d.key];
+        return `<div class="doc-item ${d.mandatory?'mandatory':''} ${uploaded?'uploaded':''}">
+            <div class="doc-icon">${d.icon}</div>
+            <div class="doc-info"><div class="doc-name">${d.name} ${d.mandatory?'<span style="color:var(--danger);font-size:0.60rem;">MANDATORY</span>':''}</div><div class="doc-desc">${d.desc}</div></div>
+            <div class="doc-status ${uploaded?'done':'pending'}">${uploaded?'✅ Uploaded':'⏳ Pending'}</div>
+            <button class="doc-upload-btn" onclick="triggerDocUpload('${d.key}')">${uploaded?'Replace':'Upload'}</button>
+        </div>`;
+    }).join('');
+}
+function triggerDocUpload(key){currentDocKey=key;document.getElementById('hiddenFileInput').click();}
+function handleDocUpload(){
+    const file=document.getElementById('hiddenFileInput').files[0];if(!file)return;
+    uploadedDocs[currentDocKey]={file,name:file.name};
+    renderDocChecklist();showToast('success',`${currentDocKey.replace(/_/g,' ')} uploaded`);
+    document.getElementById('hiddenFileInput').value='';
+}
+
+// Load classes, houses
+async function init(){
+    // Set today's date
+    document.getElementById('aAdmDate').value=new Date().toISOString().split('T')[0];
+    try{const r=await fetch('/api/school/classes',{credentials:'same-origin'});const d=await r.json();
+    const classOrder={'Nursery':1,'LKG':2,'UKG':3,'Prep':4};for(let i=1;i<=12;i++)classOrder['Class '+i]=10+i;
+    const sorted=(d.classes||[]).sort((a,b)=>(classOrder[a.name]||99)-(classOrder[b.name]||99));
+    document.getElementById('aClass').innerHTML='<option value="">Select Class</option>'+sorted.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');}catch(e){}
+    showStep(0);
+}
+
+async function loadSections(){
+    const cid=g('aClass');if(!cid)return;
+    try{const r=await fetch('/api/school/classes/'+cid+'/sections',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('aSection').innerHTML='<option value="">Select</option>'+(d.sections||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}
+}
+
+async function loadFeeHouseData(){
+    try{const r=await fetch('/api/school/houses',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('aHouse').innerHTML='<option value="">No House</option>'+(d.houses||[]).map(h=>`<option value="${h.id}">${h.name}</option>`).join('');}catch(e){}
+    // Load transport routes
+    try{const r=await fetch('/api/school/transport/routes-list',{credentials:'same-origin'});const d=await r.json();
+    document.getElementById('aRoute').innerHTML='<option value="">Select Route</option>'+(d.routes||[]).map(rt=>`<option value="${rt.id}">${rt.name} — ${rt.description||''}</option>`).join('');}catch(e){}
+}
+
+function toggleRoute(){
+    document.getElementById('routeRow').style.display=g('aTransport')==='yes'?'grid':'none';
+}
+
+function buildSummary(){
+    const classText=document.getElementById('aClass').selectedOptions[0]?.text||'-';
+    const sectionText=document.getElementById('aSection').selectedOptions[0]?.text||'-';
+    const mandatoryDocs=DOC_LIST.filter(d=>d.mandatory);
+    const mandatoryUploaded=mandatoryDocs.filter(d=>uploadedDocs[d.key]).length;
+    const totalUploaded=Object.keys(uploadedDocs).length;
+    document.getElementById('summaryGrid').innerHTML=`
+    <div class="sum-section"><h4>📝 Student</h4>
+        <div class="sum-row"><span class="sl">Name</span><span class="sv">${g('aFirstName')} ${g('aLastName')}</span></div>
+        <div class="sum-row"><span class="sl">DOB</span><span class="sv">${g('aDOB')}</span></div>
+        <div class="sum-row"><span class="sl">Gender</span><span class="sv">${g('aGender')}</span></div>
+        <div class="sum-row"><span class="sl">Aadhaar</span><span class="sv">${g('aAadhaar')||'Not provided'}</span></div>
+        <div class="sum-row"><span class="sl">Blood Group</span><span class="sv">${g('aBlood')||'-'}</span></div>
+    </div>
+    <div class="sum-section"><h4>👨‍👩‍👧 Parents</h4>
+        <div class="sum-row"><span class="sl">Father</span><span class="sv">${g('aFatherName')}</span></div>
+        <div class="sum-row"><span class="sl">Father Phone</span><span class="sv">${g('aFatherPhone')}</span></div>
+        <div class="sum-row"><span class="sl">Mother</span><span class="sv">${g('aMother')}</span></div>
+        <div class="sum-row"><span class="sl">Mother Phone</span><span class="sv">${g('aMotherPhone')||'-'}</span></div>
+        <div class="sum-row"><span class="sl">Address</span><span class="sv">${g('aAddress').substring(0,60)}...</span></div>
+        <div class="sum-row"><span class="sl">Emergency</span><span class="sv">${document.getElementById('aEmgSameParent').checked?'Father ('+g('aFatherPhone')+')':g('aEmergency')+' '+g('aEmergencyPhone')}</span></div>
+    </div>
+    <div class="sum-section"><h4>📚 Academic</h4>
+        <div class="sum-row"><span class="sl">Class</span><span class="sv">${classText} ${sectionText}</span></div>
+        <div class="sum-row"><span class="sl">Roll</span><span class="sv">${g('aRoll')||'Auto'}</span></div>
+        <div class="sum-row"><span class="sl">Admission Date</span><span class="sv">${g('aAdmDate')}</span></div>
+        <div class="sum-row"><span class="sl">Type</span><span class="sv">${g('aType')}</span></div>
+    </div>
+    <div class="sum-section"><h4>📎 Documents (${totalUploaded} uploaded)</h4>
+        <div class="sum-row"><span class="sl">Mandatory</span><span class="sv" style="color:${mandatoryUploaded===mandatoryDocs.length?'#059669':'#DC2626'};">${mandatoryUploaded}/${mandatoryDocs.length}</span></div>
+        ${DOC_LIST.filter(d=>uploadedDocs[d.key]).map(d=>`<div class="sum-row"><span class="sl">${d.icon} ${d.name}</span><span class="sv" style="color:#059669;">✅</span></div>`).join('')}
+        ${mandatoryDocs.filter(d=>!uploadedDocs[d.key]).map(d=>`<div class="sum-row"><span class="sl">${d.icon} ${d.name}</span><span class="sv" style="color:#DC2626;">⚠️ Missing</span></div>`).join('')}
+    </div>`;
+}
+
+async function submitAdmission(){
+    const data={
+        first_name:g('aFirstName'),last_name:g('aLastName'),
+        date_of_birth:g('aDOB'),gender:g('aGender'),blood_group:g('aBlood'),
+        father_name:g('aFatherName'),mother_name:g('aMother'),
+        father_phone:g('aFatherPhone'),mother_phone:g('aMotherPhone'),
+        address:g('aAddress'),class_id:g('aClass'),section_id:g('aSection'),
+        roll_number:g('aRoll')||null,uses_transport:g('aTransport')==='yes',
+        medical_conditions:g('aMedical'),
+        emergency_contact:document.getElementById('aEmgSameParent').checked?g('aFatherPhone'):g('aEmergencyPhone'),
+    };
+    try{
+        const r=await fetch('/api/school/students',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});
+        const d=await r.json();
+        if(d.error){showToast('error',d.error);return;}
+        createdStudentId=d.id;
+        if(!createdStudentId){showToast('error','Student created but ID not returned');return;}
+        showToast('success','Student created!');
+
+        // 2. Upload documents
+        let docCount=0;
+        for(const[key,val] of Object.entries(uploadedDocs)){
+            const fd=new FormData();fd.append('file',val.file);fd.append('doc_type',key);fd.append('doc_name',val.name);
+            await fetch('/api/school/students/'+createdStudentId+'/documents',{method:'POST',body:fd,credentials:'same-origin'});
+            docCount++;
+        }
+
+        // 3. Assign house
+        if(g('aHouse')){
+            await fetch('/api/school/houses/assign',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({house_id:g('aHouse'),student_ids:[createdStudentId]}),credentials:'same-origin'});
+        }
+
+        // 4. Send notifications (class teacher, transport, hostel)
+        try{
+            await fetch('/api/school/admission-notify',{method:'POST',headers:{'Content-Type':'application/json'},
+                body:JSON.stringify({
+                    student_id:createdStudentId,student_name:g('aFirstName')+' '+g('aLastName'),
+                    class_id:g('aClass'),section_id:g('aSection'),
+                    uses_transport:g('aTransport')==='yes',route_id:g('aRoute'),
+                    hostel:g('aHostel')==='yes',
+                }),credentials:'same-origin'});
+        }catch(e){}
+
+        showToast('success','🎉 Admission complete! '+docCount+' documents uploaded.');
+
+        const classText=document.getElementById('aClass').selectedOptions[0]?.text||'';
+        document.querySelector('.wiz-wrap').innerHTML=`
+        <div class="wiz-card" style="text-align:center;padding:40px;">
+            <div style="font-size:4rem;margin-bottom:12px;">🎓</div>
+            <h2 style="font-size:1.3rem;">Admission Successful!</h2>
+            <p style="color:var(--text-light);margin:8px 0;">${g('aFirstName')} ${g('aLastName')} — ${classText}</p>
+            <p style="font-size:0.72rem;color:var(--text-light);margin-bottom:20px;">📬 Notifications sent to: Class Teacher${g('aTransport')==='yes'?' • Transport':''}${g('aHostel')==='yes'?' • Hostel':''}</p>
+            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                <a href="/school/students/${createdStudentId}" class="btn-wiz btn-next" style="text-decoration:none;">View Profile</a>
+                <a href="/school/hr/id-cards" class="btn-wiz btn-prev" style="text-decoration:none;">Generate ID Card</a>
+                <a href="/school/admission" class="btn-wiz btn-prev" style="text-decoration:none;">New Admission</a>
+            </div>
+        </div>`;
+    }catch(e){showToast('error','Failed: '+e.message);}
+}
+
+function g(id){return document.getElementById(id)?.value?.trim()||'';}
+
+init();
+</script>
+{% endblock %}

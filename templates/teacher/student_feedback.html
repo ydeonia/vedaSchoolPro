@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}Student Feedback{% endblock %}
+{% block page_title %}📝 Student Feedback{% endblock %}
+{% block page_subtitle %}Tap tags to give quick, meaningful feedback — parents will love this{% endblock %}
+
+{% block extra_css %}
+<style>
+.feedback-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+.student-list { background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 16px; max-height: calc(100vh - 200px); overflow-y: auto; }
+.student-list h4 { font-size: 0.82rem; font-weight: 800; margin: 0 0 12px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.5px; }
+.student-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s; margin-bottom: 4px; }
+.student-item:hover { background: var(--bg); }
+.student-item.active { background: #EEF2FF; border-left: 3px solid #6366F1; }
+.student-item .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #6366F1, #8B5CF6); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 800; flex-shrink: 0; }
+.student-item .sname { font-weight: 600; font-size: 0.82rem; }
+.student-item .sroll { font-size: 0.68rem; color: var(--text-light); }
+.student-item .badge-done { width: 8px; height: 8px; border-radius: 50%; background: #10B981; margin-left: auto; flex-shrink: 0; }
+
+.feedback-panel { background: white; border-radius: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 24px; }
+.fb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.fb-header h3 { font-size: 1.1rem; font-weight: 800; margin: 0; }
+.fb-header .sub { font-size: 0.72rem; color: var(--text-light); }
+
+.subject-selector { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+.subj-pill { padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; border: 1px solid var(--border); background: white; cursor: pointer; transition: all 0.2s; }
+.subj-pill.active { background: #312E81; color: white; border-color: #312E81; }
+.subj-pill:hover:not(.active) { background: var(--bg); }
+
+.tag-section { margin-bottom: 20px; }
+.tag-section-title { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 800; margin-bottom: 8px; }
+.tag-section-title.strengths { color: #10B981; }
+.tag-section-title.concerns { color: #EF4444; }
+.tag-section-title.suggestions { color: #3B82F6; }
+.tags-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip { padding: 6px 14px; border-radius: 20px; font-size: 0.72rem; border: 1.5px solid var(--border); background: white; cursor: pointer; transition: all 0.2s; user-select: none; }
+.tag-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+.tag-chip.selected { font-weight: 700; }
+.tag-chip.selected.strength-tag { background: #ECFDF5; border-color: #10B981; color: #059669; }
+.tag-chip.selected.concern-tag { background: #FEF2F2; border-color: #EF4444; color: #DC2626; }
+.tag-chip.selected.suggestion-tag { background: #EFF6FF; border-color: #3B82F6; color: #2563EB; }
+
+.custom-remark-box { width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.82rem; resize: vertical; min-height: 60px; font-family: inherit; transition: border-color 0.2s; }
+.custom-remark-box:focus { outline: none; border-color: #6366F1; }
+
+.submit-row { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.submit-btn { padding: 10px 28px; background: linear-gradient(135deg, #6366F1, #4F46E5); color: white; border: none; border-radius: 10px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+.submit-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+.submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.selected-count { font-size: 0.78rem; color: var(--text-light); }
+.selected-count strong { color: #6366F1; }
+
+.success-toast { position: fixed; top: 20px; right: 20px; background: #059669; color: white; padding: 12px 20px; border-radius: 10px; font-weight: 700; font-size: 0.85rem; z-index: 9999; display: none; animation: slideIn 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+@keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.no-student { text-align: center; padding: 60px 20px; color: var(--text-light); }
+.no-student i { font-size: 3rem; margin-bottom: 12px; opacity: 0.3; }
+
+.prev-remarks { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; }
+.prev-remarks h4 { font-size: 0.82rem; font-weight: 800; margin: 0 0 10px; color: var(--text-light); }
+.remark-history-item { padding: 10px 12px; background: var(--bg); border-radius: 8px; margin-bottom: 6px; font-size: 0.78rem; }
+.remark-history-item .rh-date { font-size: 0.68rem; color: var(--text-light); }
+.remark-history-item .rh-tags { margin-top: 4px; }
+.remark-history-item .rh-tag { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; margin-right: 4px; margin-bottom: 2px; }
+.rh-tag.s { background: #ECFDF5; color: #059669; }
+.rh-tag.c { background: #FEF2F2; color: #DC2626; }
+.rh-tag.g { background: #EFF6FF; color: #2563EB; }
+
+.search-box { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.78rem; margin-bottom: 10px; }
+.search-box:focus { outline: none; border-color: #6366F1; }
+
+@media (max-width: 768px) { .feedback-layout { grid-template-columns: 1fr; } .student-list { max-height: 250px; } }
+
+[data-theme="dark"] .student-list, [data-theme="dark"] .feedback-panel { background: var(--card-bg); }
+[data-theme="dark"] .student-item.active { background: rgba(99,102,241,0.15); }
+[data-theme="dark"] .tag-chip { background: var(--bg-secondary); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .subj-pill { background: var(--bg-secondary); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .custom-remark-box { background: var(--bg-secondary); border-color: var(--border); color: var(--text); }
+[data-theme="dark"] .remark-history-item { background: var(--bg-secondary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="feedback-layout">
+    <!-- LEFT: Student List -->
+    <div class="student-list">
+        <h4>📋 Students ({{ students|length }})</h4>
+        <input type="text" class="search-box" placeholder="Search student..." oninput="filterStudents(this.value)">
+        <div id="studentListContainer">
+        {% for s in students %}
+            <div class="student-item" data-id="{{ s.id }}" data-name="{{ s.full_name }}" data-roll="{{ s.roll_number or '' }}" onclick="selectStudent('{{ s.id }}', this.dataset.name, this.dataset.roll)">
+                <div class="avatar">{{ s.first_name[0] }}{{ (s.last_name or ' ')[0] }}</div>
+                <div>
+                    <div class="sname">{{ s.full_name }}</div>
+                    <div class="sroll">Roll #{{ s.roll_number or '—' }}</div>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <!-- RIGHT: Feedback Panel -->
+    <div class="feedback-panel">
+        <div id="feedbackContent">
+            <div class="no-student">
+                <i class="fas fa-hand-pointer"></i>
+                <h3>Select a Student</h3>
+                <p>Choose a student from the left to give feedback.<br>It takes just 30 seconds — tap the relevant tags!</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="success-toast" id="successToast">✅ Feedback saved!</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allTags = {};
+let selectedTags = new Set();
+let currentStudentId = null;
+let currentSubject = 'General';
+
+// Load tags on page load
+async function loadTags() {
+    try {
+        const resp = await fetch('/api/teacher/remarks/tags', {credentials: 'same-origin'});
+        const data = await resp.json();
+        allTags = data.tags || {};
+    } catch(e) { console.error('Failed to load tags:', e); }
+}
+
+function selectStudent(id, name, roll) {
+    currentStudentId = id;
+    selectedTags.clear();
+    
+    // Update active state in list
+    document.querySelectorAll('.student-item').forEach(el => el.classList.remove('active'));
+    const activeEl = document.querySelector(`.student-item[data-id="${id}"]`);
+    if (activeEl) activeEl.classList.add('active');
+    
+    // Build subject pills
+    const subjects = Object.keys(allTags);
+    currentSubject = subjects.includes('General') ? 'General' : subjects[0] || 'General';
+    
+    let html = `
+        <div class="fb-header">
+            <div>
+                <h3>${name}</h3>
+                <div class="sub">Roll #${roll || '—'} · Select subject, tap tags, submit</div>
+            </div>
+        </div>
+        
+        <div class="subject-selector" id="subjPills">
+            ${subjects.map(s => `<button class="subj-pill${s === currentSubject ? ' active' : ''}" onclick="switchSubject('${s}', this)">${s}</button>`).join('')}
+        </div>
+        
+        <div id="tagsContainer"></div>
+        
+        <div style="margin-top:16px;">
+            <label style="font-size:0.78rem; font-weight:700; display:block; margin-bottom:6px;">✏️ Additional Comment (optional)</label>
+            <textarea class="custom-remark-box" id="customRemark" placeholder="Write a personal note for the parent... (e.g., 'Aarav has improved significantly this month. Keep encouraging him.')"></textarea>
+        </div>
+        
+        <div class="submit-row">
+            <div class="selected-count" id="selectedCount">No tags selected</div>
+            <button class="submit-btn" id="submitBtn" onclick="submitFeedback()" disabled>💾 Save Feedback</button>
+        </div>
+        
+        <div class="prev-remarks" id="prevRemarks">
+            <h4>📜 Previous Feedback for ${name}</h4>
+            <div id="prevRemarksContent"><div style="font-size:0.78rem;color:var(--text-light);">Loading...</div></div>
+        </div>
+    `;
+    
+    document.getElementById('feedbackContent').innerHTML = html;
+    renderTags(currentSubject);
+    loadPreviousRemarks(id);
+}
+
+function switchSubject(subject, btn) {
+    currentSubject = subject;
+    selectedTags.clear();
+    document.querySelectorAll('.subj-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    renderTags(subject);
+    updateSelectedCount();
+}
+
+function renderTags(subject) {
+    const container = document.getElementById('tagsContainer');
+    const data = allTags[subject];
+    if (!data) { container.innerHTML = '<p style="font-size:0.82rem;color:var(--text-light);">No tags for this subject yet.</p>'; return; }
+    
+    let html = '';
+    
+    if (data.strengths.length > 0) {
+        html += `<div class="tag-section">
+            <div class="tag-section-title strengths">💪 Strengths — what's going well</div>
+            <div class="tags-grid">${data.strengths.map(t => 
+                `<div class="tag-chip strength-tag" data-id="${t.id}" data-cat="strength" onclick="toggleTag(this)">${t.icon} ${t.text}</div>`
+            ).join('')}</div></div>`;
+    }
+    
+    if (data.concerns.length > 0) {
+        html += `<div class="tag-section">
+            <div class="tag-section-title concerns">⚠️ Needs Attention — areas to improve</div>
+            <div class="tags-grid">${data.concerns.map(t => 
+                `<div class="tag-chip concern-tag" data-id="${t.id}" data-cat="concern" onclick="toggleTag(this)">${t.icon} ${t.text}</div>`
+            ).join('')}</div></div>`;
+    }
+    
+    if (data.suggestions.length > 0) {
+        html += `<div class="tag-section">
+            <div class="tag-section-title suggestions">💡 Suggestions — action items for parents</div>
+            <div class="tags-grid">${data.suggestions.map(t => 
+                `<div class="tag-chip suggestion-tag" data-id="${t.id}" data-cat="suggestion" onclick="toggleTag(this)">${t.icon} ${t.text}</div>`
+            ).join('')}</div></div>`;
+    }
+    
+    container.innerHTML = html;
+}
+
+function toggleTag(el) {
+    const id = el.dataset.id;
+    if (selectedTags.has(id)) {
+        selectedTags.delete(id);
+        el.classList.remove('selected');
+    } else {
+        selectedTags.add(id);
+        el.classList.add('selected');
+    }
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const count = selectedTags.size;
+    const el = document.getElementById('selectedCount');
+    const btn = document.getElementById('submitBtn');
+    const hasCustom = document.getElementById('customRemark')?.value.trim();
+    if (count === 0 && !hasCustom) {
+        el.innerHTML = 'No tags selected';
+        btn.disabled = true;
+    } else {
+        el.innerHTML = `<strong>${count}</strong> tag${count !== 1 ? 's' : ''} selected`;
+        btn.disabled = false;
+    }
+}
+
+async function submitFeedback() {
+    if (!currentStudentId) return;
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Saving...';
+    
+    // Determine overall category based on majority of selected tags
+    let cats = {};
+    selectedTags.forEach(id => {
+        const el = document.querySelector(`.tag-chip[data-id="${id}"]`);
+        if (el) {
+            const cat = el.dataset.cat;
+            cats[cat] = (cats[cat] || 0) + 1;
+        }
+    });
+    const majorCat = Object.entries(cats).sort((a,b) => b[1]-a[1])[0]?.[0] || 'suggestion';
+    
+    try {
+        const resp = await fetch('/api/teacher/remarks/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                student_id: currentStudentId,
+                subject_id: null,  // We use subject_name via tags; subject_id can be enhanced later
+                exam_id: null,
+                tag_ids: Array.from(selectedTags),
+                custom_remark: document.getElementById('customRemark')?.value.trim() || '',
+                category: majorCat,
+                visible_to_parent: true,
+                visible_to_student: true,
+            })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast('✅ Feedback saved! Parents will see this.');
+            // Reset
+            selectedTags.clear();
+            document.querySelectorAll('.tag-chip.selected').forEach(el => el.classList.remove('selected'));
+            document.getElementById('customRemark').value = '';
+            updateSelectedCount();
+            // Reload previous remarks
+            loadPreviousRemarks(currentStudentId);
+            // Mark student as done
+            const studentEl = document.querySelector(`.student-item[data-id="${currentStudentId}"]`);
+            if (studentEl && !studentEl.querySelector('.badge-done')) {
+                const badge = document.createElement('div');
+                badge.className = 'badge-done';
+                badge.title = 'Feedback given';
+                studentEl.appendChild(badge);
+            }
+        }
+    } catch(e) {
+        showToast('❌ Failed to save. Try again.');
+    }
+    btn.disabled = false;
+    btn.textContent = '💾 Save Feedback';
+}
+
+async function loadPreviousRemarks(studentId) {
+    const container = document.getElementById('prevRemarksContent');
+    try {
+        const resp = await fetch(`/api/teacher/remarks/student/${studentId}`, {credentials: 'same-origin'});
+        const data = await resp.json();
+        if (!data.remarks || data.remarks.length === 0) {
+            container.innerHTML = '<div style="font-size:0.78rem;color:var(--text-light);padding:8px;">No previous feedback yet.</div>';
+            return;
+        }
+        container.innerHTML = data.remarks.map(r => `
+            <div class="remark-history-item">
+                <div class="rh-date">${r.date} · ${r.teacher} · ${r.subject}</div>
+                <div class="rh-tags">
+                    ${r.tags.map(t => `<span class="rh-tag ${r.category === 'strength' ? 's' : r.category === 'concern' ? 'c' : 'g'}">${t}</span>`).join('')}
+                </div>
+                ${r.custom_remark ? `<div style="margin-top:4px;font-style:italic;color:var(--text-secondary);">"${r.custom_remark}"</div>` : ''}
+                ${r.parent_seen ? '<div style="font-size:0.68rem;color:#10B981;margin-top:2px;">✓ Parent has seen this</div>' : ''}
+            </div>
+        `).join('');
+    } catch(e) { container.innerHTML = '<div style="font-size:0.78rem;color:var(--text-light);">Could not load history.</div>'; }
+}
+
+function showToast(msg) {
+    const toast = document.getElementById('successToast');
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    setTimeout(() => toast.style.display = 'none', 3000);
+}
+
+function filterStudents(query) {
+    const q = query.toLowerCase();
+    document.querySelectorAll('.student-item').forEach(el => {
+        const name = el.dataset.name.toLowerCase();
+        el.style.display = name.includes(q) ? '' : 'none';
+    });
+}
+
+// Listen for custom remark changes
+document.addEventListener('input', (e) => {
+    if (e.target.id === 'customRemark') updateSelectedCount();
+});
+
+document.addEventListener('DOMContentLoaded', loadTags);
+</script>
+{% endblock %}

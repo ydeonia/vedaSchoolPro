@@ -1,0 +1,70 @@
+{
+    "_meta": {
+        "name": "Gujarati",
+        "native": "ગુજરાતી",
+        "direction": "ltr",
+        "version": "1.0"
+    },
+    "common": {
+        "save": "સાચવો",
+        "cancel": "રદ કરો",
+        "delete": "કાઢી નાખો",
+        "edit": "ફેરફાર",
+        "search": "શોધો...",
+        "loading": "લોડ થઈ રહ્યું છે...",
+        "no_data": "કોઈ ડેટા નથી",
+        "success": "સફળતા",
+        "error": "ભૂલ",
+        "back": "પાછા",
+        "next": "આગળ",
+        "submit": "સબમિટ",
+        "close": "બંધ",
+        "yes": "હા",
+        "no": "ના",
+        "ok": "બરાબર",
+        "all": "બધા",
+        "name": "નામ",
+        "email": "ઈમેલ",
+        "phone": "ફોન",
+        "address": "સરનામું",
+        "amount": "રકમ",
+        "total": "કુલ",
+        "date": "તારીખ",
+        "time": "સમય",
+        "status": "સ્થિતિ",
+        "male": "પુરુષ",
+        "female": "સ્ત્રી",
+        "other": "અન્ય"
+    },
+    "nav": {
+        "dashboard": "ડેશબોર્ડ",
+        "students": "વિદ્યાર્થીઓ",
+        "teachers": "શિક્ષકો",
+        "classes": "વર્ગો",
+        "attendance": "હાજરી",
+        "exams": "પરીક્ષાઓ",
+        "results": "પરિણામો",
+        "fees": "ફી",
+        "settings": "સેટિંગ્સ",
+        "logout": "લોગ આઉટ",
+        "login": "લોગ ઇન"
+    },
+    "dashboard": {
+        "welcome": "સ્વાગત છે",
+        "total_students": "કુલ વિદ્યાર્થીઓ",
+        "today_attendance": "આજની હાજરી",
+        "fee_collected": "ઉઘરાવેલ ફી"
+    },
+    "attendance": {
+        "mark_attendance": "હાજરી નોંધો",
+        "present": "હાજર",
+        "absent": "ગેરહાજર"
+    },
+    "fees": {
+        "collect_fee": "ફી ઉઘરાવો",
+        "paid": "ચૂકવેલ",
+        "unpaid": "બાકી",
+        "receipt": "રસીદ",
+        "cash": "રોકડ"
+    }
+}

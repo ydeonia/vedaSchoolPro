@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Syllabus{% endblock %}
+{% block page_title %}📚 Syllabus & Progress{% endblock %}
+{% block page_subtitle %}Track your subject-wise chapter completion{% endblock %}
+{% block content %}
+{% if syllabus %}
+{% for subject, chapters in syllabus.items() %}
+<div class="card mb-3">
+    <div class="card-header">
+        <h2>{{ subject }}</h2>
+        {% set done = chapters|selectattr('is_completed')|list|length %}
+        <span class="badge badge-success">{{ done }}/{{ chapters|length }} done</span>
+    </div>
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>#</th><th>Chapter</th><th>Status</th></tr></thead><tbody>
+        {% for ch in chapters %}
+        <tr>
+            <td>{{ ch.chapter_number or loop.index }}</td>
+            <td>{{ ch.chapter_name or ch.title }}</td>
+            <td>{% if ch.is_completed %}<span class="badge badge-success">✅ Done</span>{% else %}<span class="badge badge-warning">📖 Pending</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+        </tbody></table>
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-book-open"></i><h3>Syllabus Not Added Yet</h3><p>Your teachers will update the syllabus soon.</p></div></div></div>
+{% endif %}
+{% endblock %}

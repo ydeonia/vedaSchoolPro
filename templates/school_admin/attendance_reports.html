@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Attendance Reports{% endblock %}
+{% block page_title %}Attendance Reports{% endblock %}
+{% block page_subtitle %}View and analyze attendance data{% endblock %}
+
+{% block content %}
+<!-- Filter -->
+<div class="card mb-3">
+    <div class="card-body" style="padding: 16px 24px;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="rptClass" class="form-select" onchange="onReportClassChange()" style="padding: 8px 12px; min-width: 140px;">
+                <option value="">Select Class</option>
+                {% for cls in classes %}
+                <option value="{{ cls.id }}">{{ cls.name }}</option>
+                {% endfor %}
+            </select>
+            <select id="rptSection" class="form-select" style="padding: 8px 12px; min-width: 120px;">
+                <option value="">All Sections</option>
+            </select>
+            <select id="rptMonth" class="form-select" style="padding: 8px 12px; min-width: 140px;">
+                <option value="">Select Month</option>
+                <option value="01">January</option><option value="02">February</option>
+                <option value="03">March</option><option value="04">April</option>
+                <option value="05">May</option><option value="06">June</option>
+                <option value="07">July</option><option value="08">August</option>
+                <option value="09">September</option><option value="10">October</option>
+                <option value="11">November</option><option value="12">December</option>
+            </select>
+            <input type="number" id="rptYear" class="form-input" value="{{ current_year }}" style="padding: 8px 12px; width: 100px;">
+            <button class="btn btn-primary btn-sm" onclick="loadReport()">
+                <i class="fas fa-chart-bar"></i> Generate
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Area -->
+<div id="reportArea">
+    <div class="empty-state">
+        <i class="fas fa-chart-pie"></i>
+        <h3>Select filters and generate report</h3>
+        <p>Choose class, section, and month to view attendance summary</p>
+    </div>
+</div>
+
+<script>
+const classSections = {{ sections_json | safe }};
+
+function onReportClassChange() {
+    const classId = document.getElementById('rptClass').value;
+    const secSelect = document.getElementById('rptSection');
+    secSelect.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSections[classId]) {
+        classSections[classId].forEach(sec => {
+            secSelect.innerHTML += `<option value="${sec.id}">${sec.name}</option>`;
+        });
+    }
+}
+
+async function loadReport() {
+    const classId = document.getElementById('rptClass').value;
+    const sectionId = document.getElementById('rptSection').value;
+    const month = document.getElementById('rptMonth').value;
+    const year = document.getElementById('rptYear').value;
+
+    if (!classId || !month || !year) {
+        showToast('error', 'Error', 'Please select class, month and year');
+        return;
+    }
+
+    try {
+        const data = await apiCall(`/api/school/attendance/report?class_id=${classId}&section_id=${sectionId}&month=${month}&year=${year}`);
+        renderReport(data);
+    } catch (e) {}
+}
+
+function renderReport(data) {
+    const area = document.getElementById('reportArea');
+
+    if (!data.students || data.students.length === 0) {
+        area.innerHTML = `<div class="empty-state"><i class="fas fa-users"></i><h3>No data found</h3><p>No attendance records for the selected period</p></div>`;
+        return;
+    }
+
+    let html = `
+    <div class="stats-grid mb-3">
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-percentage"></i></div>
+            <div class="stat-info">
+                <div class="stat-value">${data.avg_attendance}%</div>
+                <div class="stat-label">Average Attendance</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-calendar-check"></i></div>
+            <div class="stat-info">
+                <div class="stat-value">${data.working_days}</div>
+                <div class="stat-label">Working Days</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon purple"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+                <div class="stat-value">${data.students.length}</div>
+                <div class="stat-label">Total Students</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fas fa-exclamation-triangle"></i></div>
+            <div class="stat-info">
+                <div class="stat-value">${data.below_75_count}</div>
+                <div class="stat-label">Below 75%</div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Student-wise Attendance</h2>
+            <button class="btn btn-ghost btn-sm" onclick="exportAttendanceCSV()" title="Export CSV"><i class="fas fa-file-csv"></i> Export CSV</button>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Student</th>
+                            <th>Roll No</th>
+                            <th style="text-align: center;">Present</th>
+                            <th style="text-align: center;">Absent</th>
+                            <th style="text-align: center;">Late</th>
+                            <th style="text-align: center;">%</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+    data.students.forEach((s, i) => {
+        const pct = s.total > 0 ? Math.round((s.present / s.total) * 100) : 0;
+        const barColor = pct >= 90 ? '#10B981' : pct >= 75 ? '#F59E0B' : '#EF4444';
+        const statusBadge = pct >= 90
+            ? '<span class="badge badge-success">Excellent</span>'
+            : pct >= 75
+            ? '<span class="badge badge-warning">Good</span>'
+            : '<span class="badge badge-danger">Low</span>';
+
+        html += `
+                        <tr>
+                            <td class="text-sm text-muted">${i + 1}</td>
+                            <td>
+                                <div style="font-weight: 600; font-size: 0.85rem;">${s.name}</div>
+                            </td>
+                            <td class="text-sm">${s.roll_number || '—'}</td>
+                            <td style="text-align: center;"><span style="color: #10B981; font-weight: 700;">${s.present}</span></td>
+                            <td style="text-align: center;"><span style="color: #EF4444; font-weight: 700;">${s.absent}</span></td>
+                            <td style="text-align: center;"><span style="color: #F59E0B; font-weight: 700;">${s.late}</span></td>
+                            <td style="text-align: center;">
+                                <div style="display: flex; align-items: center; gap: 8px; justify-content: center;">
+                                    <div style="width: 50px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                                        <div style="width: ${pct}%; height: 100%; background: ${barColor}; border-radius: 3px;"></div>
+                                    </div>
+                                    <span style="font-weight: 700; font-size: 0.82rem; color: ${barColor};">${pct}%</span>
+                                </div>
+                            </td>
+                            <td>${statusBadge}</td>
+                        </tr>`;
+    });
+
+    html += `
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>`;
+
+    area.innerHTML = html;
+}
+function exportAttendanceCSV() {
+    const classId = document.getElementById('rptClass').value;
+    const sectionId = document.getElementById('rptSection').value;
+    const month = parseInt(document.getElementById('rptMonth').value);
+    const year = document.getElementById('rptYear').value;
+    if (!classId) { showToast('error', 'Select a class first'); return; }
+    let url = `/api/school/export/attendance-csv?class_id=${classId}&month=${month}&year=${year}`;
+    if (sectionId) url += `&section_id=${sectionId}`;
+    window.open(url, '_blank');
+}
+</script>
+{% endblock %}

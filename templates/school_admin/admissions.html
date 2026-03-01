@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Admissions{% endblock %}
+{% block page_title %}📋 Admission Management{% endblock %}
+{% block page_subtitle %}Enquiry → Application → Interview → Enrollment pipeline{% endblock %}
+{% block content %}
+<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:16px;">
+    {% for s,count in stats.items() %}
+    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:12px; text-align:center;">
+        <div style="font-size:1.3rem; font-weight:800; color:var(--primary);">{{ count }}</div>
+        <div style="font-size:0.7rem; color:var(--text-light); text-transform:capitalize;">{{ s|replace('_',' ') }}</div>
+    </div>
+    {% endfor %}
+</div>
+<div class="card mb-3">
+    <div class="card-header"><h2>New Enquiry</h2><button class="btn btn-primary btn-sm" onclick="document.getElementById('admForm').style.display=document.getElementById('admForm').style.display==='none'?'block':'none'"><i class="fas fa-plus"></i> Add</button></div>
+    <div class="card-body" id="admForm" style="display:none;">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <input type="text" id="aName" class="form-input" placeholder="Student Name *">
+            <input type="text" id="aFather" class="form-input" placeholder="Father's Name">
+            <input type="text" id="aPhone" class="form-input" placeholder="Father's Phone">
+            <select id="aClass" class="form-select"><option value="">Applying for Class</option>{% for c in classes %}<option value="{{ c.name }}">{{ c.name }}</option>{% endfor %}</select>
+            <input type="date" id="aDOB" class="form-input">
+            <input type="text" id="aPrev" class="form-input" placeholder="Previous School">
+        </div>
+        <button class="btn btn-primary mt-2" onclick="addAdmission()"><i class="fas fa-save"></i> Create Enquiry</button>
+    </div>
+</div>
+<div class="card">
+    <div class="card-body" style="padding:0;">
+        <table class="data-table"><thead><tr><th>Student</th><th>Class</th><th>Father</th><th>Phone</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>{% for a in admissions %}<tr>
+            <td><strong>{{ a.student_name }}</strong></td><td>{{ a.applying_for_class or '—' }}</td>
+            <td>{{ a.father_name or '—' }}</td><td>{{ a.father_phone or '—' }}</td>
+            <td><span style="padding:2px 8px; border-radius:10px; font-size:0.7rem; font-weight:700; text-transform:capitalize;
+                {% if a.status.value == 'enrolled' %}background:#D1FAE5; color:#059669;
+                {% elif a.status.value == 'rejected' %}background:#FEE2E2; color:#DC2626;
+                {% elif a.status.value == 'approved' %}background:#DBEAFE; color:#2563EB;
+                {% else %}background:#FEF3C7; color:#D97706;{% endif %}">{{ a.status.value|replace('_',' ') }}</span></td>
+            <td><select class="form-select" style="font-size:0.75rem; padding:4px;" onchange="updateStatus('{{ a.id }}',this.value)">
+                <option value="">Move to...</option><option value="application">Application</option><option value="interview">Interview</option>
+                <option value="approved">Approved</option><option value="enrolled">Enrolled</option><option value="rejected">Rejected</option>
+            </select></td>
+        </tr>{% endfor %}</tbody></table>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+async function addAdmission(){const d={student_name:document.getElementById('aName').value,father_name:document.getElementById('aFather').value,father_phone:document.getElementById('aPhone').value,applying_for_class:document.getElementById('aClass').value,date_of_birth:document.getElementById('aDOB').value||null,previous_school:document.getElementById('aPrev').value};if(!d.student_name){showToast('error','Name required');return;}await apiCall('/api/school/admissions/create','POST',d);showToast('success','Enquiry Created');setTimeout(()=>location.reload(),800);}
+async function updateStatus(id,s){if(!s)return;await apiCall('/api/school/admissions/'+id+'/status','PUT',{status:s});showToast('success','Status Updated');setTimeout(()=>location.reload(),800);}
+</script>
+{% endblock %}

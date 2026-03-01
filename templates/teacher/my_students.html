@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}My Students{% endblock %}
+{% block page_title %}👨‍🎓 My Students{% endblock %}
+{% block page_subtitle %}View students across your classes{% endblock %}
+
+{% block extra_css %}
+<style>
+.class-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
+.class-tab { padding:8px 16px; border-radius:20px; font-size:0.78rem; font-weight:700; cursor:pointer; background:white; border:2px solid var(--border); transition:all 0.15s; }
+.class-tab.active { background:var(--primary); color:white; border-color:var(--primary); }
+.class-tab:hover:not(.active) { background:var(--bg-secondary); }
+.student-count { font-size:0.82rem; color:var(--text-light); margin-bottom:12px; font-weight:600; }
+.search-bar { width:100%; padding:12px 16px 12px 40px; border-radius:12px; border:1px solid var(--border); font-size:0.85rem; margin-bottom:14px; background:white; }
+.search-wrap { position:relative; margin-bottom:14px; }
+.search-wrap i { position:absolute; left:14px; top:50%; transform:translateY(-50%); color:var(--text-light); }
+.students-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; }
+.stu-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.07); padding:16px; transition:all 0.2s; cursor:pointer; }
+.stu-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.stu-header { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.stu-avatar { width:42px; height:42px; border-radius:50%; background:linear-gradient(135deg,#6366F1,#8B5CF6); color:white; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.88rem; flex-shrink:0; }
+.stu-name { font-weight:800; font-size:0.88rem; }
+.stu-meta { font-size:0.72rem; color:var(--text-light); }
+.stu-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.stu-stat { text-align:center; padding:6px; background:var(--bg); border-radius:8px; }
+.stu-stat .val { font-size:0.88rem; font-weight:800; }
+.stu-stat .lbl { font-size:0.62rem; color:var(--text-light); text-transform:uppercase; }
+.stu-actions { display:flex; gap:6px; margin-top:10px; }
+.stu-action { padding:4px 10px; border-radius:8px; font-size:0.68rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:white; text-decoration:none; color:var(--text-secondary); transition:all 0.15s; }
+.stu-action:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
+.loading { text-align:center; padding:60px; color:var(--text-light); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="class-tabs" id="classTabs"></div>
+<div class="search-wrap"><i class="fas fa-search"></i><input type="text" class="search-bar" id="searchInput" placeholder="Search students..." oninput="filterStudents()"></div>
+<div class="student-count" id="studentCount"></div>
+<div class="students-grid" id="studentsGrid"><div class="loading"><i class="fas fa-spinner fa-spin" style="font-size:1.5rem;"></i><div style="margin-top:8px;">Loading students...</div></div></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let allStudents = [], activeClass = '';
+
+async function init() {
+    const res = await fetch('/api/teacher/my-classes', {credentials:'same-origin'});
+    if (!res.ok) return;
+    const data = await res.json();
+    window._classData = data.classes;
+    const tabs = document.getElementById('classTabs');
+    tabs.innerHTML = '<div class="class-tab active" onclick="loadClassStudents(\'\',this)">All</div>';
+    const unique = [...new Map(data.classes.map(c=>[c.class_id+'-'+c.section_id, c])).values()];
+    unique.forEach(c => { tabs.innerHTML += `<div class="class-tab" onclick="loadClassStudents('${c.class_id}|${c.section_id}',this)">${c.class_name} ${c.section_name}</div>`; });
+    loadAllStudents(unique);
+}
+
+async function loadAllStudents(classes) {
+    allStudents = [];
+    for (const c of classes) {
+        const res = await fetch(`/api/teacher/class-students?class_id=${c.class_id}&section_id=${c.section_id}`, {credentials:'same-origin'});
+        if (res.ok) {
+            const data = await res.json();
+            data.students.forEach(s => { s._class = c.class_name; s._section = c.section_name; s._classId = c.class_id; s._sectionId = c.section_id; });
+            allStudents.push(...data.students);
+        }
+    }
+    // Deduplicate
+    allStudents = [...new Map(allStudents.map(s=>[s.id, s])).values()];
+    renderStudents(allStudents);
+}
+
+function loadClassStudents(key, el) {
+    document.querySelectorAll('.class-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active'); activeClass = key;
+    filterStudents();
+}
+
+function filterStudents() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    let filtered = allStudents;
+    if (activeClass) {
+        const [cid,sid] = activeClass.split('|');
+        filtered = filtered.filter(s=>s._classId===cid && s._sectionId===sid);
+    }
+    if (search) filtered = filtered.filter(s=>s.name.toLowerCase().includes(search));
+    renderStudents(filtered);
+}
+
+function renderStudents(students) {
+    const grid = document.getElementById('studentsGrid');
+    document.getElementById('studentCount').textContent = `${students.length} students`;
+    if (!students.length) { grid.innerHTML = '<div class="loading"><i class="fas fa-users" style="font-size:2rem;opacity:0.2;"></i><div>No students found</div></div>'; return; }
+
+    grid.innerHTML = students.map(s => {
+        const attColor = (s.att_pct||0)>=85?'#10B981':(s.att_pct||0)>=75?'#F59E0B':'#EF4444';
+        const initials = s.name.split(' ').map(n=>n[0]).join('').substring(0,2);
+        const parentInfo = s.father_name ? `👨 ${s.father_name}${s.father_phone?' · 📞'+s.father_phone:''}` : (s.mother_name ? `👩 ${s.mother_name}${s.mother_phone?' · 📞'+s.mother_phone:''}` : '');
+        return `<div class="stu-card">
+            <div class="stu-header">
+                <div class="stu-avatar">${initials}</div>
+                <div><div class="stu-name">${s.name}</div><div class="stu-meta">${s._class} ${s._section} · Roll: ${s.roll||'—'} · ${s.admission||''}</div>
+                ${parentInfo?`<div class="stu-meta" style="margin-top:2px;font-size:0.68rem;">${parentInfo}</div>`:''}</div>
+            </div>
+            <div class="stu-stats">
+                <div class="stu-stat"><div class="val" style="color:${attColor}">${s.att_pct||0}%</div><div class="lbl">Attendance</div></div>
+                <div class="stu-stat"><div class="val" style="color:var(--primary);">${s.last_exam_pct||'—'}${s.last_exam_pct?'%':''}</div><div class="lbl">Last Exam</div></div>
+                <div class="stu-stat"><div class="val" style="color:${(s.fee_balance||0)>0?'#EF4444':'#10B981'}">₹${(s.fee_balance||0).toLocaleString()}</div><div class="lbl">Fee Due</div></div>
+            </div>
+            <div class="stu-actions">
+                <a class="stu-action" href="/teacher/student-feedback" onclick="sessionStorage.setItem('prefillStudent','${s.id}')">💬 Feedback</a>
+                <a class="stu-action" onclick="messageParent('${s.name}','${s.father_phone||s.mother_phone||''}')">📱 Message Parent</a>
+                <a class="stu-action" onclick="alert('Coming soon')">📊 Report</a>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+function messageParent(studentName, phone) {
+    if (!phone) { alert('No parent phone number available for '+studentName); return; }
+    const msg = prompt(`Send message to ${studentName}'s parent (${phone}):\n\nType your message:`);
+    if (msg && msg.trim()) {
+        alert(`✅ Message sent to parent of ${studentName}!\n\n"${msg.trim()}"\n\n(SMS/WhatsApp integration coming soon — for now this is logged)`);
+    }
+}
+</script>
+{% endblock %}

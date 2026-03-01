@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Transport — Routes{% endblock %}
+{% block page_title %}🗺️ Route Management{% endblock %}
+{% block page_subtitle %}Define routes, stops, and assign buses{% endblock %}
+{% block content %}
+<div class="card mb-3">
+    <div class="card-header"><h2>Create Route</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr 100px; gap:10px;">
+            <input type="text" id="rName" class="form-input" placeholder="Route name (e.g. Route 1 - Koramangala)">
+            <select id="rVehicle" class="form-select"><option value="">No vehicle</option>{% for v in vehicles %}<option value="{{ v.id }}">{{ v.vehicle_number }}</option>{% endfor %}</select>
+            <input type="number" id="rFee" class="form-input" placeholder="Monthly ₹" value="0">
+            <button class="btn btn-primary" onclick="addRoute()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+</div>
+{% for r in routes %}
+<div class="card mb-2">
+    <div class="card-header"><h2>{{ r.route_name }} {% if r.vehicle %}<span style="font-size:0.75rem; color:var(--text-light);">🚌 {{ r.vehicle.vehicle_number }}</span>{% endif %} <span style="font-size:0.75rem; color:var(--success);">₹{{ r.monthly_fee|int }}/mo</span></h2></div>
+    <div class="card-body">
+        <div style="font-size:0.82rem; margin-bottom:8px;">
+            <strong>Stops:</strong>
+            {% for s in r.stops|sort(attribute='stop_order') %}
+            <span style="display:inline-block; padding:3px 10px; background:var(--bg-secondary,#F1F5F9); border-radius:12px; margin:2px; font-size:0.78rem;">{{ s.stop_order }}. {{ s.stop_name }}{% if s.pickup_time %} ({{ s.pickup_time }}){% endif %}</span>
+            {% endfor %}
+            {% if not r.stops %}<span style="color:var(--text-light);">No stops added</span>{% endif %}
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+            <input type="text" class="form-input" id="stop_{{ r.id }}" placeholder="Stop name" style="max-width:200px;">
+            <input type="number" class="form-input" id="stopord_{{ r.id }}" placeholder="Order" value="{{ (r.stops|length)+1 }}" style="max-width:80px;">
+            <button class="btn btn-secondary btn-sm" onclick="addStop('{{ r.id }}')"><i class="fas fa-map-pin"></i> Add Stop</button>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% if not routes %}<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-route"></i><h3>No Routes</h3><p>Create your first transport route above.</p></div></div></div>{% endif %}
+{% endblock %}
+{% block extra_js %}
+<script>
+async function addRoute(){
+    const d={route_name:document.getElementById('rName').value, vehicle_id:document.getElementById('rVehicle').value||null, monthly_fee:parseFloat(document.getElementById('rFee').value)||0};
+    if(!d.route_name){showToast('error','Enter route name');return;}
+    await apiCall('/api/school/transport/routes/create','POST',d);
+    showToast('success','Route Created');setTimeout(()=>location.reload(),800);
+}
+async function addStop(rid){
+    const name=document.getElementById('stop_'+rid).value;
+    const order=parseInt(document.getElementById('stopord_'+rid).value)||1;
+    if(!name){showToast('error','Enter stop name');return;}
+    await apiCall('/api/school/transport/stops/create','POST',{route_id:rid,stop_name:name,stop_order:order});
+    showToast('success','Stop Added');setTimeout(()=>location.reload(),800);
+}
+</script>
+{% endblock %}
