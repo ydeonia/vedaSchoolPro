@@ -333,64 +333,18 @@
                     </a>
                 </div>
                 <div class="nav-section">
-                    <span class="nav-section-title">Updates</span>
+                    <span class="nav-section-title">Communication</span>
                     <a href="/student/announcements" class="nav-item {% if active_page == 'announcements' %}active{% endif %}">
                         <i class="fas fa-bullhorn"></i><span>Announcements</span>
                     </a>
-                </div>
-
-                {% elif user.role == 'parent' %}
-                <div class="nav-section">
-                    <span class="nav-section-title">My Children</span>
-                    <a href="/parent/dashboard" class="nav-item {% if active_page == 'dashboard' %}active{% endif %}">
-                        <i class="fas fa-home"></i><span>Dashboard</span>
-                    </a>
-                </div>
-                <div class="nav-section">
-                    <span class="nav-section-title">Academics</span>
-                    <a href="/parent/attendance" class="nav-item {% if active_page == 'attendance' %}active{% endif %}">
-                        <i class="fas fa-calendar-check"></i><span>Attendance</span>
-                    </a>
-                    <a href="/parent/results" class="nav-item {% if active_page == 'results' %}active{% endif %}">
-                        <i class="fas fa-trophy"></i><span>Results</span>
-                    </a>
-                    <a href="/parent/homework" class="nav-item {% if active_page == 'homework' %}active{% endif %}">
-                        <i class="fas fa-tasks"></i><span>Homework</span>
-                    </a>
-                    <a href="/parent/datesheet" class="nav-item {% if active_page == 'datesheet' %}active{% endif %}">
-                        <i class="fas fa-clipboard-list"></i><span>Datesheet</span>
-                    </a>
-                    <a href="/parent/timetable" class="nav-item {% if active_page == 'timetable' %}active{% endif %}">
-                        <i class="fas fa-calendar-week"></i><span>Timetable</span>
-                    </a>
-                </div>
-                <div class="nav-section">
-                    <span class="nav-section-title">Finance</span>
-                    <a href="/parent/fees" class="nav-item {% if active_page == 'fees' %}active{% endif %}">
-                        <i class="fas fa-rupee-sign"></i><span>Fee Status</span>
-                    </a>
-                    <a href="/parent/transport" class="nav-item {% if active_page == 'transport' %}active{% endif %}">
-                        <i class="fas fa-bus"></i><span>Transport</span>
-                    </a>
-                </div>
-                <div class="nav-section">
-                    <span class="nav-section-title">Communication</span>
-                    <a href="/parent/messages" class="nav-item {% if active_page == 'messages' %}active{% endif %}">
+                    <a href="/student/messages" class="nav-item {% if active_page == 'messages' %}active{% endif %}">
                         <i class="fas fa-envelope"></i><span>Messages</span>
                     </a>
-                    <a href="/parent/complaints" class="nav-item {% if active_page == 'complaints' %}active{% endif %}">
+                    <a href="/student/complaints" class="nav-item {% if active_page == 'complaints' %}active{% endif %}">
                         <i class="fas fa-comment-alt"></i><span>Complaints</span>
                     </a>
-                    <a href="/parent/announcements" class="nav-item {% if active_page == 'announcements' %}active{% endif %}">
-                        <i class="fas fa-bullhorn"></i><span>Announcements</span>
-                    </a>
                 </div>
-                <div class="nav-section">
-                    <span class="nav-section-title">School Life</span>
-                    <a href="/parent/calendar" class="nav-item {% if active_page == 'calendar' %}active{% endif %}">
-                        <i class="fas fa-calendar-alt"></i><span>School Calendar</span>
-                    </a>
-                </div>
+
                 {% endif %}
                 {% endblock %}
             </nav>
@@ -435,8 +389,14 @@
                             <span id="currentLangIcon">EN</span>
                         </button>
                         <div id="langDropdown" style="display:none;position:absolute;right:0;top:42px;background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:999;min-width:140px;overflow:hidden;">
-                            <div onclick="switchLang('en')" style="padding:10px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇬🇧 English</div>
-                            <div onclick="switchLang('hi')" style="padding:10px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 हिन्दी</div>
+                            <div onclick="switchLang('en')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇬🇧 English</div>
+                            <div onclick="switchLang('hi')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 हिन्दी</div>
+                            <div onclick="switchLang('ta')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 தமிழ்</div>
+                            <div onclick="switchLang('te')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 తెలుగు</div>
+                            <div onclick="switchLang('ml')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 മലയാളം</div>
+                            <div onclick="switchLang('as')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 অসমীয়া</div>
+                            <div onclick="switchLang('gu')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 ગુજરાતી</div>
+                            <div onclick="switchLang('pa')" style="padding:8px 16px;cursor:pointer;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:8px;color:var(--text);transition:background 0.15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='transparent'">🇮🇳 ਪੰਜਾਬੀ</div>
                         </div>
                     </div>
                     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" data-tooltip="Dark mode">

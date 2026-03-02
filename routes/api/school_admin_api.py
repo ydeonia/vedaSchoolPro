@@ -8,6 +8,7 @@ from models.academic import AcademicYear, Class, Section, Subject, ClassSubject
 from models.teacher import Teacher
 from utils.auth import hash_password
 from utils.permissions import get_current_user
+from routes.api.student_login_id_api import generate_student_login_id
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, timedelta
@@ -438,6 +439,11 @@ async def create_student(request: Request, data: StudentCreate, db: AsyncSession
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail=f"Admission number {data.admission_number} already exists")
 
+    # ─── Auto-generate Student Login ID (PO-approved v3.0) ───
+    from datetime import date as dt_date
+    adm_year = data.admission_date.year if data.admission_date else dt_date.today().year
+    student_login_id = await generate_student_login_id(db, str(branch_id), adm_year)
+
     # Get current academic year
     ay_result = await db.execute(
         select(AcademicYear).where(AcademicYear.branch_id == branch_id, AcademicYear.is_current == True)
@@ -453,6 +459,7 @@ async def create_student(request: Request, data: StudentCreate, db: AsyncSession
 
     student = Student(
         branch_id=branch_id,
+        student_login_id=student_login_id,
         class_id=uuid.UUID(data.class_id),
         section_id=uuid.UUID(data.section_id) if data.section_id else None,
         academic_year_id=academic_year.id if academic_year else None,
@@ -481,8 +488,32 @@ async def create_student(request: Request, data: StudentCreate, db: AsyncSession
         uses_transport=data.uses_transport,
     )
     db.add(student)
-    await db.flush()  # get the ID before commit
-    return {"success": True, "id": str(student.id), "message": f"Student {data.first_name} enrolled"}
+    await db.flush()
+
+    # ─── Auto-create User account for student login ───
+    default_password = student_login_id  # Initial password = login ID (parent changes later)
+    student_user = User(
+        org_id=uuid.UUID(user["org_id"]) if user.get("org_id") else None,
+        branch_id=branch_id,
+        email=None,
+        phone=data.father_phone or data.mother_phone or None,
+        first_name=data.first_name,
+        last_name=data.last_name,
+        role=UserRole.STUDENT,
+        password_hash=hash_password(default_password),
+        is_active=True,
+    )
+    db.add(student_user)
+    await db.flush()
+    student.user_id = student_user.id
+    await db.flush()
+
+    return {
+        "success": True,
+        "id": str(student.id),
+        "student_login_id": student_login_id,
+        "message": f"Student {data.first_name} enrolled. Login ID: {student_login_id}",
+    }
 
 
 class BulkImportData(BaseModel):
@@ -2460,6 +2491,7 @@ async def download_fee_receipt(record_id: str, request: Request, db: AsyncSessio
         "class_name": "",
         "roll_number": student.roll_number or "" if student else "",
         "admission_number": student.admission_number or "" if student else "",
+        "student_login_id": student.student_login_id or "" if student else "",
         "father_name": student.father_name or "" if student else "",
         "fee_name": rec.fee_structure.fee_name if rec.fee_structure else "Fee",
         "amount_due": rec.amount_due, "amount_paid": rec.amount_paid,
@@ -2567,6 +2599,7 @@ async def download_report_card(request: Request, student_id: str, exam_id: str =
         "section": student.section.name if student.section else "",
         "roll": student.roll_number or "",
         "admission": student.admission_number or "",
+        "student_login_id": student.student_login_id or "",
         "father_name": student.father_name or "",
         "academic_year": ay.label if ay else "",
         "principal_signature_url": branch.principal_signature_url if branch else None,
@@ -4112,6 +4145,7 @@ async def student_profile(request: Request, student_id: str, db: AsyncSession = 
         "id": str(s.id), "first_name": s.first_name, "last_name": s.last_name or "",
         "full_name": s.full_name, "roll_number": s.roll_number or "",
         "admission_number": s.admission_number or "",
+            "student_login_id": s.student_login_id or "",
         "class_name": cls_name or "", "section_name": sec_name,
         "class_id": str(s.class_id) if s.class_id else "",
         "section_id": str(s.section_id) if s.section_id else "",

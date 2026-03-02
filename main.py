@@ -38,8 +38,8 @@ from routes.api.onboarding_api import router as onboarding_api_router
 from routes.api.help_api import router as help_api_router
 from routes.api.messaging_api import router as messaging_api_router
 from routes.api.payment_api import router as payment_api_router
-
-
+from routes.api.mobile_api_final import router as mobile_api_router
+from routes.api.registration_api import router as registration_api_router
 async def create_super_admin():
     """Create default super admin if not exists"""
     async with async_session() as session:
@@ -123,7 +123,8 @@ app.include_router(onboarding_api_router)
 app.include_router(help_api_router)
 app.include_router(messaging_api_router)
 app.include_router(payment_api_router)
-
+app.include_router(mobile_api_router)
+app.include_router(registration_api_router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

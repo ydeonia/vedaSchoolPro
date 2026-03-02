@@ -3,10 +3,8 @@
 {% block auth_content %}
 <div class="auth-card">
     <div class="auth-logo">
-        <div class="logo-icon">
-            <i class="fas fa-graduation-cap"></i>
-        </div>
-        <h1>EduFlow</h1>
+        <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
+        <h1>VedaSchoolPro</h1>
         <p>Beautiful School Management, Simplified.</p>
     </div>
 
@@ -15,7 +13,6 @@
         <i class="fas fa-exclamation-circle"></i> {{ error }}
     </div>
     {% endif %}
-
     {% if success %}
     <div style="background: var(--success-light); color: var(--success); padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 20px; font-size: 0.85rem; font-weight: 500;">
         <i class="fas fa-check-circle"></i> {{ success }}
@@ -24,21 +21,23 @@
 
     <form class="auth-form" method="POST" action="/login">
         <div class="form-group">
-            <label class="form-label">Email or Phone</label>
+            <label class="form-label">Student ID / Phone / Email</label>
             <div style="position: relative;">
-                <input type="text" name="username" class="form-input" placeholder="Enter your email or phone"
-                       required style="padding-left: 42px;" value="{{ username or '' }}">
-                <i class="fas fa-user" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+                <input type="text" name="username" id="loginInput" class="form-input"
+                       placeholder="e.g. GNK24123 or 9876543210"
+                       required style="padding-left: 42px;" value="{{ username or '' }}" autocomplete="username">
+                <i class="fas fa-user" id="loginIcon" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
             </div>
+            <div id="loginHint" style="font-size: 0.73rem; margin-top: 4px; display: none; font-weight: 600;"></div>
         </div>
 
         <div class="form-group">
             <label class="form-label">Password</label>
             <div style="position: relative;">
                 <input type="password" name="password" id="password" class="form-input" placeholder="Enter your password"
-                       required style="padding-left: 42px; padding-right: 42px;">
+                       required style="padding-left: 42px; padding-right: 42px;" autocomplete="current-password">
                 <i class="fas fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
-                <button type="button" onclick="togglePasswordVisibility()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-light); cursor: pointer;">
+                <button type="button" onclick="togglePwd()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-light); cursor: pointer;">
                     <i class="fas fa-eye" id="eyeIcon"></i>
                 </button>
             </div>
@@ -46,35 +45,40 @@
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
             <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;">
-                <input type="checkbox" name="remember" style="accent-color: var(--primary);">
-                Remember me
+                <input type="checkbox" name="remember" style="accent-color: var(--primary);"> Remember me
             </label>
             <a href="/forgot-password" style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">Forgot password?</a>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-lg">
-            <i class="fas fa-sign-in-alt"></i> Sign In
-        </button>
+        <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-sign-in-alt"></i> Sign In</button>
     </form>
 
-    <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border-light);">
-        <p style="font-size: 0.78rem; color: var(--text-light);">
-            Powered by <strong style="color: var(--primary);">EduFlow</strong> — School Management System
-        </p>
+    <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light);">
+        <div style="font-size: 0.75rem; color: var(--text-light); line-height: 1.6;">
+            <strong>Students & Parents:</strong> Use Student ID (on ID card)<br>
+            <strong>Staff:</strong> Use phone number or email
+        </div>
+    </div>
+    <div style="text-align: center; margin-top: 12px;">
+        <p style="font-size: 0.78rem; color: var(--text-light);">Powered by <strong style="color: var(--primary);">VedaSchoolPro</strong></p>
     </div>
 </div>
 
 <script>
-function togglePasswordVisibility() {
-    const pwd = document.getElementById('password');
-    const icon = document.getElementById('eyeIcon');
-    if (pwd.type === 'password') {
-        pwd.type = 'text';
-        icon.classList.replace('fa-eye', 'fa-eye-slash');
-    } else {
-        pwd.type = 'password';
-        icon.classList.replace('fa-eye-slash', 'fa-eye');
-    }
+function togglePwd() {
+    const p = document.getElementById('password'), i = document.getElementById('eyeIcon');
+    p.type = p.type === 'password' ? 'text' : 'password';
+    i.classList.toggle('fa-eye'); i.classList.toggle('fa-eye-slash');
 }
+const inp = document.getElementById('loginInput'), ico = document.getElementById('loginIcon'), hnt = document.getElementById('loginHint');
+inp.addEventListener('input', function() {
+    const v = this.value.trim();
+    if (!v) { ico.className = 'fas fa-user'; hnt.style.display = 'none'; return; }
+    const d = v.replace(/[+\-\s]/g, '');
+    if (/^\d+$/.test(d) && d.length >= 8) { ico.className = 'fas fa-phone'; hnt.textContent = 'Staff login (phone)'; hnt.style.color = '#059669'; hnt.style.display = 'block'; return; }
+    if (v.includes('@')) { ico.className = 'fas fa-envelope'; hnt.textContent = 'Staff login (email)'; hnt.style.color = '#2563EB'; hnt.style.display = 'block'; return; }
+    if (/[a-zA-Z]/.test(v)) { ico.className = 'fas fa-id-card'; hnt.textContent = 'Student / Parent login'; hnt.style.color = '#D97706'; hnt.style.display = 'block'; return; }
+    ico.className = 'fas fa-user'; hnt.style.display = 'none';
+});
 </script>
 {% endblock %}

@@ -1,6 +1,7 @@
 """
 Chairman / Trustee API — Organization-level oversight across all branches.
 Read-only aggregated data for the Command Tower dashboard.
+Correct table names: students, teachers, attendance, fee_records, admissions
 """
 import uuid
 from datetime import datetime, date, timedelta
@@ -42,8 +43,9 @@ async def morning_pulse(request: Request, db: AsyncSession = Depends(get_db)):
     if not org_id:
         return {"error": "No organization assigned"}
     today = date.today()
+    month_start = today.replace(day=1)
 
-    # Get all branches in this org
+    # Get all branches
     branches = (await db.execute(
         text("SELECT id, name, city FROM branches WHERE org_id = :oid AND is_active = true"),
         {"oid": org_id}
@@ -57,7 +59,7 @@ async def morning_pulse(request: Request, db: AsyncSession = Depends(get_db)):
 
     bid_list = ",".join(f"'{b}'" for b in branch_ids)
 
-    # Total students — use is_active flag instead of enum
+    # Total students
     total_students = 0
     try:
         total_students = (await db.execute(
@@ -89,11 +91,11 @@ async def morning_pulse(request: Request, db: AsyncSession = Depends(get_db)):
     except Exception:
         pass
 
-    # Today's attendance — try both cases
+    # Today's attendance — FIXED: correct table "attendance", cast enum
     present_today = 0
     try:
         present_today = (await db.execute(
-            text(f"SELECT COUNT(*) FROM student_attendance WHERE branch_id IN ({bid_list}) AND date = :d AND UPPER(status::text) = 'PRESENT'"),
+            text(f"SELECT COUNT(*) FROM attendance WHERE branch_id IN ({bid_list}) AND date = :d AND UPPER(status::text) IN ('PRESENT','LATE')"),
             {"d": today}
         )).scalar() or 0
     except Exception:
@@ -101,18 +103,17 @@ async def morning_pulse(request: Request, db: AsyncSession = Depends(get_db)):
 
     att_pct = round((present_today / total_students * 100), 1) if total_students > 0 else 0
 
-    # Fee collected this month
-    month_start = today.replace(day=1)
+    # Fee collected this month — FIXED: correct table "fee_records", correct column "amount_paid"
     fee_this_month = 0
     try:
         fee_this_month = (await db.execute(
-            text(f"SELECT COALESCE(SUM(amount), 0) FROM fee_payments WHERE branch_id IN ({bid_list}) AND payment_date >= :ms"),
+            text(f"SELECT COALESCE(SUM(amount_paid), 0) FROM fee_records WHERE branch_id IN ({bid_list}) AND payment_date >= :ms"),
             {"ms": month_start}
         )).scalar() or 0
     except Exception:
         pass
 
-    # Alerts
+    # Alerts — separation requests
     alerts = []
     try:
         sep_count = (await db.execute(
@@ -120,6 +121,16 @@ async def morning_pulse(request: Request, db: AsyncSession = Depends(get_db)):
         )).scalar() or 0
         if sep_count > 0:
             alerts.append({"type": "warning", "text": f"{sep_count} separation request(s) pending approval"})
+    except Exception:
+        pass
+
+    # Fee due alert
+    try:
+        total_due = float((await db.execute(
+            text(f"SELECT COALESCE(SUM(amount_due - amount_paid), 0) FROM fee_records WHERE branch_id IN ({bid_list}) AND UPPER(status::text) IN ('PENDING','PARTIAL','OVERDUE')")
+        )).scalar() or 0)
+        if total_due > 0:
+            alerts.append({"type": "info", "text": f"₹{total_due:,.0f} total fee pending across branches"})
     except Exception:
         pass
 
@@ -156,7 +167,7 @@ async def branch_scorecard(request: Request, db: AsyncSession = Depends(get_db))
     for b in branches:
         bid = str(b['id'])
 
-        # Students — use is_active
+        # Students
         students = 0
         try:
             students = (await db.execute(
@@ -182,38 +193,38 @@ async def branch_scorecard(request: Request, db: AsyncSession = Depends(get_db))
         except Exception:
             pass
 
-        # Attendance today — case insensitive
+        # Attendance today — FIXED: correct table "attendance"
         present = 0
         try:
             present = (await db.execute(
-                text("SELECT COUNT(*) FROM student_attendance WHERE branch_id = :bid AND date = :d AND UPPER(status::text) = 'PRESENT'"),
+                text("SELECT COUNT(*) FROM attendance WHERE branch_id = :bid AND date = :d AND UPPER(status::text) IN ('PRESENT','LATE')"),
                 {"bid": bid, "d": today}
             )).scalar() or 0
         except Exception:
             pass
         att_pct = round(present / students * 100, 1) if students > 0 else 0
 
-        # Fee collected this month
+        # Fee collected this month — FIXED: correct table "fee_records"
         fee_month = 0
         try:
             fee_month = float((await db.execute(
-                text("SELECT COALESCE(SUM(amount), 0) FROM fee_payments WHERE branch_id = :bid AND payment_date >= :ms"),
+                text("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_records WHERE branch_id = :bid AND payment_date >= :ms"),
                 {"bid": bid, "ms": month_start}
             )).scalar() or 0)
         except Exception:
             pass
 
-        # New admissions this month
+        # New admissions this month — FIXED: correct column "admission_date"
         new_admissions = 0
         try:
             new_admissions = (await db.execute(
-                text("SELECT COUNT(*) FROM students WHERE branch_id = :bid AND date_of_admission >= :ms"),
+                text("SELECT COUNT(*) FROM students WHERE branch_id = :bid AND admission_date >= :ms"),
                 {"bid": bid, "ms": month_start}
             )).scalar() or 0
         except Exception:
             pass
 
-        # TCs this month — case insensitive
+        # TCs this month
         tcs = 0
         try:
             tcs = (await db.execute(
@@ -248,6 +259,7 @@ async def revenue_overview(request: Request, db: AsyncSession = Depends(get_db))
     user = request.state.user
     org_id = user.get("org_id")
     today = date.today()
+    month_start = today.replace(day=1)
 
     branches = (await db.execute(
         text("SELECT id, name FROM branches WHERE org_id = :oid AND is_active = true ORDER BY name"),
@@ -260,23 +272,22 @@ async def revenue_overview(request: Request, db: AsyncSession = Depends(get_db))
 
     for b in branches:
         bid = str(b['id'])
-        month_start = today.replace(day=1)
 
-        # Monthly collection
+        # Monthly collection — FIXED: correct table "fee_records"
         collected = 0
         try:
             collected = float((await db.execute(
-                text("SELECT COALESCE(SUM(amount), 0) FROM fee_payments WHERE branch_id = :bid AND payment_date >= :ms"),
+                text("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_records WHERE branch_id = :bid AND payment_date >= :ms"),
                 {"bid": bid, "ms": month_start}
             )).scalar() or 0)
         except Exception:
             pass
 
-        # Pending fees — case insensitive
+        # Pending fees — FIXED: correct table "fee_records", correct columns
         pending = 0
         try:
             pending = float((await db.execute(
-                text("SELECT COALESCE(SUM(balance), 0) FROM fee_invoices WHERE branch_id = :bid AND UPPER(status::text) IN ('UNPAID', 'PARTIAL', 'PENDING', 'OVERDUE')"),
+                text("SELECT COALESCE(SUM(amount_due - amount_paid), 0) FROM fee_records WHERE branch_id = :bid AND UPPER(status::text) IN ('PENDING','PARTIAL','OVERDUE')"),
                 {"bid": bid}
             )).scalar() or 0)
         except Exception:

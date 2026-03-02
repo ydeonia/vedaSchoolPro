@@ -737,3 +737,51 @@ async def student_my_profile(request: Request, db: AsyncSession = Depends(get_db
         "request": request, "user": user, "active_page": "my_profile",
         "student": student,
     })
+
+
+# ═══ Complaints & Messages (transferred from parent module — PO v3.0) ═══
+
+@router.get("/complaints", response_class=HTMLResponse)
+@require_role(UserRole.STUDENT)
+async def student_complaints(request: Request, db: AsyncSession = Depends(get_db)):
+    student, user = await get_student_profile(request, db)
+    if not student:
+        return templates.TemplateResponse("student/no_profile.html", {
+            "request": request, "user": user, "active_page": "complaints"})
+    try:
+        from models.messaging import Complaint
+        complaints = (await db.execute(
+            select(Complaint).where(Complaint.submitted_by == uuid.UUID(user["user_id"]))
+            .order_by(Complaint.created_at.desc())
+        )).scalars().all()
+    except Exception:
+        complaints = []
+
+    return templates.TemplateResponse("student/complaints.html", {
+        "request": request, "user": user, "active_page": "complaints",
+        "student": student, "complaints": complaints,
+    })
+
+
+@router.get("/messages", response_class=HTMLResponse)
+@require_role(UserRole.STUDENT)
+async def student_messages(request: Request, db: AsyncSession = Depends(get_db)):
+    student, user = await get_student_profile(request, db)
+    if not student:
+        return templates.TemplateResponse("student/no_profile.html", {
+            "request": request, "user": user, "active_page": "messages"})
+    try:
+        from models.messaging import MessageThread
+        threads = (await db.execute(
+            select(MessageThread).where(
+                MessageThread.parent_id == uuid.UUID(user["user_id"])
+            ).options(selectinload(MessageThread.messages))
+            .order_by(MessageThread.updated_at.desc())
+        )).scalars().all()
+    except Exception:
+        threads = []
+
+    return templates.TemplateResponse("student/messages.html", {
+        "request": request, "user": user, "active_page": "messages",
+        "student": student, "threads": threads,
+    })
