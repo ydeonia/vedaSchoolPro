@@ -128,7 +128,7 @@ function renderTransactions(txns) {
 
 async function saveTransaction() {
     const amt = parseFloat(document.getElementById('txnAmt').value);
-    if (!amt || amt <= 0) { alert('Enter valid amount'); return; }
+    if (!amt || amt <= 0) { showToast('warning', 'Enter valid amount'); return; }
     try {
         const res = await fetch('/api/school/accounts', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({transaction_type: txnType, category: document.getElementById('txnCat').value,
@@ -136,10 +136,10 @@ async function saveTransaction() {
                 payment_mode: document.getElementById('txnMode').value, description: document.getElementById('txnDesc').value.trim(),
                 reference_number: document.getElementById('txnRef').value.trim()})});
         if (!res.ok) throw new Error();
-        alert('✅ Transaction saved!');
+        showToast('success', 'Transaction saved!');
         document.getElementById('txnAmt').value = ''; document.getElementById('txnDesc').value = ''; document.getElementById('txnRef').value = '';
         loadTransactions(); switchTab('ledger', document.querySelectorAll('.acc-tab')[0]);
-    } catch(e) { alert('Failed to save'); }
+    } catch(e) { showToast('error', 'Failed to save'); }
 }
 
 loadTransactions();

@@ -3,9 +3,13 @@
 {% block auth_content %}
 <div class="auth-card">
     <div class="auth-logo">
+        {% if school and school.logo_url %}
+        <img src="{{ school.logo_url }}" alt="{{ school.name }}" style="width: 64px; height: 64px; border-radius: 50%; object-fit: cover; margin-bottom: 8px; border: 3px solid var(--primary-light, #e0e7ff);">
+        {% else %}
         <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
-        <h1>VedaSchoolPro</h1>
-        <p>Beautiful School Management, Simplified.</p>
+        {% endif %}
+        <h1>{{ school.name if school else 'VedaSchoolPro' }}</h1>
+        <p>{{ school.motto or school.tagline or school.city or 'Beautiful School Management, Simplified.' if school else 'Beautiful School Management, Simplified.' }}</p>
     </div>
 
     {% if error %}
@@ -19,7 +23,8 @@
     </div>
     {% endif %}
 
-    <form class="auth-form" method="POST" action="/login">
+    <!-- UNIFIED LOGIN FORM -->
+    <form class="auth-form" method="POST" action="/login" id="loginForm" onsubmit="return handleFormSubmit(event)">
         <div class="form-group">
             <label class="form-label">Student ID / Phone / Email</label>
             <div style="position: relative;">
@@ -31,54 +36,528 @@
             <div id="loginHint" style="font-size: 0.73rem; margin-top: 4px; display: none; font-weight: 600;"></div>
         </div>
 
-        <div class="form-group">
-            <label class="form-label">Password</label>
-            <div style="position: relative;">
-                <input type="password" name="password" id="password" class="form-input" placeholder="Enter your password"
-                       required style="padding-left: 42px; padding-right: 42px;" autocomplete="current-password">
-                <i class="fas fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
-                <button type="button" onclick="togglePwd()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-light); cursor: pointer;">
-                    <i class="fas fa-eye" id="eyeIcon"></i>
-                </button>
+        <!-- PASSWORD SECTION -->
+        <div id="passwordSection">
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <div style="position: relative;">
+                    <input type="password" name="password" id="password" class="form-input" placeholder="Enter your password"
+                           required style="padding-left: 42px; padding-right: 42px;" autocomplete="current-password">
+                    <i class="fas fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light);"></i>
+                    <span onclick="togglePwd()" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--text-light); cursor: pointer;">
+                        <i class="fas fa-eye" id="eyeIcon"></i>
+                    </span>
+                </div>
             </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;">
+                    <input type="checkbox" name="remember" style="accent-color: var(--primary);"> Remember me
+                </label>
+                <a href="/forgot-password" style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">Forgot password?</a>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-sign-in-alt"></i> Sign In</button>
         </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: var(--text-secondary); cursor: pointer;">
-                <input type="checkbox" name="remember" style="accent-color: var(--primary);"> Remember me
-            </label>
-            <a href="/forgot-password" style="font-size: 0.82rem; color: var(--primary); font-weight: 600;">Forgot password?</a>
-        </div>
-
-        <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-sign-in-alt"></i> Sign In</button>
     </form>
 
-    <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light);">
-        <div style="font-size: 0.75rem; color: var(--text-light); line-height: 1.6;">
-            <strong>Students & Parents:</strong> Use Student ID (on ID card)<br>
-            <strong>Staff:</strong> Use phone number or email
+    <!-- OTP SECTION (outside form, AJAX-driven) -->
+    <div id="otpSection" style="display:none;">
+        <!-- Step 1: Send OTP -->
+        <div id="otpStep1">
+            <div style="background: var(--primary-light, #e0e7ff); border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px; font-size: 0.82rem; color: var(--primary, #4f46e5);">
+                <i class="fas fa-shield-alt"></i> We'll send an OTP to verify your phone number
+            </div>
+            <div id="otpSendError" style="display:none; color: var(--danger); font-size: 0.82rem; font-weight: 600; margin-bottom: 10px; padding: 8px 12px; background: var(--danger-light); border-radius: var(--radius-sm);"></div>
+            <button type="button" class="btn btn-primary btn-lg" onclick="sendOTP()" id="sendOtpBtn" style="width:100%;">
+                <i class="fas fa-paper-plane"></i> Send OTP
+            </button>
+        </div>
+
+        <!-- Step 2: Enter OTP -->
+        <div id="otpStep2" style="display:none;">
+            <div style="text-align:center; margin-bottom:16px;">
+                <div style="width:48px; height:48px; border-radius:50%; background: var(--success-light, #dcfce7); display:inline-flex; align-items:center; justify-content:center; margin-bottom:6px;">
+                    <i class="fas fa-sms" style="font-size:1.2rem; color: var(--success, #16a34a);"></i>
+                </div>
+                <p style="font-size:0.82rem; color: var(--text-secondary); margin:0;">OTP sent to <strong id="otpPhoneDisplay">******1234</strong></p>
+                <div id="otpDevHint" style="display:none; margin-top:6px; padding:6px 12px; background:#fef3c7; border-radius:6px; font-size:0.75rem; color:#92400e; font-weight:600;"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" style="text-align:center; display:block;">Enter 6-digit OTP</label>
+                <div style="display:flex; gap:8px; justify-content:center;" id="otpInputs">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                    <input type="text" maxlength="1" class="otp-digit" inputmode="numeric" pattern="[0-9]">
+                </div>
+            </div>
+            <div id="otpError" style="display:none; text-align:center; color: var(--danger); font-size:0.82rem; font-weight:600; margin-bottom:10px;"></div>
+            <button type="button" class="btn btn-primary btn-lg" onclick="verifyOTP()" id="verifyOtpBtn" style="width:100%;">
+                <i class="fas fa-check-circle"></i> Verify & Login
+            </button>
+            <div style="text-align:center; margin-top:14px;">
+                <span id="otpTimer" style="font-size:0.8rem; color: var(--text-light);"></span>
+                <span id="resendBtn" style="display:none; color: var(--primary); font-weight:700; font-size:0.82rem; cursor:pointer;" onclick="sendOTP()">
+                    <i class="fas fa-redo"></i> Resend OTP
+                </span>
+            </div>
+            <button type="button" onclick="resetOtpFlow()" style="width:100%; margin-top:10px; border:1px solid var(--border); border-radius: var(--radius-sm); padding:8px; color: var(--text-secondary); font-size:0.82rem; cursor:pointer; text-align:center; background:transparent;">
+                <i class="fas fa-arrow-left"></i> Change Phone Number
+            </button>
+        </div>
+
+        <!-- Step 3: Account Selector -->
+        <div id="otpStep3" style="display:none;">
+            <div style="text-align:center; margin-bottom:16px;">
+                <div style="width:48px; height:48px; border-radius:50%; background: var(--primary-light, #e0e7ff); display:inline-flex; align-items:center; justify-content:center; margin-bottom:6px;">
+                    <i class="fas fa-users" style="font-size:1.2rem; color: var(--primary);"></i>
+                </div>
+                <p style="font-size:0.88rem; font-weight:700; color: var(--text-primary); margin:0 0 4px;">Select Profile</p>
+                <p style="font-size:0.78rem; color: var(--text-secondary); margin:0;">Multiple accounts found for this number</p>
+            </div>
+            <div id="accountList" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;"></div>
         </div>
     </div>
-    <div style="text-align: center; margin-top: 12px;">
-        <p style="font-size: 0.78rem; color: var(--text-light);">Powered by <strong style="color: var(--primary);">VedaSchoolPro</strong></p>
+
+    <div style="text-align: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-light);">
+        {% if school %}
+        <p style="font-size: 0.72rem; color: var(--text-light); margin: 0;">{{ school.name }}{% if school.city %} &middot; {{ school.city }}{% endif %}</p>
+        <p style="font-size: 0.68rem; color: var(--text-light); margin: 4px 0 0; opacity: 0.6;">Powered by <strong>VedaSchoolPro</strong></p>
+        {% else %}
+        <p style="font-size: 0.78rem; color: var(--text-light); margin: 0;">Powered by <strong style="color: var(--primary);">VedaSchoolPro</strong></p>
+        {% endif %}
     </div>
 </div>
 
-<script>
-function togglePwd() {
-    const p = document.getElementById('password'), i = document.getElementById('eyeIcon');
-    p.type = p.type === 'password' ? 'text' : 'password';
-    i.classList.toggle('fa-eye'); i.classList.toggle('fa-eye-slash');
+<style>
+.otp-digit {
+    width: 46px; height: 52px; text-align: center; font-size: 1.3rem; font-weight: 700;
+    border-radius: 8px; border: 2px solid var(--border, #e2e8f0); outline: none;
+    transition: border-color 0.2s; background: var(--bg-card, white); color: var(--text-primary, #1e293b);
 }
-const inp = document.getElementById('loginInput'), ico = document.getElementById('loginIcon'), hnt = document.getElementById('loginHint');
-inp.addEventListener('input', function() {
-    const v = this.value.trim();
-    if (!v) { ico.className = 'fas fa-user'; hnt.style.display = 'none'; return; }
-    const d = v.replace(/[+\-\s]/g, '');
-    if (/^\d+$/.test(d) && d.length >= 8) { ico.className = 'fas fa-phone'; hnt.textContent = 'Staff login (phone)'; hnt.style.color = '#059669'; hnt.style.display = 'block'; return; }
-    if (v.includes('@')) { ico.className = 'fas fa-envelope'; hnt.textContent = 'Staff login (email)'; hnt.style.color = '#2563EB'; hnt.style.display = 'block'; return; }
-    if (/[a-zA-Z]/.test(v)) { ico.className = 'fas fa-id-card'; hnt.textContent = 'Student / Parent login'; hnt.style.color = '#D97706'; hnt.style.display = 'block'; return; }
-    ico.className = 'fas fa-user'; hnt.style.display = 'none';
-});
+.otp-digit:focus { border-color: var(--primary, #6366f1); }
+.account-card {
+    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+    border: 2px solid var(--border, #e2e8f0); border-radius: 10px; cursor: pointer; transition: all 0.2s;
+}
+.account-card:hover { border-color: var(--primary); background: var(--primary-light, #e0e7ff); }
+.account-card .ac-icon {
+    width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 1rem; font-weight: 700; color: white; flex-shrink: 0;
+}
+.account-card .ac-info { flex: 1; min-width: 0; }
+.account-card .ac-name { font-weight: 700; font-size: 0.88rem; }
+.account-card .ac-detail { font-size: 0.72rem; color: var(--text-light); margin-top: 2px; }
+</style>
+
+<script>
+(function() {
+    /* Safe element getter — never returns null */
+    function $(id) {
+        var el = document.getElementById(id);
+        if (!el) { console.warn('Login: element #' + id + ' not found'); }
+        return el;
+    }
+    function show(id) { var el = $(id); if (el) el.style.display = 'block'; }
+    function hide(id) { var el = $(id); if (el) el.style.display = 'none'; }
+
+    var currentMode = 'password';
+    var otpTimerInterval = null;
+    var lastCleanPhone = '';
+
+    /* Phone Cleaning */
+    function getCleanPhone(val) {
+        var cleaned = val.trim().replace(/[+\-\s]/g, '');
+        if (cleaned.indexOf('91') === 0 && cleaned.length === 12) cleaned = cleaned.substring(2);
+        if (cleaned.indexOf('0') === 0) cleaned = cleaned.substring(1);
+        return cleaned;
+    }
+
+    /* Mode Detection */
+    function detectMode(val) {
+        val = val.trim();
+        if (!val) return 'password';
+        if (val.indexOf('@') !== -1) return 'password';
+        var d = getCleanPhone(val);
+        if (/^\d+$/.test(d) && d.length >= 10) return 'otp';
+        return 'password';
+    }
+
+    /* Switch between Password & OTP modes */
+    function switchMode(mode) {
+        currentMode = mode;
+        var pwdInput = $('password');
+        if (mode === 'otp') {
+            hide('passwordSection');
+            show('otpSection');
+            if (pwdInput) pwdInput.removeAttribute('required');
+        } else {
+            show('passwordSection');
+            hide('otpSection');
+            if (pwdInput) pwdInput.setAttribute('required', '');
+        }
+    }
+
+    /* Input Detection (live as user types) */
+    var loginInput = $('loginInput');
+    var loginIcon = $('loginIcon');
+    var loginHint = $('loginHint');
+
+    if (loginInput) {
+        loginInput.addEventListener('input', function() {
+            var v = this.value.trim();
+            var newMode = detectMode(v);
+            var newPhone = getCleanPhone(v);
+
+            /* Update icon & hint */
+            if (!v) {
+                if (loginIcon) loginIcon.className = 'fas fa-user';
+                if (loginHint) loginHint.style.display = 'none';
+            } else if (newMode === 'otp') {
+                if (loginIcon) loginIcon.className = 'fas fa-mobile-alt';
+                if (loginHint) { loginHint.textContent = 'OTP will be sent to this number'; loginHint.style.color = '#059669'; loginHint.style.display = 'block'; }
+            } else if (v.indexOf('@') !== -1) {
+                if (loginIcon) loginIcon.className = 'fas fa-envelope';
+                if (loginHint) { loginHint.textContent = 'Staff login (email + password)'; loginHint.style.color = '#2563EB'; loginHint.style.display = 'block'; }
+            } else if (/[a-zA-Z]/.test(v)) {
+                if (loginIcon) loginIcon.className = 'fas fa-id-card';
+                if (loginHint) { loginHint.textContent = 'Student / Staff login (password)'; loginHint.style.color = '#D97706'; loginHint.style.display = 'block'; }
+            } else {
+                if (loginIcon) loginIcon.className = 'fas fa-user';
+                if (loginHint) loginHint.style.display = 'none';
+            }
+
+            /* Switch mode if needed */
+            if (newMode !== currentMode || (newMode === 'otp' && newPhone !== lastCleanPhone)) {
+                resetOtpState();
+                switchMode(newMode);
+                lastCleanPhone = newPhone;
+            }
+        });
+
+        /* Enter key: send OTP if in OTP mode */
+        loginInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && currentMode === 'otp') {
+                e.preventDefault();
+                var step1 = $('otpStep1');
+                if (step1 && step1.style.display !== 'none') {
+                    sendOTP();
+                }
+            }
+        });
+    }
+
+    /* Form Submit Handler — AJAX for both password and OTP modes */
+    window.handleFormSubmit = function(event) {
+        event.preventDefault();
+        if (currentMode === 'otp') return false;
+
+        /* Password login via AJAX — supports multi-role profile selection */
+        var usernameVal = loginInput ? loginInput.value.trim() : '';
+        var passwordVal = $('password') ? $('password').value : '';
+        if (!usernameVal || !passwordVal) return false;
+
+        var submitBtn = document.querySelector('#passwordSection button[type="submit"]');
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...'; }
+
+        fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: usernameVal, password: passwordVal }),
+        })
+        .then(function(resp) {
+            return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+        })
+        .then(function(result) {
+            var data = result.data;
+            if (data.success) {
+                var accounts = data.accounts || [];
+                if (accounts.length > 1) {
+                    /* Multiple roles — show profile selector */
+                    hide('passwordSection');
+                    show('otpSection');
+                    showAccountSelector(accounts);
+                } else {
+                    /* Single account — direct login */
+                    document.cookie = 'access_token=' + data.token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
+                    window.location.href = data.redirect || '/login';
+                }
+            } else {
+                /* Show error inline */
+                var errDiv = document.querySelector('.auth-card > div[style*="danger-light"]');
+                if (!errDiv) {
+                    errDiv = document.createElement('div');
+                    errDiv.style.cssText = 'background:var(--danger-light);color:var(--danger);padding:12px 16px;border-radius:var(--radius-sm);margin-bottom:20px;font-size:0.85rem;font-weight:500;';
+                    var authCard = document.querySelector('.auth-card');
+                    var form = $('loginForm');
+                    if (authCard && form) authCard.insertBefore(errDiv, form);
+                }
+                if (errDiv) errDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> ' + (data.error || 'Login failed');
+            }
+        })
+        .catch(function(err) {
+            console.error('Login error:', err);
+            alert('Connection failed. Please check your network.');
+        })
+        .finally(function() {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In'; }
+        });
+        return false;
+    };
+
+    /* Password Toggle */
+    window.togglePwd = function() {
+        var p = $('password');
+        var i = $('eyeIcon');
+        if (p) { p.type = p.type === 'password' ? 'text' : 'password'; }
+        if (i) { i.classList.toggle('fa-eye'); i.classList.toggle('fa-eye-slash'); }
+    };
+
+    /* OTP State Reset */
+    function resetOtpState() {
+        show('otpStep1');
+        hide('otpStep2');
+        hide('otpStep3');
+        hide('otpSendError');
+        hide('otpError');
+        document.querySelectorAll('.otp-digit').forEach(function(d) { d.value = ''; });
+        if (otpTimerInterval) { clearInterval(otpTimerInterval); otpTimerInterval = null; }
+    }
+
+    window.resetOtpFlow = function() {
+        resetOtpState();
+        if (loginInput) { loginInput.focus(); loginInput.select(); }
+    };
+
+    function showSendError(msg) {
+        var el = $('otpSendError');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+    }
+
+    function showOtpError(msg) {
+        var el = $('otpError');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+    }
+
+    /* Send OTP */
+    window.sendOTP = function() {
+        var phone = getCleanPhone(loginInput ? loginInput.value : '');
+        if (!phone || phone.length < 10 || !/^\d+$/.test(phone)) {
+            showSendError('Please enter a valid 10-digit mobile number');
+            return;
+        }
+        hide('otpSendError');
+
+        var btn = $('sendOtpBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending OTP...'; }
+
+        fetch('/api/otp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone }),
+        })
+        .then(function(resp) {
+            if (!resp.ok) {
+                return resp.text().then(function(txt) {
+                    try { var j = JSON.parse(txt); return { ok: false, data: j }; }
+                    catch(e) { return { ok: false, data: { error: 'Server error (' + resp.status + ')' } }; }
+                });
+            }
+            return resp.json().then(function(data) { return { ok: true, data: data }; });
+        })
+        .then(function(result) {
+            var data = result.data;
+            if (data.success) {
+                hide('otpStep1');
+                show('otpStep2');
+
+                var phoneDisp = $('otpPhoneDisplay');
+                if (phoneDisp) phoneDisp.textContent = '+91 ******' + phone.slice(-4);
+
+                hide('otpError');
+
+                /* Dev hint / SMS not sent hint */
+                var devEl = $('otpDevHint');
+                if (devEl) {
+                    if (data.dev_hint) {
+                        devEl.textContent = 'Your OTP: ' + data.dev_hint;
+                        devEl.style.display = 'block';
+                    } else {
+                        devEl.style.display = 'none';
+                    }
+                    if (data.sms_error) {
+                        devEl.textContent = (data.dev_hint ? 'OTP: ' + data.dev_hint + ' — ' : '') + 'SMS: ' + data.sms_error;
+                        devEl.style.display = 'block';
+                    }
+                }
+
+                /* Focus first OTP digit */
+                var firstDigit = document.querySelectorAll('.otp-digit')[0];
+                if (firstDigit) firstDigit.focus();
+
+                startOtpTimer(60);
+            } else {
+                showSendError(data.error || data.detail || 'Failed to send OTP');
+            }
+        })
+        .catch(function(err) {
+            console.error('OTP send error:', err);
+            showSendError('Connection failed. Please check your network and try again.');
+        })
+        .finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP'; }
+        });
+    };
+
+    /* Verify OTP */
+    window.verifyOTP = function() {
+        var phone = getCleanPhone(loginInput ? loginInput.value : '');
+        var digits = document.querySelectorAll('.otp-digit');
+        var otp = '';
+        digits.forEach(function(d) { otp += d.value; });
+
+        if (otp.length !== 6) {
+            showOtpError('Please enter the complete 6-digit OTP');
+            return;
+        }
+
+        var btn = $('verifyOtpBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
+
+        fetch('/api/otp/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ phone: phone, otp: otp }),
+        })
+        .then(function(resp) {
+            if (!resp.ok) {
+                return resp.text().then(function(txt) {
+                    try { var j = JSON.parse(txt); return { ok: false, data: j }; }
+                    catch(e) { return { ok: false, data: { error: 'Server error (' + resp.status + ')' } }; }
+                });
+            }
+            return resp.json().then(function(data) { return { ok: true, data: data }; });
+        })
+        .then(function(result) {
+            var data = result.data;
+            if (data.success) {
+                var accounts = data.accounts || [];
+                if (accounts.length > 1) {
+                    showAccountSelector(accounts);
+                } else {
+                    document.cookie = 'access_token=' + data.token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
+                    window.location.href = data.redirect || '/student/dashboard';
+                }
+            } else {
+                showOtpError(data.error || data.detail || 'Verification failed');
+                digits.forEach(function(d) { d.value = ''; });
+                if (digits[0]) digits[0].focus();
+            }
+        })
+        .catch(function(err) {
+            console.error('OTP verify error:', err);
+            showOtpError('Connection failed. Please check your network.');
+        })
+        .finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Login'; }
+        });
+    };
+
+    /* Account Selector */
+    function showAccountSelector(accounts) {
+        hide('otpStep2');
+        show('otpStep3');
+
+        var list = $('accountList');
+        if (!list) return;
+        list.innerHTML = '';
+        var colors = ['#6366f1','#059669','#D97706','#DC2626','#7C3AED','#0891B2'];
+
+        accounts.forEach(function(acc, i) {
+            var color = colors[i % colors.length];
+            var initials = (acc.name || 'U').charAt(0).toUpperCase();
+            var card = document.createElement('div');
+            card.className = 'account-card';
+            card.innerHTML = '<div class="ac-icon" style="background:' + color + ';">' + initials + '</div>'
+                + '<div class="ac-info">'
+                + '<div class="ac-name">' + (acc.name || 'Account') + '</div>'
+                + '<div class="ac-detail">' + (acc.detail || '') + '</div>'
+                + '</div>'
+                + '<i class="fas fa-chevron-right" style="color:var(--text-light);"></i>';
+            card.onclick = function() {
+                document.cookie = 'access_token=' + acc.token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
+                window.location.href = acc.redirect || '/student/dashboard';
+            };
+            list.appendChild(card);
+        });
+    }
+
+    /* OTP Timer */
+    function startOtpTimer(seconds) {
+        var timerEl = $('otpTimer');
+        var resendBtn = $('resendBtn');
+        var remaining = seconds;
+
+        if (resendBtn) resendBtn.style.display = 'none';
+        if (timerEl) { timerEl.style.display = 'inline'; timerEl.textContent = '0:' + String(seconds).padStart(2, '0'); }
+
+        if (otpTimerInterval) clearInterval(otpTimerInterval);
+        otpTimerInterval = setInterval(function() {
+            remaining--;
+            if (timerEl) timerEl.textContent = '0:' + String(remaining).padStart(2, '0');
+            if (remaining <= 0) {
+                clearInterval(otpTimerInterval);
+                otpTimerInterval = null;
+                if (timerEl) timerEl.style.display = 'none';
+                if (resendBtn) resendBtn.style.display = 'inline';
+            }
+        }, 1000);
+    }
+
+    /* OTP Digit Auto-advance + Paste */
+    var otpDigits = document.querySelectorAll('.otp-digit');
+    otpDigits.forEach(function(input, idx) {
+        input.addEventListener('input', function() {
+            var val = this.value.replace(/\D/g, '');
+            this.value = val.slice(0, 1);
+            if (val && idx < otpDigits.length - 1) otpDigits[idx + 1].focus();
+            if (idx === otpDigits.length - 1 && val) {
+                var full = '';
+                otpDigits.forEach(function(i) { full += i.value; });
+                if (full.length === 6) window.verifyOTP();
+            }
+        });
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !this.value && idx > 0) otpDigits[idx - 1].focus();
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                var full = '';
+                otpDigits.forEach(function(i) { full += i.value; });
+                if (full.length === 6) window.verifyOTP();
+            }
+        });
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            var pasted = (e.clipboardData.getData('text') || '').replace(/\D/g, '').slice(0, 6);
+            pasted.split('').forEach(function(ch, ci) {
+                if (otpDigits[idx + ci]) otpDigits[idx + ci].value = ch;
+            });
+            if (pasted.length > 0) otpDigits[Math.min(idx + pasted.length, otpDigits.length - 1)].focus();
+            if (pasted.length === 6) setTimeout(window.verifyOTP, 100);
+        });
+    });
+
+    /* Init: detect mode on page load if value pre-filled */
+    if (loginInput) {
+        var v = loginInput.value.trim();
+        if (v) {
+            var mode = detectMode(v);
+            lastCleanPhone = getCleanPhone(v);
+            switchMode(mode);
+            loginInput.dispatchEvent(new Event('input'));
+        }
+    }
+})();
 </script>
 {% endblock %}

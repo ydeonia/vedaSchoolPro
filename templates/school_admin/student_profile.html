@@ -24,38 +24,117 @@
 .doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;}
 .doc-card{border:1px solid var(--border-light);border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;}
 .doc-icon{font-size:1.5rem;}.doc-info{flex:1;overflow:hidden;}.doc-name{font-weight:700;font-size:0.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.doc-meta{font-size:0.62rem;color:var(--text-light);}
-@media(max-width:768px){.profile-layout{grid-template-columns:1fr;}.d-grid{grid-template-columns:1fr 1fr;}}
+
+/* Achievements */
+.ach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+.ach-card{border:1px solid var(--border-light);border-radius:10px;padding:10px;display:flex;gap:10px;align-items:center;}
+.ach-badge{font-size:2rem;flex-shrink:0;}
+.ach-title{font-weight:700;font-size:0.82rem;}
+.ach-date{font-size:0.62rem;color:var(--text-light);}
+.ach-cat{display:inline-block;padding:1px 6px;border-radius:4px;font-size:0.56rem;font-weight:700;text-transform:uppercase;}
+.cat-academic{background:#DBEAFE;color:#1D4ED8;}.cat-sports{background:#D1FAE5;color:#059669;}
+.cat-discipline{background:#EDE9FE;color:#7C3AED;}.cat-attendance{background:#FEF3C7;color:#D97706;}
+.cat-extracurricular{background:#FCE7F3;color:#DB2777;}.cat-leadership{background:#FFF7ED;color:#EA580C;}
+.cat-creativity{background:#F0FDF4;color:#16A34A;}.cat-community{background:#F1F5F9;color:#475569;}
+
+/* Calendar */
+.cal-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.cal-stat{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;}
+.cal-stat.s-present{background:#D1FAE5;color:#059669;}.cal-stat.s-absent{background:#FEE2E2;color:#DC2626;}
+.cal-stat.s-late{background:#FEF3C7;color:#D97706;}.cal-stat.s-excused{background:#DBEAFE;color:#2563EB;}
+.cal-stat.s-pct{background:#F0F9FF;color:#0369A1;font-size:0.85rem;}
+.cal-nav{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.cal-nav button{border:none;background:var(--bg,#f1f5f9);border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:700;}
+.cal-nav .cal-month{font-weight:900;font-size:0.92rem;flex:1;text-align:center;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-hdr{font-size:0.56rem;text-align:center;font-weight:700;color:var(--text-light);padding:4px 0;}
+.cal-day{text-align:center;padding:8px 4px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.15s;position:relative;min-height:36px;display:flex;align-items:center;justify-content:center;}
+.cal-day:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,0.12);}
+.cal-day.selected{outline:2px solid var(--primary);outline-offset:1px;}
+.cal-day.present{background:#D1FAE5;color:#059669;}.cal-day.absent{background:#FEE2E2;color:#DC2626;}
+.cal-day.late{background:#FEF3C7;color:#D97706;}.cal-day.half_day{background:#FEF3C7;color:#D97706;}
+.cal-day.excused{background:#DBEAFE;color:#2563EB;}.cal-day.holiday{background:#F3F4F6;color:#9CA3AF;}
+.cal-day.weekend{background:#F9FAFB;color:#D1D5DB;}.cal-day.future{background:transparent;color:#D1D5DB;}
+.cal-day.empty{background:transparent;cursor:default;}
+.day-panel{margin-top:12px;padding:14px;border-radius:10px;background:var(--bg,#f1f5f9);display:none;}
+.day-panel.show{display:block;}
+.dp-date{font-weight:900;font-size:0.88rem;margin-bottom:6px;}
+.dp-status{font-weight:700;font-size:0.82rem;margin-bottom:8px;}
+.dp-times{display:flex;gap:16px;font-size:0.78rem;}
+.dp-times span{display:flex;align-items:center;gap:4px;}
+.dp-remarks{margin-top:6px;font-size:0.72rem;color:var(--text-light);font-style:italic;}
+
+@media(max-width:768px){.profile-layout{grid-template-columns:1fr;}.d-grid{grid-template-columns:1fr 1fr;}.cal-grid{gap:2px;}.cal-day{padding:6px 2px;font-size:0.68rem;}}
 </style>
 {% endblock %}
 {% block content %}
 <div class="profile-layout">
 <div>
     <div class="profile-card">
-        <div class="profile-photo" id="photoBox">👤</div>
+        <div class="profile-photo" id="photoBox" style="cursor:pointer;" title="Click to change photo" onclick="document.getElementById('photoInput').click();">👤</div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
+        <div id="photoStatus" style="font-size:0.62rem;color:var(--text-light);margin-bottom:4px;"></div>
         <div class="p-name" id="pName">Loading...</div>
         <div class="p-class" id="pClass"></div>
         <div id="pBadge"></div><div id="pHouse"></div>
         <div id="pRoles" style="margin-top:6px;"></div>
-        <div style="margin-top:12px;"><button class="btn-primary btn-sm" onclick="toggleEdit()"><i class="fas fa-edit"></i> Edit</button></div>
+        <div style="margin-top:12px;display:flex;gap:6px;justify-content:center;">
+            <button class="btn-primary btn-sm" onclick="toggleEdit()"><i class="fas fa-edit"></i> Edit</button>
+            <button class="btn-primary btn-sm" style="background:var(--bg,#f1f5f9);color:var(--text);" onclick="document.getElementById('photoInput').click();"><i class="fas fa-camera"></i> Photo</button>
+        </div>
+        <div id="lastUpdated" style="margin-top:10px;font-size:0.58rem;color:var(--text-light);"></div>
     </div>
 </div>
 <div>
     <!-- View -->
     <div id="viewMode">
-        <div class="sec-card"><h3>📋 Personal</h3><div class="d-grid">
+        <div class="sec-card"><h3>📋 Personal Details</h3><div class="d-grid">
             <div><div class="d-lbl">Roll No</div><div class="d-val" id="vRoll">-</div></div>
             <div><div class="d-lbl">Admission No</div><div class="d-val" id="vAdm">-</div></div>
+            <div><div class="d-lbl">Login ID</div><div class="d-val" id="vLoginId">-</div></div>
             <div><div class="d-lbl">DOB</div><div class="d-val" id="vDOB">-</div></div>
             <div><div class="d-lbl">Gender</div><div class="d-val" id="vGender">-</div></div>
             <div><div class="d-lbl">Blood Group</div><div class="d-val" id="vBlood">-</div></div>
+            <div><div class="d-lbl">Religion</div><div class="d-val" id="vReligion">-</div></div>
+            <div><div class="d-lbl">Category</div><div class="d-val" id="vCategory">-</div></div>
+            <div><div class="d-lbl">Nationality</div><div class="d-val" id="vNationality">-</div></div>
+            <div><div class="d-lbl">Aadhaar</div><div class="d-val" id="vAadhaar">-</div></div>
+            <div><div class="d-lbl">Admission Date</div><div class="d-val" id="vAdmDate">-</div></div>
             <div><div class="d-lbl">Status</div><div class="d-val" id="vStatus">-</div></div>
         </div></div>
-        <div class="sec-card"><h3>👨‍👩‍👧 Family</h3><div class="d-grid">
+        <div class="sec-card"><h3>👨‍👩‍👧 Family & Guardian</h3><div class="d-grid">
             <div><div class="d-lbl">Father</div><div class="d-val" id="vFather">-</div></div>
-            <div><div class="d-lbl">Mother</div><div class="d-val" id="vMother">-</div></div>
             <div><div class="d-lbl">Father Phone</div><div class="d-val" id="vFPhone">-</div></div>
+            <div><div class="d-lbl">Father Email</div><div class="d-val" id="vFEmail">-</div></div>
+            <div><div class="d-lbl">Father Occupation</div><div class="d-val" id="vFOccup">-</div></div>
+            <div><div class="d-lbl">Father Qualification</div><div class="d-val" id="vFQual">-</div></div>
+            <div><div class="d-lbl">&nbsp;</div></div>
+            <div><div class="d-lbl">Mother</div><div class="d-val" id="vMother">-</div></div>
             <div><div class="d-lbl">Mother Phone</div><div class="d-val" id="vMPhone">-</div></div>
-            <div style="grid-column:span 2;"><div class="d-lbl">Address</div><div class="d-val" id="vAddr">-</div></div>
+            <div><div class="d-lbl">Mother Email</div><div class="d-val" id="vMEmail">-</div></div>
+            <div><div class="d-lbl">Mother Occupation</div><div class="d-val" id="vMOccup">-</div></div>
+            <div><div class="d-lbl">Mother Qualification</div><div class="d-val" id="vMQual">-</div></div>
+            <div><div class="d-lbl">&nbsp;</div></div>
+            <div><div class="d-lbl">Guardian</div><div class="d-val" id="vGuardian">-</div></div>
+            <div><div class="d-lbl">Guardian Phone</div><div class="d-val" id="vGPhone">-</div></div>
+            <div><div class="d-lbl">Emergency Contact</div><div class="d-val" id="vEmergency">-</div></div>
+        </div></div>
+        <div class="sec-card"><h3>🏠 Address</h3><div class="d-grid">
+            <div style="grid-column:span 3;"><div class="d-lbl">Address</div><div class="d-val" id="vAddr">-</div></div>
+            <div><div class="d-lbl">City</div><div class="d-val" id="vCity">-</div></div>
+            <div><div class="d-lbl">State</div><div class="d-val" id="vState">-</div></div>
+            <div><div class="d-lbl">Pincode</div><div class="d-val" id="vPincode">-</div></div>
+        </div></div>
+        <div class="sec-card"><h3>🚌 Transport & Medical</h3><div class="d-grid">
+            <div><div class="d-lbl">Uses Transport</div><div class="d-val" id="vTransport">-</div></div>
+            <div><div class="d-lbl">Route</div><div class="d-val" id="vRoute">-</div></div>
+            <div><div class="d-lbl">Vehicle / Stop</div><div class="d-val" id="vVehicle">-</div></div>
+            <div style="grid-column:span 3;"><div class="d-lbl">Medical Conditions</div><div class="d-val" id="vMedical">-</div></div>
+        </div></div>
+        <div class="sec-card" id="prevSchoolCard" style="display:none;"><h3>🏫 Previous School</h3><div class="d-grid">
+            <div><div class="d-lbl">School</div><div class="d-val" id="vPrevSchool">-</div></div>
+            <div><div class="d-lbl">Board</div><div class="d-val" id="vPrevBoard">-</div></div>
+            <div><div class="d-lbl">Class</div><div class="d-val" id="vPrevClass">-</div></div>
         </div></div>
     </div>
     <!-- Edit -->
@@ -69,8 +148,8 @@
             <div class="f-grp"><label>Blood Group</label><select id="eBlood"><option value="">-</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
             <div class="f-grp"><label>Father</label><input id="eFather"></div>
             <div class="f-grp"><label>Mother</label><input id="eMother"></div>
-            <div class="f-grp"><label>Father Phone</label><input id="eFPhone"></div>
-            <div class="f-grp"><label>Mother Phone</label><input id="eMPhone"></div>
+            <div class="f-grp"><label>Father Phone</label><div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 8px;background:var(--bg,#f1f5f9);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.75rem;font-weight:700;color:var(--text-secondary);">+91</span><input id="eFPhone" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div></div>
+            <div class="f-grp"><label>Mother Phone</label><div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 8px;background:var(--bg,#f1f5f9);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.75rem;font-weight:700;color:var(--text-secondary);">+91</span><input id="eMPhone" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div></div>
             <div class="f-grp"><label>Status</label><select id="eStatus"><option value="admitted">Admitted</option><option value="tc_issued">TC Issued</option><option value="left">Left</option><option value="withdrawn">Withdrawn</option></select></div>
         </div>
         <div class="f-grp"><label>Address</label><input id="eAddr" style="width:100%;"></div>
@@ -92,12 +171,37 @@
         </div>
         <div class="doc-grid" id="docGrid"></div>
     </div>
+    <!-- Achievements -->
+    <div class="sec-card">
+        <h3>🏆 Achievements & Awards</h3>
+        <div class="ach-grid" id="achGrid"><div style="padding:16px;text-align:center;color:var(--text-light);grid-column:1/-1;">Loading...</div></div>
+    </div>
+    <!-- Attendance Calendar -->
+    <div class="sec-card">
+        <h3>📅 Attendance</h3>
+        <div class="cal-summary" id="calSummary"></div>
+        <div class="cal-nav">
+            <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+            <div class="cal-month" id="calTitle">-</div>
+            <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="day-panel" id="dayPanel">
+            <div class="dp-date" id="dpDate"></div>
+            <div class="dp-status" id="dpStatus"></div>
+            <div class="dp-times" id="dpTimes"></div>
+            <div class="dp-remarks" id="dpRemarks"></div>
+        </div>
+    </div>
 </div></div>
 {% endblock %}
 {% block extra_js %}
 <script>
-const sid='{{ student_id | default("") }}' || location.pathname.split('/students/')[1] || new URLSearchParams(location.search).get('id') || '';
-let S=null;
+(function(){
+var sid='{{ student_id | default("") }}' || location.pathname.split('/students/')[1] || new URLSearchParams(location.search).get('id') || '';
+var S=null;
+var calMonth=new Date().getMonth()+1, calYear=new Date().getFullYear(), calData=null;
+
 async function load(){if(!sid)return;
 try{const r=await fetch('/api/school/students/'+sid+'/profile',{credentials:'same-origin'});const d=await r.json();S=d.student;if(!S)return;
 document.getElementById('pName').textContent=S.full_name;
@@ -109,33 +213,204 @@ const ss=S.admission_status||'admitted';
 document.getElementById('pBadge').innerHTML=`<div class="p-badge" style="background:${sc[ss]||'#E2E8F0'};">${st[ss]||ss}</div>`;
 if(S.house_name)document.getElementById('pHouse').innerHTML=`<div class="p-house" style="background:${S.house_color};">${S.house_name}</div>`;
 if(S.roles?.length)document.getElementById('pRoles').innerHTML=S.roles.map(r=>`<span class="role-tag">👑 ${r.title}</span>`).join('');
+// Personal
 document.getElementById('vRoll').textContent=S.roll_number||'-';
 document.getElementById('vAdm').textContent=S.admission_number||'-';
+document.getElementById('vLoginId').textContent=S.student_login_id||'-';
 document.getElementById('vDOB').textContent=S.date_of_birth||'-';
-document.getElementById('vGender').textContent=S.gender||'-';
+document.getElementById('vGender').textContent=S.gender?S.gender.charAt(0).toUpperCase()+S.gender.slice(1):'-';
 document.getElementById('vBlood').textContent=S.blood_group||'-';
+document.getElementById('vReligion').textContent=S.religion||'-';
+document.getElementById('vCategory').textContent=S.category||'-';
+document.getElementById('vNationality').textContent=S.nationality||'-';
+document.getElementById('vAadhaar').textContent=S.aadhaar_number||'-';
+document.getElementById('vAdmDate').textContent=S.admission_date||'-';
 document.getElementById('vStatus').textContent=st[ss]||ss;
+// Family
 document.getElementById('vFather').textContent=S.father_name||'-';
+document.getElementById('vFPhone').textContent=S.father_phone?'+91 '+S.father_phone.replace(/^\+?91/,''):'-';
+document.getElementById('vFEmail').textContent=S.father_email||'-';
+document.getElementById('vFOccup').textContent=S.father_occupation||'-';
+document.getElementById('vFQual').textContent=S.father_qualification||'-';
 document.getElementById('vMother').textContent=S.mother_name||'-';
-document.getElementById('vFPhone').textContent=S.father_phone||'-';
-document.getElementById('vMPhone').textContent=S.mother_phone||'-';
+document.getElementById('vMPhone').textContent=S.mother_phone?'+91 '+S.mother_phone.replace(/^\+?91/,''):'-';
+document.getElementById('vMEmail').textContent=S.mother_email||'-';
+document.getElementById('vMOccup').textContent=S.mother_occupation||'-';
+document.getElementById('vMQual').textContent=S.mother_qualification||'-';
+document.getElementById('vGuardian').textContent=S.guardian_name||'-';
+document.getElementById('vGPhone').textContent=S.guardian_phone?'+91 '+S.guardian_phone.replace(/^\+?91/,''):'-';
+document.getElementById('vEmergency').textContent=S.emergency_contact?'+91 '+S.emergency_contact.replace(/^\+?91/,''):'-';
+// Address
 document.getElementById('vAddr').textContent=S.address||'-';
+document.getElementById('vCity').textContent=S.city||'-';
+document.getElementById('vState').textContent=S.state||'-';
+document.getElementById('vPincode').textContent=S.pincode||'-';
+// Transport & Medical
+document.getElementById('vTransport').textContent=S.uses_transport?'Yes 🚌':'No';
+document.getElementById('vRoute').textContent=S.transport_route||'-';
+document.getElementById('vVehicle').textContent=[S.transport_vehicle,S.transport_stop].filter(Boolean).join(' · ')||'-';
+document.getElementById('vMedical').textContent=S.medical_conditions||'None';
+// Previous school
+if(S.previous_school||S.previous_board||S.previous_class){
+    document.getElementById('prevSchoolCard').style.display='block';
+    document.getElementById('vPrevSchool').textContent=S.previous_school||'-';
+    document.getElementById('vPrevBoard').textContent=S.previous_board||'-';
+    document.getElementById('vPrevClass').textContent=S.previous_class||'-';
+}
+// Last updated
+if(S.updated_at){document.getElementById('lastUpdated').innerHTML=`<i class="fas fa-clock"></i> Last updated: ${S.updated_at}`;}
 renderDocs(S.documents||[]);
-}catch(e){console.error(e);}}
+}catch(e){console.error(e);}
+loadAchievements();
+loadCalendar();
+}
+
+async function uploadPhoto(input){
+    if(!input.files||!input.files[0])return;
+    var file=input.files[0];
+    if(file.size>512000){showToast('error','Photo must be under 500KB');return;}
+    var role=('{{ user.role }}' === 'school_admin')?'admin':'self';
+    if(role==='admin'){
+        // Admin can directly upload
+        var fd=new FormData();fd.append('file',file);
+        try{var r=await fetch('/api/school/students/'+sid+'/photo',{method:'POST',body:fd,credentials:'same-origin'});
+        var d=await r.json();if(d.photo_url){document.getElementById('photoBox').innerHTML='<img src="'+d.photo_url+'">';showToast('success','Photo updated');}else{showToast('error',d.error||'Failed');}}
+        catch(e){showToast('error','Upload failed');}
+    } else {
+        // Non-admin: submit for approval
+        var fd=new FormData();fd.append('file',file);fd.append('entity_type','student');fd.append('entity_id',sid);
+        try{var r=await fetch('/api/school/photo-request',{method:'POST',body:fd,credentials:'same-origin'});
+        var d=await r.json();if(d.success){showToast('success','Photo submitted for admin approval');document.getElementById('photoStatus').textContent='Pending approval';}
+        else{showToast('error',d.detail||'Failed');}}
+        catch(e){showToast('error','Upload failed');}
+    }
+    input.value='';
+}
+window.uploadPhoto=uploadPhoto;
+
 function renderDocs(docs){const ic={birth_certificate:'📜',transfer_certificate:'📋',character_certificate:'🎖️',marksheet:'📊',aadhaar:'🪪',medical:'🏥',photo:'📸',other:'📎'};
 document.getElementById('docGrid').innerHTML=docs.length?docs.map(d=>`<div class="doc-card"><div class="doc-icon">${ic[d.doc_type]||'📎'}</div><div class="doc-info"><div class="doc-name">${d.doc_name}</div><div class="doc-meta">${d.doc_type.replace(/_/g,' ')} · ${d.uploaded_at}</div></div><div><a href="${d.file_url}" target="_blank" style="margin-right:4px;">👁️</a><button onclick="delDoc('${d.id}')" style="border:none;background:none;cursor:pointer;">🗑️</button></div></div>`).join(''):'<div style="padding:20px;text-align:center;color:var(--text-light);grid-column:1/-1;">No documents yet</div>';}
+
 function toggleEdit(){const on=document.getElementById('editMode').style.display==='block';
 document.getElementById('editMode').style.display=on?'none':'block';document.getElementById('viewMode').style.display=on?'block':'none';
 if(!on&&S){['Fname','Lname','Roll','DOB','Gender','Blood','Father','Mother','FPhone','MPhone','Addr','Status'].forEach(f=>{
 const map={Fname:'first_name',Lname:'last_name',Roll:'roll_number',DOB:'date_of_birth',Gender:'gender',Blood:'blood_group',Father:'father_name',Mother:'mother_name',FPhone:'father_phone',MPhone:'mother_phone',Addr:'address',Status:'admission_status'};
 const el=document.getElementById('e'+f);if(el)el.value=S[map[f]]||'';});}}
+
 async function saveStudent(){const d={first_name:g('eFname'),last_name:g('eLname'),roll_number:g('eRoll'),date_of_birth:g('eDOB'),gender:g('eGender'),blood_group:g('eBlood'),father_name:g('eFather'),mother_name:g('eMother'),father_phone:g('eFPhone'),mother_phone:g('eMPhone'),address:g('eAddr'),admission_status:g('eStatus')};
 await apiCall('/api/school/students/'+sid,'PUT',d);showToast('success','Updated');toggleEdit();load();}
+
 async function uploadDoc(){const file=document.getElementById('docFile').files[0];if(!file){showToast('error','Select file');return;}
 const fd=new FormData();fd.append('file',file);fd.append('doc_type',g('docType'));fd.append('doc_name',file.name);
 try{await fetch('/api/school/students/'+sid+'/documents',{method:'POST',body:fd,credentials:'same-origin'});showToast('success','Uploaded');load();}catch(e){showToast('error','Failed');}}
-async function delDoc(id){if(!confirm('Delete?'))return;await apiCall('/api/school/students/'+sid+'/documents/'+id,'DELETE');showToast('success','Deleted');load();}
+
+async function delDoc(id){
+showConfirm('Confirm','Delete this document?', async () => {
+await apiCall('/api/school/students/'+sid+'/documents/'+id,'DELETE');showToast('success','Deleted');load();
+}, {icon:'🗑️', danger:true, yesText:'Delete'});
+}
+
+/* ── Achievements ── */
+async function loadAchievements(){
+try{
+    const r=await fetch('/api/sprint21/achievements/'+sid,{credentials:'same-origin'});
+    const d=await r.json();
+    const achs=d.achievements||[];
+    if(!achs.length){document.getElementById('achGrid').innerHTML='<div style="padding:16px;text-align:center;color:var(--text-light);grid-column:1/-1;">No achievements yet. Teachers can award achievements.</div>';return;}
+    document.getElementById('achGrid').innerHTML=achs.map(a=>`<div class="ach-card"><div class="ach-badge">${a.badge||'🏆'}</div><div><div class="ach-title">${a.title}</div><div><span class="ach-cat cat-${a.category}">${a.category}</span></div><div class="ach-date">${a.date}</div></div></div>`).join('');
+}catch(e){document.getElementById('achGrid').innerHTML='<div style="padding:16px;text-align:center;color:var(--text-light);">Could not load</div>';}}
+
+/* ── Attendance Calendar ── */
+const MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+async function loadCalendar(){
+try{
+    const r=await fetch(`/api/school/students/${sid}/attendance-calendar?month=${calMonth}&year=${calYear}`,{credentials:'same-origin'});
+    calData=await r.json();
+    if(calData.error)return;
+    renderCalendar();
+}catch(e){console.error('Calendar load failed',e);}}
+
+function renderCalendar(){
+    if(!calData)return;
+    const s=calData.summary;
+    document.getElementById('calTitle').textContent=`${MONTHS[calData.month]} ${calData.year}`;
+
+    // Summary
+    document.getElementById('calSummary').innerHTML=`
+        <div class="cal-stat s-pct">📊 ${s.percentage}%</div>
+        <div class="cal-stat s-present">✅ ${s.present} Present</div>
+        <div class="cal-stat s-absent">❌ ${s.absent} Absent</div>
+        ${s.late?`<div class="cal-stat s-late">⏰ ${s.late} Late</div>`:''}
+        ${s.half_day?`<div class="cal-stat s-late">½ ${s.half_day} Half</div>`:''}
+        ${s.excused?`<div class="cal-stat s-excused">📋 ${s.excused} Excused</div>`:''}
+    `;
+
+    // Grid header
+    let html='<div class="cal-hdr">Mon</div><div class="cal-hdr">Tue</div><div class="cal-hdr">Wed</div><div class="cal-hdr">Thu</div><div class="cal-hdr">Fri</div><div class="cal-hdr">Sat</div><div class="cal-hdr">Sun</div>';
+
+    // First day offset
+    const firstDay=new Date(calData.year, calData.month-1, 1).getDay();
+    const offset=firstDay===0?6:firstDay-1; // Mon=0
+    for(let i=0;i<offset;i++) html+='<div class="cal-day empty"></div>';
+
+    // Days
+    calData.days.forEach(d=>{
+        let cls='cal-day';
+        if(d.is_weekend) cls+=' weekend';
+        else if(d.is_holiday) cls+=' holiday';
+        else if(d.is_future) cls+=' future';
+        else if(d.status) cls+=' '+d.status;
+        else cls+=' absent';
+        const click=(!d.is_weekend&&!d.is_future)?` onclick="showDay(${d.day})"`:'';
+        html+=`<div class="${cls}" data-day="${d.day}"${click}>${d.day}</div>`;
+    });
+
+    document.getElementById('calGrid').innerHTML=html;
+    document.getElementById('dayPanel').classList.remove('show');
+}
+
+function showDay(dayNum){
+    if(!calData)return;
+    const d=calData.days.find(x=>x.day===dayNum);
+    if(!d)return;
+
+    // Highlight selected
+    document.querySelectorAll('.cal-day.selected').forEach(el=>el.classList.remove('selected'));
+    const el=document.querySelector(`.cal-day[data-day="${dayNum}"]`);
+    if(el)el.classList.add('selected');
+
+    const panel=document.getElementById('dayPanel');
+    const date=new Date(calData.year, calData.month-1, dayNum);
+    const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    document.getElementById('dpDate').textContent=`${dayNames[date.getDay()]}, ${dayNum} ${MONTHS[calData.month]} ${calData.year}`;
+
+    const icons={present:'✅ Present',absent:'❌ Absent',late:'⏰ Late',half_day:'½ Half Day',excused:'📋 Excused',holiday:'🎉 Holiday'};
+    document.getElementById('dpStatus').textContent=icons[d.status]||d.status||'No record';
+
+    let times='';
+    if(d.check_in) times+=`<span>🟢 Check-in: <b>${d.check_in}</b></span>`;
+    if(d.check_out) times+=`<span>🔴 Check-out: <b>${d.check_out}</b></span>`;
+    if(!d.check_in&&!d.check_out&&d.status==='present') times='<span style="color:var(--text-light);">Time not recorded</span>';
+    document.getElementById('dpTimes').innerHTML=times;
+    document.getElementById('dpRemarks').textContent=d.remarks?`Remarks: ${d.remarks}`:'';
+    panel.classList.add('show');
+}
+
+window.changeMonth=function(delta){
+    calMonth+=delta;
+    if(calMonth>12){calMonth=1;calYear++;}
+    if(calMonth<1){calMonth=12;calYear--;}
+    loadCalendar();
+};
+window.showDay=showDay;
+window.toggleEdit=toggleEdit;
+window.saveStudent=saveStudent;
+window.uploadDoc=uploadDoc;
+window.delDoc=delDoc;
+
 function g(id){return document.getElementById(id).value.trim();}
 load();
+})();
 </script>
 {% endblock %}

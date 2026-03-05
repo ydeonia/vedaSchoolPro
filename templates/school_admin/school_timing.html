@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block title %}School Timing{% endblock %}
+{% block page_title %}School Timing{% endblock %}
+{% block page_subtitle %}Configure school working hours, gate timing, and late-grace period{% endblock %}
+
+{% block extra_css %}
+<style>
+    .timing-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+    .timing-card{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:16px;padding:22px 26px;transition:all 0.2s;}
+    .timing-card:hover{border-color:#6366f1;box-shadow:0 2px 12px rgba(99,102,241,0.07);}
+    .tc-header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+    .tc-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+    .tc-title{font-weight:800;font-size:0.95rem;color:var(--text);}
+    .tc-sub{font-size:0.7rem;color:var(--text-light);margin-top:2px;}
+    .tc-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .tc-fields.single{grid-template-columns:1fr;}
+    .tf label{font-size:0.62rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.5px;display:block;margin-bottom:4px;}
+    .tf input,.tf select{width:100%;padding:9px 13px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.82rem;box-sizing:border-box;transition:border-color 0.15s;}
+    .tf input:focus,.tf select:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,0.08);}
+    .tf input[type=time]{font-family:inherit;font-variant-numeric:tabular-nums;}
+    .tf input[type=number]{-moz-appearance:textfield;}
+    .tf input[type=number]::-webkit-inner-spin-button{opacity:1;}
+    .toggle-sw{position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0;}
+    .toggle-sw input{display:none;}
+    .toggle-sw .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;transition:0.2s;}
+    .toggle-sw .slider:before{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:white;left:3px;top:3px;transition:0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+    .toggle-sw input:checked+.slider{background:#6366f1;}
+    .toggle-sw input:checked+.slider:before{transform:translateX(20px);}
+    .sat-toggle-row{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+    .sat-toggle-row span{font-size:0.82rem;font-weight:600;color:var(--text);}
+    .tz-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:8px;background:rgba(99,102,241,0.07);color:#6366f1;font-size:0.78rem;font-weight:600;}
+    .tz-badge i{font-size:0.9rem;}
+    .tz-change{margin-left:8px;font-size:0.7rem;color:var(--text-light);text-decoration:underline;cursor:pointer;}
+    .eff-card{background:var(--bg-card,white);border:1.5px solid var(--border);border-radius:16px;padding:22px 26px;margin-bottom:20px;}
+    .eff-card .alert-box{padding:12px 16px;border-radius:10px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);color:#b45309;font-size:0.78rem;margin-top:12px;display:none;line-height:1.5;}
+    .eff-card .alert-box i{margin-right:6px;}
+    .hist-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:0.78rem;color:var(--text-light);}
+    .hist-item:last-child{border:none;}
+    .hist-item i{color:#6366f1;}
+    .btn-save{background:linear-gradient(135deg,#6366f1,#818cf8);color:white;border:none;padding:12px 32px;border-radius:10px;font-weight:700;font-size:0.88rem;cursor:pointer;transition:all 0.15s;}
+    .btn-save:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(99,102,241,0.3);}
+    .btn-save:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+    .btn-save i{margin-right:6px;}
+    .save-bar{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+    .tmpl-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+    .tmpl-chip{padding:4px 12px;border-radius:6px;background:rgba(99,102,241,0.07);color:#6366f1;font-size:0.7rem;font-weight:600;}
+    @media(max-width:900px){.timing-grid{grid-template-columns:1fr;}}
+    @media(max-width:600px){.tc-fields{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Timezone Info Banner -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+    <div>
+        <span class="tz-badge"><i class="fas fa-globe-asia"></i> {{ tz_label }}</span>
+        <a href="/school/notification-settings" class="tz-change">Change timezone</a>
+    </div>
+    {% if template_names %}
+    <div style="font-size:0.72rem;color:var(--text-light);">
+        <i class="fas fa-info-circle" style="margin-right:4px;"></i> Bell Schedules:
+        <span class="tmpl-list">
+            {% for tn in template_names %}
+            <span class="tmpl-chip">{{ tn }}</span>
+            {% endfor %}
+        </span>
+    </div>
+    {% endif %}
+</div>
+
+<div class="timing-grid">
+    <!-- School Working Hours -->
+    <div class="timing-card">
+        <div class="tc-header">
+            <div class="tc-icon" style="background:rgba(99,102,241,0.1);color:#6366f1;"><i class="fas fa-clock"></i></div>
+            <div>
+                <div class="tc-title">School Working Hours</div>
+                <div class="tc-sub">Define start & end times for regular school days</div>
+            </div>
+        </div>
+        <div class="tc-fields">
+            <div class="tf">
+                <label>School Start Time</label>
+                <input type="time" id="schoolStartTime" value="{{ timing.school_start_time }}">
+            </div>
+            <div class="tf">
+                <label>School End Time</label>
+                <input type="time" id="schoolEndTime" value="{{ timing.school_end_time }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Gate & Grace -->
+    <div class="timing-card">
+        <div class="tc-header">
+            <div class="tc-icon" style="background:rgba(16,185,129,0.1);color:#10b981;"><i class="fas fa-door-open"></i></div>
+            <div>
+                <div class="tc-title">Gate & Grace Period</div>
+                <div class="tc-sub">Gate open time and late-arrival grace minutes</div>
+            </div>
+        </div>
+        <div class="tc-fields">
+            <div class="tf">
+                <label>Gate Opens At</label>
+                <input type="time" id="gateOpenTime" value="{{ timing.gate_open_time }}">
+            </div>
+            <div class="tf">
+                <label>Late Grace (minutes)</label>
+                <input type="number" id="lateGraceMinutes" value="{{ timing.late_grace_minutes }}" min="0" max="60" step="1">
+            </div>
+        </div>
+    </div>
+
+    <!-- Saturday Timing -->
+    <div class="timing-card">
+        <div class="tc-header">
+            <div class="tc-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b;"><i class="fas fa-calendar-week"></i></div>
+            <div>
+                <div class="tc-title">Saturday Timing</div>
+                <div class="tc-sub">Separate schedule for half-day Saturdays</div>
+            </div>
+        </div>
+        <div class="sat-toggle-row">
+            <label class="toggle-sw">
+                <input type="checkbox" id="saturdayEnabled" {{ 'checked' if timing.saturday_enabled }}>
+                <span class="slider"></span>
+            </label>
+            <span>Saturday classes enabled</span>
+        </div>
+        <div class="tc-fields" id="satFields">
+            <div class="tf">
+                <label>Saturday Start</label>
+                <input type="time" id="satStartTime" value="{{ timing.saturday_start_time }}">
+            </div>
+            <div class="tf">
+                <label>Saturday End</label>
+                <input type="time" id="satEndTime" value="{{ timing.saturday_end_time }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Half Day -->
+    <div class="timing-card">
+        <div class="tc-header">
+            <div class="tc-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;"><i class="fas fa-hourglass-half"></i></div>
+            <div>
+                <div class="tc-title">Half-Day Timing</div>
+                <div class="tc-sub">End time when a half-day is declared</div>
+            </div>
+        </div>
+        <div class="tc-fields single">
+            <div class="tf">
+                <label>Half-Day End Time</label>
+                <input type="time" id="halfDayEndTime" value="{{ timing.half_day_end_time }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Effective Date + Notification -->
+<div class="eff-card">
+    <div class="tc-header">
+        <div class="tc-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6;"><i class="fas fa-bullhorn"></i></div>
+        <div>
+            <div class="tc-title">Effective Date & Notifications</div>
+            <div class="tc-sub">Set when new timing takes effect. All stakeholders will be notified automatically.</div>
+        </div>
+    </div>
+    <div class="tc-fields">
+        <div class="tf">
+            <label>Effective From</label>
+            <input type="date" id="effectiveFrom" value="{{ timing.effective_from or '' }}">
+        </div>
+        <div class="tf">
+            <label>&nbsp;</label>
+            <div style="font-size:0.72rem;color:var(--text-light);padding-top:10px;">
+                <i class="fas fa-info-circle"></i> Leave empty to save timing without sending notifications
+            </div>
+        </div>
+    </div>
+    <div class="alert-box" id="notifyAlert">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Heads up:</strong> Setting an effective date will notify <strong>all teachers, students, parents & staff</strong> about the timing change via announcement and notifications.
+    </div>
+</div>
+
+<!-- Save Bar -->
+<div class="save-bar">
+    <div>
+        {% if timing.last_changed_at %}
+        <div class="hist-item" style="border:none;padding:0;">
+            <i class="fas fa-history"></i>
+            <span>Last changed: {{ timing.last_changed_at }} {% if timing.last_changed_by %} by {{ timing.last_changed_by }}{% endif %}</span>
+        </div>
+        {% endif %}
+    </div>
+    <button class="btn-save" id="btnSaveTiming" onclick="saveTiming()">
+        <i class="fas fa-save"></i> Save School Timing
+    </button>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Saturday toggle
+const satToggle = document.getElementById('saturdayEnabled');
+const satFields = document.getElementById('satFields');
+function toggleSat(){
+    satFields.style.opacity = satToggle.checked ? '1' : '0.4';
+    satFields.querySelectorAll('input').forEach(i => i.disabled = !satToggle.checked);
+}
+satToggle.addEventListener('change', toggleSat);
+toggleSat();
+
+// Effective date alert
+const effInput = document.getElementById('effectiveFrom');
+const notifyAlert = document.getElementById('notifyAlert');
+effInput.addEventListener('change', () => {
+    notifyAlert.style.display = effInput.value ? 'block' : 'none';
+});
+if(effInput.value) notifyAlert.style.display = 'block';
+
+async function saveTiming(){
+    const btn = document.getElementById('btnSaveTiming');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    const data = {
+        school_start_time: document.getElementById('schoolStartTime').value,
+        school_end_time: document.getElementById('schoolEndTime').value,
+        gate_open_time: document.getElementById('gateOpenTime').value,
+        late_grace_minutes: parseInt(document.getElementById('lateGraceMinutes').value) || 15,
+        half_day_end_time: document.getElementById('halfDayEndTime').value,
+        saturday_enabled: document.getElementById('saturdayEnabled').checked,
+        saturday_start_time: document.getElementById('satStartTime').value,
+        saturday_end_time: document.getElementById('satEndTime').value,
+        effective_from: document.getElementById('effectiveFrom').value || null,
+    };
+
+    // Validate times
+    if(!data.school_start_time || !data.school_end_time){
+        showToast('Please set school start and end times', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save School Timing';
+        return;
+    }
+
+    if(data.school_start_time >= data.school_end_time){
+        showToast('School end time must be after start time', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save School Timing';
+        return;
+    }
+
+    if(data.gate_open_time && data.gate_open_time > data.school_start_time){
+        showToast('Gate open time should be before school start', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save School Timing';
+        return;
+    }
+
+    // Confirm if effective date is set
+    if(data.effective_from){
+        const ok = await showConfirm(
+            'Send Notifications?',
+            `This will notify ALL teachers, students, parents & staff about the timing change effective from ${data.effective_from}. Continue?`
+        );
+        if(!ok){
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Save School Timing';
+            return;
+        }
+    }
+
+    try{
+        const res = await apiCall('/api/school/settings/school-timing', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+
+        if(res.success){
+            let msg = 'School timing saved successfully!';
+            if(res.notifications_sent > 0){
+                msg += ` ${res.notifications_sent} notifications sent.`;
+            }
+            showToast(msg, 'success');
+
+            // Update last changed display
+            if(res.timing_changed){
+                setTimeout(() => location.reload(), 1500);
+            }
+        } else {
+            showToast(res.error || 'Failed to save timing', 'error');
+        }
+    } catch(err){
+        showToast('Network error: ' + err.message, 'error');
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-save"></i> Save School Timing';
+}
+</script>
+{% endblock %}

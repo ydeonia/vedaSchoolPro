@@ -12,7 +12,7 @@
     .tab-btn .badge-count { background: var(--danger); color: white; border-radius: 10px; padding: 2px 7px; font-size: 0.7rem; margin-left: 6px; }
 
     .leave-card {
-        background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm);
+        background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm);
         padding: 20px; margin-bottom: 12px; display: grid;
         grid-template-columns: 1fr auto; gap: 16px; align-items: center;
         transition: all 0.2s; border-left: 4px solid transparent;
@@ -44,6 +44,12 @@
     .status-badge.rejected { background: var(--danger-light); color: var(--danger); }
     .status-badge.cancelled { background: var(--border-light); color: var(--text-secondary); }
     .status-badge.pending { background: var(--warning-light); color: var(--warning); }
+
+    .on-behalf-badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 0.65rem; font-weight: 700; background: #EEF2FF; color: #4F46E5; margin-left: 6px; }
+
+    .behalf-form { max-width: 600px; }
+    .behalf-form .fg { margin-bottom: 12px; }
+    .behalf-form label { font-weight: 600; font-size: 0.82rem; display: block; margin-bottom: 4px; }
 </style>
 {% endblock %}
 
@@ -55,6 +61,9 @@
     <button class="tab-btn" onclick="switchTab('all')">
         <i class="fas fa-list"></i> All Requests
     </button>
+    <button class="tab-btn" onclick="switchTab('behalf')">
+        <i class="fas fa-user-shield"></i> Apply on Behalf
+    </button>
 </div>
 
 <div id="tab-pending">
@@ -63,6 +72,55 @@
 
 <div id="tab-all" style="display: none;">
     <div id="allList"><div class="card"><div class="card-body" style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div></div></div>
+</div>
+
+<div id="tab-behalf" style="display: none;">
+    <div class="card">
+        <div class="card-header"><h2><i class="fas fa-user-shield"></i> Apply Leave on Behalf</h2></div>
+        <div class="card-body">
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:16px;">
+                Apply leave on behalf of a teacher who is unable to do so themselves. The leave will be marked as "Raised on behalf by" your name.
+            </p>
+            <div class="behalf-form">
+                <div class="fg">
+                    <label>Teacher *</label>
+                    <select id="behalfTeacher" class="form-select">
+                        <option value="">Select Teacher</option>
+                        {% for t in teachers %}<option value="{{ t.id }}">{{ t.full_name }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="fg">
+                        <label>Leave Type *</label>
+                        <select id="behalfType" class="form-select">
+                            <option value="casual">Casual Leave</option>
+                            <option value="sick">Sick Leave</option>
+                            <option value="earned">Earned Leave</option>
+                            <option value="maternity">Maternity Leave</option>
+                            <option value="paternity">Paternity Leave</option>
+                            <option value="compensatory">Compensatory Off</option>
+                            <option value="unpaid">Unpaid Leave</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div></div>
+                    <div class="fg">
+                        <label>From Date *</label>
+                        <input type="date" id="behalfFrom" class="form-input">
+                    </div>
+                    <div class="fg">
+                        <label>To Date *</label>
+                        <input type="date" id="behalfTo" class="form-input">
+                    </div>
+                </div>
+                <div class="fg">
+                    <label>Reason *</label>
+                    <textarea id="behalfReason" class="form-input" rows="3" placeholder="Reason for leave..."></textarea>
+                </div>
+                <button class="btn btn-primary" onclick="applyOnBehalf()"><i class="fas fa-paper-plane"></i> Submit Leave on Behalf</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Remarks Modal -->
@@ -94,6 +152,7 @@ const TYPE_LABELS = { casual: 'Casual', sick: 'Sick', earned: 'Earned', maternit
 function switchTab(tab) {
     document.getElementById('tab-pending').style.display = tab === 'pending' ? 'block' : 'none';
     document.getElementById('tab-all').style.display = tab === 'all' ? 'block' : 'none';
+    document.getElementById('tab-behalf').style.display = tab === 'behalf' ? 'block' : 'none';
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     event.target.closest('.tab-btn').classList.add('active');
     if (tab === 'all') loadAllLeaves();
@@ -123,10 +182,11 @@ async function loadAllLeaves() {
 }
 
 function renderLeaveCard(l, showActions) {
+    const onBehalfHtml = l.on_behalf ? `<span class="on-behalf-badge"><i class="fas fa-user-shield"></i> Raised on behalf by ${l.on_behalf}</span>` : '';
     return `
         <div class="leave-card ${l.status}">
             <div>
-                <div class="lc-name">${l.teacher_name} <span class="lc-type ${l.type}">${TYPE_LABELS[l.type] || l.type}</span></div>
+                <div class="lc-name">${l.teacher_name} <span class="lc-type ${l.type}">${TYPE_LABELS[l.type] || l.type}</span>${onBehalfHtml}</div>
                 <div class="lc-dates">📅 ${formatDate(l.start)} → ${formatDate(l.end)} <strong>(${l.days} day${l.days > 1 ? 's' : ''})</strong></div>
                 <div class="lc-reason">"${l.reason}"</div>
                 <div class="lc-meta">Applied: ${l.applied}${l.admin_remarks ? ' · Admin: ' + l.admin_remarks : ''}</div>
@@ -148,7 +208,7 @@ function formatDate(iso) {
 
 function leaveAction(leaveId, action) {
     pendingAction = { leaveId, action };
-    document.getElementById('remarksTitle').textContent = action === 'approve' ? '✅ Approve Leave' : '❌ Reject Leave';
+    document.getElementById('remarksTitle').textContent = action === 'approve' ? 'Approve Leave' : 'Reject Leave';
     document.getElementById('confirmActionBtn').className = `btn ${action === 'approve' ? 'btn-primary' : 'btn-danger'}`;
     document.getElementById('confirmActionBtn').innerHTML = action === 'approve' ? '<i class="fas fa-check"></i> Approve' : '<i class="fas fa-times"></i> Reject';
     document.getElementById('remarksInput').value = '';
@@ -168,6 +228,33 @@ async function confirmAction() {
         loadPendingLeaves();
     } catch(e) { showToast('error', 'Error', e.message); }
     btn.disabled = false;
+}
+
+async function applyOnBehalf() {
+    const teacher_id = document.getElementById('behalfTeacher').value;
+    const leave_type = document.getElementById('behalfType').value;
+    const start_date = document.getElementById('behalfFrom').value;
+    const end_date = document.getElementById('behalfTo').value;
+    const reason = document.getElementById('behalfReason').value.trim();
+
+    if (!teacher_id) { showToast('error', 'Select a teacher'); return; }
+    if (!start_date || !end_date) { showToast('error', 'Select dates'); return; }
+    if (!reason) { showToast('error', 'Enter a reason'); return; }
+
+    try {
+        const result = await apiCall('/api/school/leaves/on-behalf', 'POST', {
+            teacher_id, leave_type, start_date, end_date, reason
+        });
+        showToast('success', result.message);
+        // Reset form
+        document.getElementById('behalfTeacher').value = '';
+        document.getElementById('behalfFrom').value = '';
+        document.getElementById('behalfTo').value = '';
+        document.getElementById('behalfReason').value = '';
+        // Switch to pending tab
+        switchTab('pending');
+        loadPendingLeaves();
+    } catch(e) { showToast('error', 'Failed', e.message); }
 }
 
 // Load on page start

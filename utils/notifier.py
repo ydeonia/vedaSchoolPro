@@ -94,10 +94,11 @@ async def send_notification(
             db.add(log)
             results["whatsapp"] = {"status": "failed", "error": str(e)}
 
-    # 3. SMS
+    # 3. SMS — use PlatformConfig override if available, else branch config
     if "sms" in channels and recipient_phone:
         try:
-            sms_result = await send_sms(comm_config, recipient_phone, message, data)
+            sms_config = await get_sms_config(db, branch_id) or comm_config
+            sms_result = await send_sms(sms_config, recipient_phone, message, data)
             log = NotificationLog(
                 branch_id=uuid.UUID(branch_id),
                 channel="sms",
@@ -239,8 +240,13 @@ async def _send_whatsapp_cloud_api(token: str, phone_id: str, phone: str, title:
 # SMS — MSG91 / Twilio / Textlocal
 # ═══════════════════════════════════════════════════════════
 
-async def send_sms(comm_config, phone: str, message: str, data: dict = None) -> dict:
-    """Send SMS via configured provider."""
+async def send_sms(comm_config, phone: str, message: str, data: dict = None, sms_type: str = "transactional") -> dict:
+    """
+    Send SMS via configured provider.
+    sms_type: "otp" → forces OTP route (MsgClub route 8)
+              "transactional" → uses transactional route (MsgClub route 1)
+              "promotional" → uses promotional route (MsgClub route 2)
+    """
     if not comm_config or not comm_config.sms_enabled:
         return {"status": "skipped", "reason": "SMS not enabled"}
 
@@ -257,6 +263,15 @@ async def send_sms(comm_config, phone: str, message: str, data: dict = None) -> 
         return await _send_sms_twilio(api_key, phone, message)
     elif provider == "textlocal":
         return await _send_sms_textlocal(api_key, comm_config.sms_sender_id, phone, message)
+    elif provider == "msgclub":
+        # Route selection: OTP=8, Transactional=1, Promotional=2
+        if sms_type == "otp":
+            route_id = "8"
+        elif sms_type == "promotional":
+            route_id = "2"
+        else:
+            route_id = getattr(comm_config, 'sms_route_id', None) or "1"
+        return await _send_sms_msgclub(api_key, comm_config.sms_sender_id, phone, message, route_id)
     else:
         return {"status": "failed", "reason": f"Unknown SMS provider: {provider}"}
 
@@ -331,9 +346,97 @@ async def _send_sms_textlocal(api_key: str, sender: str, phone: str, message: st
         }
 
 
+async def _send_sms_msgclub(api_key: str, sender_id: str, phone: str, message: str, route_id: str = "8") -> dict:
+    """
+    Send SMS via MsgClub (msg.msgclub.net).
+    route_id: 1=Transactional, 2=Promotional, 8=OTP, etc.
+    """
+    # Strip country code for msgclub — they expect 10-digit Indian numbers
+    mobile = phone.replace("+91", "").replace("+", "").replace(" ", "")
+    if mobile.startswith("91") and len(mobile) == 12:
+        mobile = mobile[2:]
+
+    params = {
+        "AUTH_KEY": api_key,
+        "message": message,
+        "senderId": sender_id or "EDUFLW",
+        "routeId": route_id,
+        "mobileNos": mobile,
+        "smsContentType": "english",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "http://msg.msgclub.net/rest/services/sendSMS/sendGroupSms",
+                params=params,
+            )
+            result = resp.json() if resp.status_code == 200 else {}
+            success = result.get("responseCode") == "3001"
+            if not success:
+                logger.warning(
+                    f"MsgClub SMS response: code={result.get('responseCode')}, "
+                    f"msg={result.get('response', '')}, senderId={sender_id}, "
+                    f"mobile={mobile}, http={resp.status_code}"
+                )
+            else:
+                logger.info(f"MsgClub SMS sent OK: mobile={mobile}, senderId={sender_id}")
+            return {
+                "status": "sent" if success else "failed",
+                "reason": f"MsgClub code {result.get('responseCode')}: {result.get('response', '')}" if not success else "",
+                "provider": "msgclub",
+                "message_id": result.get("response", ""),
+                "response_code": result.get("responseCode", ""),
+                "cost": 0.20,
+            }
+    except Exception as e:
+        logger.error(f"MsgClub SMS failed: {e}")
+        return {"status": "failed", "provider": "msgclub", "error": str(e)}
+
+
 # ═══════════════════════════════════════════════════════════
 # EMAIL — Brevo / SES / SMTP
 # ═══════════════════════════════════════════════════════════
+
+async def send_platform_email(db, to_email: str, subject: str, body_html: str) -> dict:
+    """
+    Send email using PlatformConfig SMTP settings (Super Admin level).
+    Falls back to any branch CommunicationConfig with email enabled.
+    """
+    from sqlalchemy import select
+    from models.branch import PlatformConfig, CommunicationConfig
+
+    # 1. Try PlatformConfig SMTP
+    try:
+        platform = await db.scalar(select(PlatformConfig))
+        if platform and platform.config:
+            pc = platform.config
+            if pc.get("smtp_host") and pc.get("smtp_username"):
+                return await _send_email_smtp(
+                    host=pc["smtp_host"],
+                    port=int(pc.get("smtp_port", 587)),
+                    username=pc["smtp_username"],
+                    password=pc.get("smtp_password", ""),
+                    from_email=pc.get("from_email", pc["smtp_username"]),
+                    to_email=to_email,
+                    subject=subject,
+                    body=body_html,
+                )
+    except Exception as e:
+        logger.warning(f"PlatformConfig email failed: {e}")
+
+    # 2. Fallback to any CommunicationConfig
+    try:
+        comm = await db.scalar(
+            select(CommunicationConfig).where(CommunicationConfig.email_enabled == True)
+        )
+        if comm:
+            return await send_email(comm, to_email, subject, body_html)
+    except Exception:
+        pass
+
+    return {"status": "skipped", "reason": "No email provider configured. Set SMTP in Settings → Email."}
+
 
 async def send_email(comm_config, to_email: str, subject: str, body: str, data: dict = None) -> dict:
     """Send email via configured provider."""
@@ -434,6 +537,64 @@ def normalize_phone(phone: str) -> str:
         else:
             phone = "+91" + phone
     return phone
+
+
+async def get_sms_config(db, branch_id: str = None):
+    """
+    Resolve SMS configuration with correct priority:
+      1. PlatformConfig (Super Admin level — platform-wide master override)
+      2. Branch-specific CommunicationConfig
+      3. Any CommunicationConfig with SMS enabled (fallback)
+
+    Returns a config object with: sms_enabled, sms_provider, sms_api_key,
+    sms_sender_id, sms_route_id — or None if no SMS config found.
+    """
+    from sqlalchemy import select
+    from models.branch import PlatformConfig, CommunicationConfig
+
+    # 1. PlatformConfig — Super Admin platform-wide settings (HIGHEST priority)
+    try:
+        platform = await db.scalar(select(PlatformConfig))
+        if platform and platform.config:
+            pc = platform.config
+            if pc.get("sms_provider") and pc.get("sms_api_key"):
+                from types import SimpleNamespace
+                return SimpleNamespace(
+                    sms_enabled=True,
+                    sms_provider=pc["sms_provider"],
+                    sms_api_key=pc["sms_api_key"],
+                    sms_sender_id=pc.get("sms_sender_id", "EDUFLW"),
+                    sms_route_id=pc.get("sms_route_id", "8"),
+                )
+    except Exception as e:
+        logger.warning(f"PlatformConfig SMS lookup failed: {e}")
+
+    # 2. Branch-specific CommunicationConfig
+    import uuid as _uuid
+    if branch_id:
+        try:
+            comm = await db.scalar(
+                select(CommunicationConfig).where(
+                    CommunicationConfig.branch_id == _uuid.UUID(branch_id),
+                    CommunicationConfig.sms_enabled == True,
+                )
+            )
+            if comm:
+                return comm
+        except Exception:
+            pass
+
+    # 3. Any CommunicationConfig with SMS enabled (last-resort fallback)
+    try:
+        comm = await db.scalar(
+            select(CommunicationConfig).where(CommunicationConfig.sms_enabled == True)
+        )
+        if comm:
+            return comm
+    except Exception:
+        pass
+
+    return None
 
 
 # ═══════════════════════════════════════════════════════════

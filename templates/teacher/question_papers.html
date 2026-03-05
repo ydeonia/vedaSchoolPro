@@ -152,7 +152,7 @@ dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag
 
 function handleFile(input) { if(input.files.length) handleFileObj(input.files[0]); }
 function handleFileObj(file) {
-    if (file.size > 10*1024*1024) { alert('File too large — max 10MB'); return; }
+    if (file.size > 10*1024*1024) { showToast('warning','File too large — max 10MB'); return; }
     selectedFile = file;
     const ext = file.name.split('.').pop().toUpperCase();
     const icons = {PDF:'fa-file-pdf',DOC:'fa-file-word',DOCX:'fa-file-word',JPG:'fa-file-image',JPEG:'fa-file-image',PNG:'fa-file-image'};
@@ -175,7 +175,7 @@ function uploadPaper() {
     const year = document.getElementById('qpYear').value;
     const desc = document.getElementById('qpDesc').value.trim();
 
-    if (!title) { alert('Enter a title'); return; }
+    if (!title) { showToast('warning','Enter a title'); return; }
 
     const paper = {
         id: Date.now(), title, exam, class_name: cls, subject: subj, year,
@@ -189,7 +189,7 @@ function uploadPaper() {
     // Reset form
     document.getElementById('qpTitle').value = ''; document.getElementById('qpDesc').value = '';
     selectedFile = null; document.getElementById('filePreview').innerHTML = '';
-    showToast('✅ Question paper uploaded!', 'success');
+    showToast('success','Question paper uploaded!');
     switchTab('library', document.querySelectorAll('.qp-tab')[0]);
     renderPapers();
 }
@@ -230,13 +230,13 @@ function renderPapers() {
 }
 
 function deletePaper(id) {
-    if (!confirm('Delete this paper?')) return;
-    papers = papers.filter(p=>p.id!==id);
-    localStorage.setItem('qp_papers_{{teacher.id}}', JSON.stringify(papers));
-    renderPapers();
+    showConfirm('Delete Paper','Delete this paper?', ()=>{
+        papers = papers.filter(p=>p.id!==id);
+        localStorage.setItem('qp_papers_{{teacher.id}}', JSON.stringify(papers));
+        renderPapers();
+    },{icon:'🗑️',danger:true,yesText:'Delete'});
 }
 
-function showToast(msg,type) { const t=document.createElement('div'); t.className='toast '+type; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3000); }
 document.addEventListener('DOMContentLoaded', init);
 </script>
 {% endblock %}

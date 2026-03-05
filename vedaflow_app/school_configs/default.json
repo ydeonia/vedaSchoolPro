@@ -1,0 +1,12 @@
+{
+  "school_id": "default",
+  "school_name": "VedaSchoolPro",
+  "package_id": "com.vedaschoolpro.app",
+  "api_base_url": "https://app.vedaschoolpro.com",
+  "default_theme_color": "#4F46E5",
+  "logo_file": "default_logo.png",
+  "motto": "Smart School Management",
+  "language": "en",
+  "play_store_name": "VedaSchoolPro",
+  "play_store_description": "Smart School Management App"
+}

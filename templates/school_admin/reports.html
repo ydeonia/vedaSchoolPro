@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+{% block title %}Report Center{% endblock %}
+{% block page_title %}📊 Report Center{% endblock %}
+{% block page_subtitle %}Generate and download comprehensive school reports{% endblock %}
+{% block extra_css %}
+<style>
+/* ── Report Categories ── */
+.rpt-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:20px;}
+.rpt-cat{background:var(--bg-card,white);border-radius:12px;padding:16px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.rpt-cat:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08);}
+.rpt-cat.active{border-color:var(--primary);background:rgba(79,70,229,.06);}
+.rpt-cat i{font-size:1.6rem;display:block;margin-bottom:8px;color:var(--primary);}
+.rpt-cat-label{font-weight:800;font-size:.78rem;}
+.rpt-cat-count{font-size:.62rem;color:var(--text-light);margin-top:2px;}
+
+/* ── Filters Panel ── */
+.rpt-filters{background:var(--bg-card,white);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.05);display:none;}
+.rpt-filters.show{display:block;}
+.filter-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end;}
+.filter-group{display:flex;flex-direction:column;gap:4px;}
+.filter-group label{font-size:.68rem;font-weight:700;color:var(--text-secondary);}
+.filter-group select,.filter-group input{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:.78rem;min-width:140px;background:var(--bg-card,white);color:var(--text);}
+.btn-generate{padding:10px 24px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;font-size:.82rem;display:flex;align-items:center;gap:6px;}
+.btn-generate:hover{opacity:.9;}
+.btn-generate:disabled{opacity:.5;cursor:not-allowed;}
+.btn-export{padding:8px 16px;border-radius:8px;background:#22c55e;color:white;border:none;font-weight:700;cursor:pointer;font-size:.76rem;display:flex;align-items:center;gap:6px;}
+.btn-export:hover{opacity:.9;}
+.btn-print{padding:8px 16px;border-radius:8px;background:#6366f1;color:white;border:none;font-weight:700;cursor:pointer;font-size:.76rem;display:flex;align-items:center;gap:6px;}
+
+/* ── Summary Cards ── */
+.rpt-summary{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;display:none;}
+.rpt-summary.show{display:grid;}
+.sum-card{background:var(--bg-card,white);border-radius:10px;padding:14px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);}
+.sum-card .sum-val{font-size:1.5rem;font-weight:900;color:var(--primary);}
+.sum-card .sum-label{font-size:.62rem;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-top:2px;}
+
+/* ── Data Table ── */
+.rpt-table-wrap{background:var(--bg-card,white);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.05);display:none;}
+.rpt-table-wrap.show{display:block;}
+.rpt-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border-light);}
+.rpt-toolbar h3{font-size:.88rem;font-weight:800;margin:0;}
+.rpt-toolbar-actions{display:flex;gap:8px;}
+.rpt-table{width:100%;border-collapse:collapse;font-size:.76rem;}
+.rpt-table thead{background:var(--bg,#f8fafc);}
+.rpt-table th{padding:10px 14px;text-align:left;font-weight:800;font-size:.68rem;text-transform:uppercase;color:var(--text-secondary);border-bottom:2px solid var(--border-light);white-space:nowrap;}
+.rpt-table td{padding:10px 14px;border-bottom:1px solid var(--border-light);}
+.rpt-table tr:hover{background:rgba(79,70,229,.02);}
+.rpt-table .status-pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.62rem;font-weight:700;text-transform:uppercase;}
+.status-present,.status-paid,.status-approved,.status-active,.status-promoted{background:#D1FAE5;color:#059669;}
+.status-absent,.status-overdue,.status-rejected,.status-inactive{background:#FEE2E2;color:#DC2626;}
+.status-late,.status-partial,.status-pending,.status-half_day{background:#FEF3C7;color:#D97706;}
+.status-excused,.status-on_leave,.status-tc_issued{background:#DBEAFE;color:#2563EB;}
+.status-dropout{background:#FCE7F3;color:#DB2777;}
+
+/* ── Loader ── */
+.rpt-loader{text-align:center;padding:40px;display:none;}
+.rpt-loader.show{display:block;}
+.rpt-loader .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Empty State ── */
+.rpt-empty{text-align:center;padding:50px;color:var(--text-light);display:none;}
+.rpt-empty.show{display:block;}
+.rpt-empty i{font-size:2.5rem;opacity:.3;display:block;margin-bottom:10px;}
+
+/* ── Print Styles ── */
+@media print{
+    .sidebar,.topbar,.rpt-cats,.rpt-filters,.rpt-toolbar-actions,.btn-generate,.btn-export,.btn-print,.page-header{display:none!important;}
+    .main-content{margin:0!important;padding:0!important;}
+    .rpt-table-wrap{box-shadow:none!important;border:1px solid #ddd;}
+    .rpt-summary .sum-card{border:1px solid #ddd;box-shadow:none;}
+    body{font-size:11px!important;}
+}
+
+@media(max-width:768px){
+    .rpt-cats{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));}
+    .filter-row{flex-direction:column;}
+    .filter-group select,.filter-group input{min-width:100%;}
+    .rpt-table{font-size:.68rem;}
+    .rpt-table th,.rpt-table td{padding:6px 8px;}
+}
+</style>
+{% endblock %}
+{% block content %}
+
+<!-- Report Category Cards -->
+<div class="rpt-cats" id="reportCats">
+    <div class="rpt-cat active" onclick="selectReport('student-attendance')" id="cat-student-attendance">
+        <i class="fas fa-clipboard-check"></i>
+        <div class="rpt-cat-label">Student Attendance</div>
+        <div class="rpt-cat-count">Monthly / Class-wise</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('teacher-attendance')" id="cat-teacher-attendance">
+        <i class="fas fa-user-check"></i>
+        <div class="rpt-cat-label">Teacher Attendance</div>
+        <div class="rpt-cat-count">Monthly Summary</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('academic-performance')" id="cat-academic-performance">
+        <i class="fas fa-trophy"></i>
+        <div class="rpt-cat-label">Academic Performance</div>
+        <div class="rpt-cat-count">Marks / Toppers / Grades</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('fee-collection')" id="cat-fee-collection">
+        <i class="fas fa-rupee-sign"></i>
+        <div class="rpt-cat-label">Fee Collection</div>
+        <div class="rpt-cat-count">Payments / Defaulters</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('transport')" id="cat-transport">
+        <i class="fas fa-bus"></i>
+        <div class="rpt-cat-label">Transport</div>
+        <div class="rpt-cat-count">Routes / Students</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('houses')" id="cat-houses">
+        <i class="fas fa-flag"></i>
+        <div class="rpt-cat-label">Houses</div>
+        <div class="rpt-cat-count">Points / Members</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('tc-alumni')" id="cat-tc-alumni">
+        <i class="fas fa-user-minus"></i>
+        <div class="rpt-cat-label">TC / Alumni</div>
+        <div class="rpt-cat-count">Separations / Dropouts</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('login-history')" id="cat-login-history">
+        <i class="fas fa-sign-in-alt"></i>
+        <div class="rpt-cat-label">Login History</div>
+        <div class="rpt-cat-count">User Activity</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('student-directory')" id="cat-student-directory">
+        <i class="fas fa-address-book"></i>
+        <div class="rpt-cat-label">Student Directory</div>
+        <div class="rpt-cat-count">Contacts / Details</div>
+    </div>
+    <div class="rpt-cat" onclick="selectReport('student-leaves')" id="cat-student-leaves">
+        <i class="fas fa-calendar-minus"></i>
+        <div class="rpt-cat-label">Student Leaves</div>
+        <div class="rpt-cat-count">Applications / Status</div>
+    </div>
+</div>
+
+<!-- Filters Panel -->
+<div class="rpt-filters" id="filtersPanel">
+    <div class="filter-row" id="filterRow">
+        <!-- Dynamically populated based on selected report -->
+    </div>
+</div>
+
+<!-- Summary Section -->
+<div class="rpt-summary" id="summarySection"></div>
+
+<!-- Loading Spinner -->
+<div class="rpt-loader" id="loader">
+    <div class="spinner"></div>
+    <div style="font-size:.82rem;font-weight:700;">Generating report...</div>
+</div>
+
+<!-- Empty State -->
+<div class="rpt-empty" id="emptyState">
+    <i class="fas fa-file-alt"></i>
+    <div style="font-weight:800;font-size:.92rem;">Select a report type above</div>
+    <div style="font-size:.78rem;margin-top:4px;">Choose filters and click Generate to view data</div>
+</div>
+
+<!-- Data Table -->
+<div class="rpt-table-wrap" id="tableWrap">
+    <div class="rpt-toolbar">
+        <h3 id="reportTitle">Report</h3>
+        <div class="rpt-toolbar-actions">
+            <button class="btn-export" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
+            <button class="btn-print" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
+        </div>
+    </div>
+    <div style="overflow-x:auto;">
+        <table class="rpt-table" id="reportTable">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+    <div style="padding:12px 18px;font-size:.68rem;color:var(--text-light);border-top:1px solid var(--border-light);">
+        <span id="rowCount">0</span> records &bull; Generated on <span id="genDate"></span>
+    </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+
+var currentReport = 'student-attendance';
+var reportData = null;
+var classesCache = null;
+var sectionsCache = {};
+var examsCache = null;
+var NOW = new Date();
+
+// ── Load classes for filter dropdowns ──
+async function loadClasses(){
+    if(classesCache) return classesCache;
+    try{
+        var r = await fetch('/api/school/classes',{credentials:'same-origin'});
+        var d = await r.json();
+        classesCache = d.classes || d || [];
+        return classesCache;
+    }catch(e){return [];}
+}
+
+async function loadSections(classId){
+    if(sectionsCache[classId]) return sectionsCache[classId];
+    try{
+        var r = await fetch('/api/school/classes/'+classId+'/sections',{credentials:'same-origin'});
+        var d = await r.json();
+        sectionsCache[classId] = d.sections || d || [];
+        return sectionsCache[classId];
+    }catch(e){return [];}
+}
+
+async function loadExams(){
+    if(examsCache) return examsCache;
+    try{
+        var r = await fetch('/api/school/reports/exams-list',{credentials:'same-origin'});
+        var d = await r.json();
+        examsCache = d.exams || [];
+        return examsCache;
+    }catch(e){return [];}
+}
+
+// ── Month Options ──
+function monthOptions(selected){
+    var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months.map(function(m,i){
+        return '<option value="'+(i+1)+'" '+(selected==(i+1)?'selected':'')+'>'+m+'</option>';
+    }).join('');
+}
+
+function yearOptions(selected){
+    var cur=NOW.getFullYear();
+    var html='';
+    for(var y=cur;y>=cur-3;y--) html+='<option value="'+y+'" '+(selected==y?'selected':'')+'>'+y+'</option>';
+    return html;
+}
+
+// ── Select Report Category ──
+async function selectReport(type){
+    currentReport = type;
+    document.querySelectorAll('.rpt-cat').forEach(function(el){el.classList.remove('active');});
+    var catEl = document.getElementById('cat-'+type);
+    if(catEl) catEl.classList.add('active');
+
+    // Show filters
+    document.getElementById('filtersPanel').classList.add('show');
+    await buildFilters(type);
+
+    // Reset table
+    document.getElementById('tableWrap').classList.remove('show');
+    document.getElementById('summarySection').classList.remove('show');
+    document.getElementById('emptyState').classList.remove('show');
+    document.getElementById('loader').classList.remove('show');
+}
+
+async function buildFilters(type){
+    var fr = document.getElementById('filterRow');
+    var classes = await loadClasses();
+    var classOpts = '<option value="">All Classes</option>' + classes.map(function(c){
+        return '<option value="'+c.id+'">'+c.name+'</option>';
+    }).join('');
+
+    var html = '';
+
+    if(type === 'student-attendance'){
+        html += filterSelect('Class','f_class',classOpts);
+        html += filterSelect('Section','f_section','<option value="">All</option>');
+        html += filterSelect('Month','f_month',monthOptions(NOW.getMonth()+1));
+        html += filterSelect('Year','f_year',yearOptions(NOW.getFullYear()));
+        html += generateBtn();
+    } else if(type === 'teacher-attendance'){
+        html += filterSelect('Month','f_month',monthOptions(NOW.getMonth()+1));
+        html += filterSelect('Year','f_year',yearOptions(NOW.getFullYear()));
+        html += generateBtn();
+    } else if(type === 'academic-performance'){
+        var exams = await loadExams();
+        var examOpts = '<option value="">Latest Exam</option>' + exams.map(function(e){
+            return '<option value="'+e.id+'">'+e.name+(e.published?' ✓':'')+'</option>';
+        }).join('');
+        html += filterSelect('Exam','f_exam',examOpts);
+        html += filterSelect('Class','f_class',classOpts);
+        html += filterSelect('Section','f_section','<option value="">All</option>');
+        html += filterSelect('Filter','f_threshold','<option value="all">All Students</option><option value="above90">Above 90%</option><option value="below80">Below 80%</option><option value="below70">Below 70%</option><option value="toppers">Top 10</option>');
+        html += generateBtn();
+    } else if(type === 'fee-collection'){
+        html += filterSelect('Class','f_class',classOpts);
+        html += filterSelect('Status','f_status','<option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="overdue">Overdue</option><option value="partial">Partial</option>');
+        html += filterSelect('Month','f_month','<option value="">All</option>'+monthOptions(0));
+        html += filterSelect('Year','f_year',yearOptions(NOW.getFullYear()));
+        html += generateBtn();
+    } else if(type === 'transport'){
+        html += generateBtn();
+    } else if(type === 'houses'){
+        html += generateBtn();
+    } else if(type === 'tc-alumni'){
+        html += filterSelect('Action','f_action','<option value="all">All</option><option value="tc_issued">TC Issued</option><option value="dropout">Dropout</option><option value="promoted">Promoted</option><option value="detained">Detained</option>');
+        html += generateBtn();
+    } else if(type === 'login-history'){
+        html += filterSelect('Role','f_role','<option value="all">All Roles</option><option value="student">Students</option><option value="teacher">Teachers</option><option value="school_admin">Admins</option>');
+        html += filterSelect('Period','f_days','<option value="7">Last 7 Days</option><option value="14">Last 14 Days</option><option value="30">Last 30 Days</option><option value="90">Last 90 Days</option>');
+        html += generateBtn();
+    } else if(type === 'student-directory'){
+        html += filterSelect('Class','f_class',classOpts);
+        html += filterSelect('Section','f_section','<option value="">All</option>');
+        html += filterSelect('Filter','f_filter','<option value="all">All Students</option><option value="transport">Transport Users</option><option value="medical">Medical Conditions</option><option value="new_admissions">New Admissions</option>');
+        html += generateBtn();
+    } else if(type === 'student-leaves'){
+        html += filterSelect('Class','f_class',classOpts);
+        html += filterSelect('Status','f_status','<option value="all">All</option><option value="approved">Approved</option><option value="pending">Pending</option><option value="rejected">Rejected</option>');
+        html += filterSelect('Month','f_month','<option value="">All</option>'+monthOptions(0));
+        html += filterSelect('Year','f_year',yearOptions(NOW.getFullYear()));
+        html += generateBtn();
+    }
+
+    fr.innerHTML = html;
+
+    // Class → Section chaining
+    var classEl = document.getElementById('f_class');
+    if(classEl){
+        classEl.addEventListener('change', async function(){
+            var secEl = document.getElementById('f_section');
+            if(!secEl) return;
+            if(!this.value){secEl.innerHTML='<option value="">All</option>';return;}
+            var secs = await loadSections(this.value);
+            secEl.innerHTML = '<option value="">All</option>' + secs.map(function(s){
+                return '<option value="'+s.id+'">'+s.name+'</option>';
+            }).join('');
+        });
+    }
+}
+
+function filterSelect(label, id, options){
+    return '<div class="filter-group"><label>'+label+'</label><select id="'+id+'">'+options+'</select></div>';
+}
+
+function generateBtn(){
+    return '<div class="filter-group" style="justify-content:flex-end;"><label>&nbsp;</label><button class="btn-generate" onclick="generateReport()"><i class="fas fa-play"></i> Generate</button></div>';
+}
+
+// ── Generate Report ──
+async function generateReport(){
+    var type = currentReport;
+    var url = '/api/school/reports/' + type + '?';
+    var params = [];
+
+    var classEl = document.getElementById('f_class');
+    var sectionEl = document.getElementById('f_section');
+    var monthEl = document.getElementById('f_month');
+    var yearEl = document.getElementById('f_year');
+
+    if(classEl && classEl.value) params.push('class_id='+classEl.value);
+    if(sectionEl && sectionEl.value) params.push('section_id='+sectionEl.value);
+    if(monthEl && monthEl.value) params.push('month='+monthEl.value);
+    if(yearEl && yearEl.value) params.push('year='+yearEl.value);
+
+    // Type-specific params
+    if(type === 'academic-performance'){
+        var examEl = document.getElementById('f_exam');
+        var threshEl = document.getElementById('f_threshold');
+        if(examEl && examEl.value) params.push('exam_id='+examEl.value);
+        if(threshEl && threshEl.value) params.push('threshold='+threshEl.value);
+    } else if(type === 'fee-collection'){
+        var statusEl = document.getElementById('f_status');
+        if(statusEl && statusEl.value) params.push('status='+statusEl.value);
+    } else if(type === 'tc-alumni'){
+        var actionEl = document.getElementById('f_action');
+        if(actionEl && actionEl.value) params.push('action='+actionEl.value);
+    } else if(type === 'login-history'){
+        var roleEl = document.getElementById('f_role');
+        var daysEl = document.getElementById('f_days');
+        if(roleEl && roleEl.value) params.push('role='+roleEl.value);
+        if(daysEl && daysEl.value) params.push('days='+daysEl.value);
+    } else if(type === 'student-directory'){
+        var filterEl = document.getElementById('f_filter');
+        if(filterEl && filterEl.value) params.push('filter_type='+filterEl.value);
+    } else if(type === 'student-leaves'){
+        var statusEl2 = document.getElementById('f_status');
+        if(statusEl2 && statusEl2.value) params.push('status='+statusEl2.value);
+    }
+
+    url += params.join('&');
+
+    // Show loader, hide table
+    document.getElementById('loader').classList.add('show');
+    document.getElementById('tableWrap').classList.remove('show');
+    document.getElementById('summarySection').classList.remove('show');
+    document.getElementById('emptyState').classList.remove('show');
+
+    try{
+        var r = await fetch(url, {credentials:'same-origin'});
+        var d = await r.json();
+        reportData = d;
+        renderReport(d);
+    }catch(e){
+        console.error(e);
+        showToast('error','Failed to generate report');
+    }finally{
+        document.getElementById('loader').classList.remove('show');
+    }
+}
+
+// ── Render Report ──
+function renderReport(d){
+    if(!d.rows || !d.rows.length){
+        document.getElementById('emptyState').classList.add('show');
+        document.getElementById('emptyState').innerHTML = '<i class="fas fa-inbox"></i><div style="font-weight:800;font-size:.92rem;">No Data Found</div><div style="font-size:.78rem;margin-top:4px;">Try different filters or date range</div>';
+        return;
+    }
+
+    // Summary
+    if(d.summary && Object.keys(d.summary).length){
+        var sumHtml = '';
+        for(var key in d.summary){
+            var label = key.replace(/_/g,' ').replace(/\b\w/g,function(l){return l.toUpperCase();});
+            var val = d.summary[key];
+            if(typeof val === 'number' && key.includes('pct') || key.includes('percentage') || key.includes('rate')){
+                val = val + '%';
+            } else if(typeof val === 'number' && (key.includes('due') || key.includes('collected') || key.includes('outstanding') || key.includes('fee'))){
+                val = '₹' + val.toLocaleString('en-IN');
+            }
+            sumHtml += '<div class="sum-card"><div class="sum-val">'+val+'</div><div class="sum-label">'+label+'</div></div>';
+        }
+        document.getElementById('summarySection').innerHTML = sumHtml;
+        document.getElementById('summarySection').classList.add('show');
+    }
+
+    // Title
+    document.getElementById('reportTitle').textContent = d.report_name || 'Report';
+    document.getElementById('genDate').textContent = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('rowCount').textContent = d.rows.length;
+
+    // Table header
+    var cols = d.columns || [];
+    var headHtml = '<tr>';
+    cols.forEach(function(c){ headHtml += '<th>'+c+'</th>'; });
+    headHtml += '</tr>';
+    document.getElementById('tableHead').innerHTML = headHtml;
+
+    // Table body
+    var bodyHtml = '';
+    d.rows.forEach(function(row){
+        bodyHtml += '<tr>';
+        cols.forEach(function(col){
+            var key = colToKey(col);
+            var val = row[key];
+            if(val === undefined || val === null) val = '';
+
+            // Status pill styling
+            if(key === 'status' || key === 'teacher_status' || key === 'action'){
+                val = '<span class="status-pill status-'+String(val).toLowerCase()+'">'+val+'</span>';
+            }
+            // Percentage coloring
+            else if(key === 'percentage'){
+                var pct = parseFloat(val);
+                var color = pct >= 90 ? '#059669' : pct >= 75 ? '#2563EB' : pct >= 60 ? '#D97706' : '#DC2626';
+                val = '<strong style="color:'+color+'">'+val+'%</strong>';
+            }
+            // Money formatting
+            else if(key === 'amount_due' || key === 'amount_paid' || key === 'outstanding' || key === 'monthly_fee'){
+                val = '₹' + Number(val).toLocaleString('en-IN');
+            }
+            // Grade coloring
+            else if(key === 'grade'){
+                var gc = val === 'A+' ? '#059669' : val === 'A' ? '#2563EB' : val === 'F' ? '#DC2626' : '#D97706';
+                val = '<strong style="color:'+gc+'">'+val+'</strong>';
+            }
+
+            bodyHtml += '<td>'+val+'</td>';
+        });
+        bodyHtml += '</tr>';
+    });
+    document.getElementById('tableBody').innerHTML = bodyHtml;
+    document.getElementById('tableWrap').classList.add('show');
+}
+
+// ── Column name to row key mapping ──
+function colToKey(col){
+    var map = {
+        'Name':'name','Roll No':'roll_no','Class':'class','Section':'section',
+        'Present':'present','Absent':'absent','Late':'late','Half Day':'half_day',
+        'Excused':'excused','Total Days':'total_days','Attendance %':'percentage',
+        'Employee ID':'employee_id','Designation':'designation','On Leave':'on_leave',
+        'Rank':'rank','Marks':'marks_obtained','Max Marks':'max_marks','Percentage':'percentage','Grade':'grade',
+        'Fee':'fee_name','Due':'amount_due','Paid':'amount_paid','Outstanding':'outstanding',
+        'Status':'status','Due Date':'due_date','Paid Date':'payment_date','Mode':'payment_mode',
+        'Route':'route_name','Route No':'route_number','Vehicle':'vehicle_number','Type':'vehicle_type',
+        'Driver':'driver_name','Phone':'driver_phone','Capacity':'capacity','Students':'students_assigned',
+        'Monthly Fee':'monthly_fee',
+        'House':'house_name','Color':'color','Points':'points',
+        'Adm No':'admission_number','From Class':'from_class','To Class':'to_class',
+        'Action':'action','Year':'academic_year','Remarks':'remarks','Date':'date',
+        'Email':'email','Username':'email','Role':'role','Last Login':'last_login',
+        'Gender':'gender','DOB':'dob','Father':'father_name','Father Phone':'father_phone',
+        'Mother':'mother_name','Mother Phone':'mother_phone','Address':'address',
+        'Transport':'transport','Medical':'medical','Admission Date':'admission_date',
+        'From':'start_date','To':'end_date','Days':'total_days','Reason':'reason',
+        'Applied On':'applied_on',
+    };
+    return map[col] || col.toLowerCase().replace(/ /g,'_');
+}
+
+// ── Export to CSV ──
+function exportCSV(){
+    if(!reportData || !reportData.rows || !reportData.rows.length){
+        showToast('error','No data to export');
+        return;
+    }
+    var cols = reportData.columns || [];
+    var rows = reportData.rows;
+    var csv = cols.join(',') + '\n';
+    rows.forEach(function(row){
+        var line = cols.map(function(col){
+            var key = colToKey(col);
+            var val = row[key];
+            if(val === undefined || val === null) val = '';
+            val = String(val).replace(/"/g,'""');
+            if(String(val).includes(',') || String(val).includes('"') || String(val).includes('\n'))
+                val = '"'+val+'"';
+            return val;
+        });
+        csv += line.join(',') + '\n';
+    });
+
+    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = (reportData.report_name || 'report').replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.csv';
+    link.click();
+    showToast('success','CSV downloaded');
+}
+
+// Expose functions
+window.selectReport = selectReport;
+window.generateReport = generateReport;
+window.exportCSV = exportCSV;
+
+// Auto-load on page open
+selectReport('student-attendance');
+
+})();
+</script>
+{% endblock %}

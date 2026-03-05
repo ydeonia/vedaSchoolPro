@@ -5,12 +5,12 @@
 
 {% block extra_css %}
 <style>
-.act-tabs { display:flex; gap:4px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:16px; }
+.act-tabs { display:flex; gap:4px; background:var(--bg-card, white); border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:16px; }
 .act-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
 .act-tab.active { background:var(--primary); color:white; }
 /* Event cards */
 .event-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
-.event-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; transition:all 0.2s; }
+.event-card { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; transition:all 0.2s; }
 .event-card:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
 .ec-banner { padding:14px 16px; color:white; }
 .ec-banner.sports { background:linear-gradient(135deg,#059669,#10B981); }
@@ -26,11 +26,11 @@
 .ec-stats { display:flex; gap:8px; margin-bottom:10px; }
 .ec-stat { padding:4px 10px; border-radius:6px; font-size:0.68rem; font-weight:700; background:var(--bg); }
 .ec-actions { display:flex; gap:6px; }
-.ec-btn { padding:6px 12px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:white; }
+.ec-btn { padding:6px 12px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--bg-card, white); }
 .ec-btn:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
 .ec-btn.primary { background:var(--primary); color:white; border-color:var(--primary); }
 /* Create form */
-.create-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; }
+.create-card { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; }
 .c-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
 .c-grp { display:flex; flex-direction:column; gap:3px; }
 .c-grp label { font-size:0.65rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; }
@@ -44,7 +44,7 @@
 /* Participants modal */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:100; justify-content:center; align-items:center; }
 .modal-overlay.show { display:flex; }
-.modal-box { background:white; border-radius:14px; padding:20px; width:90%; max-width:600px; max-height:80vh; overflow-y:auto; }
+.modal-box { background:var(--bg-card, white); border-radius:14px; padding:20px; width:90%; max-width:600px; max-height:80vh; overflow-y:auto; }
 .modal-box h3 { margin-bottom:14px; font-size:0.95rem; }
 .p-item { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-light); }
 .p-item:last-child { border:none; }
@@ -90,12 +90,23 @@
         </div>
         <div class="c-grp" style="margin-bottom:12px;"><label>Description</label><textarea id="evDesc" placeholder="Event details, rules, eligibility..."></textarea></div>
         <div class="c-grp" style="margin-bottom:12px;"><label>Eligible Classes (comma-separated, or blank=all)</label><input id="evClasses" placeholder="e.g., 8,9,10,11,12"></div>
-        <button class="btn-primary" onclick="createEvent()"><i class="fas fa-plus"></i> Create Event</button>
+        <div class="c-grp" style="margin-bottom:14px;">
+            <label>Target Audience (who should be notified on publish)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                <label style="font-size:0.82rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="tgAll" value="all_students" checked> All Students</label>
+                <label style="font-size:0.82rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="tgTeachers" value="teachers"> Teachers</label>
+                <label style="font-size:0.82rem;display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="tgStaff" value="non_teaching_staff"> Non-Teaching Staff</label>
+            </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+            <button class="btn-primary" onclick="createEvent('draft')" style="background:#6B7280;border-color:#6B7280;"><i class="fas fa-save"></i> Save as Draft</button>
+            <button class="btn-primary" onclick="createEvent('publish')"><i class="fas fa-paper-plane"></i> Publish & Notify</button>
+        </div>
     </div>
 </div>
 
 <div id="achievementsTab" style="display:none;">
-    <div id="achieveList" style="background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;">Loading...</div>
+    <div id="achieveList" style="background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;">Loading...</div>
 </div>
 
 <!-- Participants Modal -->
@@ -126,18 +137,20 @@ function renderEvents() {
     if (!events.length) { grid.innerHTML = '<div style="padding:60px;text-align:center;color:var(--text-light);grid-column:1/-1;"><i class="fas fa-trophy" style="font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;"></i>No events yet. Create your first activity!</div>'; return; }
     grid.innerHTML = events.map(e => {
         const typeLbl = {sports:'🏏 Sports',cultural:'🎭 Cultural',academic:'📚 Academic',arts:'🎨 Arts',tech:'💻 Tech'}[e.activity_type] || '📋 Event';
-        const statusColor = {upcoming:'#3B82F6',open:'#10B981',ongoing:'#F59E0B',completed:'#6B7280',cancelled:'#EF4444'}[e.status];
-        return `<div class="event-card">
-            <div class="ec-banner ${e.activity_type}"><div class="ec-type">${typeLbl}</div><div class="ec-title">${e.title}</div></div>
+        const statusColor = {draft:'#9CA3AF',upcoming:'#3B82F6',open:'#10B981',ongoing:'#F59E0B',completed:'#6B7280',cancelled:'#EF4444',published:'#10B981'}[e.status] || '#6B7280';
+        const isDraft = e.status === 'draft';
+        return `<div class="event-card" style="${isDraft?'opacity:0.85;border:2px dashed var(--border);':''}">
+            <div class="ec-banner ${e.activity_type}"><div class="ec-type">${typeLbl}</div><div class="ec-title">${e.title}${isDraft?' <span style="font-size:0.7rem;background:rgba(255,255,255,0.3);padding:2px 8px;border-radius:8px;">DRAFT</span>':''}</div></div>
             <div class="ec-body">
                 <div class="ec-meta"><i class="fas fa-calendar"></i> ${e.event_date||'TBD'}<br><i class="fas fa-map-marker-alt"></i> ${e.venue||'TBD'}</div>
                 <div class="ec-stats">
-                    <div class="ec-stat" style="color:${statusColor}">${e.status.toUpperCase()}</div>
+                    <div class="ec-stat" style="color:${statusColor};${isDraft?'background:#FEF3C7;':''}">${e.status.toUpperCase()}</div>
                     <div class="ec-stat">👥 ${e.participant_count||0} registered</div>
                     ${e.category?`<div class="ec-stat">${e.category}</div>`:''}
                 </div>
                 <div class="ec-actions">
-                    <button class="ec-btn primary" onclick="openParticipants('${e.id}','${e.title}')">👥 Manage</button>
+                    ${isDraft?`<button class="ec-btn primary" onclick="publishEvent('${e.id}')"><i class="fas fa-paper-plane"></i> Publish</button>`:''}
+                    ${!isDraft?`<button class="ec-btn primary" onclick="openParticipants('${e.id}','${e.title}')">👥 Manage</button>`:''}
                     <button class="ec-btn" onclick="addNominations('${e.id}')">➕ Nominate</button>
                     ${e.status==='completed'?`<button class="ec-btn" onclick="viewWinners('${e.id}')">🏆 Winners</button>`:''}
                 </div>
@@ -146,7 +159,15 @@ function renderEvents() {
     }).join('');
 }
 
-async function createEvent() {
+function getTargetAudience() {
+    const targets = [];
+    if (document.getElementById('tgAll').checked) targets.push('all_students');
+    if (document.getElementById('tgTeachers').checked) targets.push('teachers');
+    if (document.getElementById('tgStaff').checked) targets.push('non_teaching_staff');
+    return targets;
+}
+
+async function createEvent(saveAs) {
     const data = {
         title: document.getElementById('evTitle').value.trim(),
         activity_type: selActivity,
@@ -157,16 +178,36 @@ async function createEvent() {
         max_participants: parseInt(document.getElementById('evMax').value) || null,
         description: document.getElementById('evDesc').value.trim(),
         eligible_classes: document.getElementById('evClasses').value.trim() ? document.getElementById('evClasses').value.split(',').map(c=>c.trim()) : null,
+        save_as: saveAs || 'draft',
+        target_audience: getTargetAudience(),
     };
-    if (!data.title) { alert('Enter title'); return; }
+    if (!data.title) { showToast('warning', 'Enter title'); return; }
     try {
         const res = await fetch('/api/school/activities', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         if (!res.ok) throw new Error();
-        alert('✅ Event created!');
+        const msg = saveAs === 'draft' ? 'Event saved as draft' : 'Event published & notifications sent!';
+        showToast('success', msg);
         ['evTitle','evCat','evDate','evDeadline','evVenue','evMax','evDesc','evClasses'].forEach(id=>document.getElementById(id).value='');
         loadEvents();
         switchTab('events', document.querySelectorAll('.act-tab')[0]);
-    } catch(e) { alert('Failed to create event'); }
+    } catch(e) { showToast('error', 'Failed to create event'); }
+}
+
+async function publishEvent(actId) {
+    const targets = getTargetAudience();
+    if (!targets.length) {
+        if (!confirm('No target audience selected. Publish anyway without notifications?')) return;
+    }
+    try {
+        const res = await fetch(`/api/school/activities/${actId}/publish`, {
+            method:'POST', credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({target_audience: targets})
+        });
+        if (!res.ok) throw new Error();
+        showToast('success', 'Event published & notifications sent!');
+        loadEvents();
+    } catch(e) { showToast('error', 'Failed to publish'); }
 }
 
 async function openParticipants(actId, title) {
@@ -182,7 +223,7 @@ async function openParticipants(actId, title) {
 }
 
 function closeModal() { document.getElementById('partModal').classList.remove('show'); }
-async function addNominations(actId) { alert('Coming: Select students from class list to nominate for this event.'); }
+async function addNominations(actId) { showToast('info', 'Coming: Select students from class list to nominate for this event.'); }
 async function updatePosition(actId, partId, pos) { try { await fetch(`/api/school/activities/${actId}/participants/${partId}`, {method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({position:pos})}); } catch(e){} }
 async function viewWinners(actId) { openParticipants(actId, 'Winners'); }
 

@@ -6,13 +6,13 @@
 {% block extra_css %}
 <style>
     .analytics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
-    .chart-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; transition: all 0.3s; }
+    .chart-card { background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; transition: all 0.3s; }
     .chart-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
     .chart-card h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     .chart-card h3 .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
     .chart-card canvas { max-height: 260px; }
     .kpi-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-bottom: 16px; }
-    .kpi-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 14px 16px; text-align: center; border-top: 3px solid var(--primary); transition: all 0.3s; position: relative; overflow: hidden; }
+    .kpi-card { background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 14px 16px; text-align: center; border-top: 3px solid var(--primary); transition: all 0.3s; position: relative; overflow: hidden; }
     .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
     .kpi-card .kpi-val { font-size: 1.6rem; font-weight: 800; line-height: 1.2; }
     .kpi-card .kpi-label { font-size: 0.68rem; color: var(--text-light); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -23,7 +23,7 @@
 
     .gauge-container { display: flex; justify-content: center; align-items: center; flex-direction: column; }
     .gauge-ring { width: 120px; height: 120px; border-radius: 50%; background: conic-gradient(var(--color, var(--primary)) calc(var(--pct, 0) * 3.6deg), var(--bg-secondary, #F1F5F9) 0); display: flex; align-items: center; justify-content: center; position: relative; transition: all 1s ease; }
-    .gauge-ring::after { content: ''; width: 90px; height: 90px; border-radius: 50%; background: white; position: absolute; }
+    .gauge-ring::after { content: ''; width: 90px; height: 90px; border-radius: 50%; background: var(--bg-card, white); position: absolute; }
     .gauge-value { position: relative; z-index: 1; font-size: 1.5rem; font-weight: 800; }
     .gauge-label { font-size: 0.72rem; color: var(--text-light); margin-top: 6px; }
 

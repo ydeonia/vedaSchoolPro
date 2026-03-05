@@ -467,9 +467,10 @@ async function loadSavedDesign() {
 }
 
 async function applyToAll() {
-    if (!confirm(`Apply this ${cardType} ID card design to ALL ${cardType}s? This will save the design and mark it as the active template.`)) return;
-    await saveDesign();
-    showToast('success', `Design saved and will be used for all ${cardType} ID cards!`);
+    showConfirm('Confirm', `Apply this ${cardType} ID card design to ALL ${cardType}s? This will save the design and mark it as the active template.`, async () => {
+        await saveDesign();
+        showToast('success', `Design saved and will be used for all ${cardType} ID cards!`);
+    }, {icon:'⚠️'});
 }
 
 // === INIT ===

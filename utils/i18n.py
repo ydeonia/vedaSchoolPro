@@ -1,21 +1,28 @@
 """
-i18n Translation Engine — Sprint 26
+i18n Translation Engine — Sprint 26+
 Loads language JSON files, provides t() function for templates.
-Supports: en, hi, ta, te, mr, bn, kn, gu, ur
+Uses contextvars for per-request language detection.
+Supports: en, hi, ta, te, ml, gu, pa, as
 """
 import json
 import os
 import logging
+import contextvars
 from typing import Optional, Dict, Any
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
-# Global language cache
+# ═══════════════════════════════════════════════════════════
+# GLOBAL STATE
+# ═══════════════════════════════════════════════════════════
 _translations: Dict[str, Dict] = {}
 _default_lang = "en"
 _supported_langs = []
 _lang_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "lang")
+
+# Per-request language context
+_current_lang = contextvars.ContextVar('current_lang', default='en')
 
 
 def init_i18n(lang_dir: str = None, default_lang: str = "en"):
@@ -32,7 +39,7 @@ def init_i18n(lang_dir: str = None, default_lang: str = "en"):
         return
 
     # Load all language files
-    for filename in os.listdir(_lang_dir):
+    for filename in sorted(os.listdir(_lang_dir)):
         if filename.endswith(".json"):
             lang_code = filename.replace(".json", "")
             filepath = os.path.join(_lang_dir, filename)
@@ -51,6 +58,22 @@ def init_i18n(lang_dir: str = None, default_lang: str = "en"):
 
     if not _translations:
         logger.warning("No language files found. i18n will return keys as-is.")
+    else:
+        logger.info(f"i18n loaded {len(_translations)} languages: {list(_translations.keys())}")
+
+
+# ═══════════════════════════════════════════════════════════
+# LANGUAGE CONTEXT
+# ═══════════════════════════════════════════════════════════
+
+def set_current_lang(lang: str):
+    """Set language for the current request (called by middleware)."""
+    _current_lang.set(lang)
+
+
+def get_current_lang() -> str:
+    """Get language for the current request."""
+    return _current_lang.get()
 
 
 def get_supported_languages() -> list:
@@ -58,19 +81,23 @@ def get_supported_languages() -> list:
     return _supported_langs
 
 
+# ═══════════════════════════════════════════════════════════
+# TRANSLATION FUNCTIONS
+# ═══════════════════════════════════════════════════════════
+
 def get_translation(key: str, lang: str = None, **kwargs) -> str:
     """
     Get translated string by dot-notation key.
-    
+
     Examples:
         t("common.save")           → "Save" (en) / "सहेजें" (hi)
         t("student.name")          → "Student Name"
         t("fee.due_msg", name="Rahul", amount="5000")
             → "Fee of ₹5000 is due for Rahul"
-    
+
     Falls back: requested_lang → default_lang → key itself
     """
-    lang = lang or _default_lang
+    lang = lang or get_current_lang() or _default_lang
 
     # Try requested language
     value = _resolve_key(key, lang)
@@ -110,12 +137,16 @@ def _resolve_key(key: str, lang: str) -> Optional[str]:
     return current if isinstance(current, str) else None
 
 
+# ═══════════════════════════════════════════════════════════
+# JAVASCRIPT EXPORT
+# ═══════════════════════════════════════════════════════════
+
 def get_all_keys_for_js(lang: str = None) -> dict:
     """
     Return flattened dict of all translations for JS.
-    Used to inject into base.html as window.T = {...}
+    Used to inject into base.html as window._i18n = {...}
     """
-    lang = lang or _default_lang
+    lang = lang or get_current_lang() or _default_lang
     data = _translations.get(lang, {})
     flat = {}
     _flatten(data, "", flat)
@@ -134,26 +165,35 @@ def _flatten(d: dict, prefix: str, result: dict):
             result[full_key] = v
 
 
+def get_i18n_json_str() -> str:
+    """Return JSON string of flattened translations for current language."""
+    return json.dumps(get_all_keys_for_js(), ensure_ascii=False)
+
+
 # ═══════════════════════════════════════════════════════════
 # JINJA2 INTEGRATION
 # ═══════════════════════════════════════════════════════════
 
-def setup_jinja2_i18n(app_templates):
+def inject_i18n(app_templates):
     """
-    Add t() function to Jinja2 globals.
-    Call in main.py: setup_jinja2_i18n(templates)
-    
+    Add i18n functions to a Jinja2Templates instance.
+    Call for each templates object in route files.
+
     Usage in templates:
         {{ t('common.save') }}
         {{ t('fee.due_msg', name='Rahul') }}
+        {{ current_lang() }}
+        {{ i18n_json() }}
     """
-    def t(key: str, **kwargs):
-        # Try to get language from request context (set by middleware)
-        return get_translation(key, **kwargs)
+    app_templates.env.globals["t"] = get_translation
+    app_templates.env.globals["current_lang"] = get_current_lang
+    app_templates.env.globals["i18n_json"] = get_i18n_json_str
+    app_templates.env.globals["supported_languages"] = get_supported_languages
 
-    app_templates.env.globals["t"] = t
-    app_templates.env.globals["get_supported_languages"] = get_supported_languages
-    app_templates.env.globals["i18n_default_lang"] = _default_lang
+
+def setup_jinja2_i18n(app_templates):
+    """Alias for inject_i18n for backward compatibility."""
+    inject_i18n(app_templates)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -162,8 +202,8 @@ def setup_jinja2_i18n(app_templates):
 
 class I18nMiddleware:
     """
-    Middleware to detect user language and inject into request.
-    Priority: 1) Cookie 2) User preference 3) Accept-Language header 4) Default
+    Middleware to detect user language and inject into request context.
+    Priority: 1) Cookie 2) Query param 3) Accept-Language header 4) Default
     """
     def __init__(self, app):
         self.app = app
@@ -186,7 +226,10 @@ class I18nMiddleware:
             if lang not in valid_codes:
                 lang = _default_lang
 
-            # Store in scope for templates
+            # Set in contextvars for this request
+            set_current_lang(lang)
+
+            # Also store in scope for compatibility
             scope["state"] = scope.get("state", {})
             scope["state"]["lang"] = lang
 

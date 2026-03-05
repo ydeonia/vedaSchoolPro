@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}Teacher Profile{% endblock %}
+{% block page_title %}👤 Teacher Profile{% endblock %}
+{% block page_subtitle %}View teacher details, awards, and attendance{% endblock %}
+{% block extra_css %}
+<style>
+.profile-layout{display:grid;grid-template-columns:280px 1fr;gap:16px;}
+.profile-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;text-align:center;}
+.profile-photo{width:120px;height:140px;border-radius:12px;background:var(--bg,#f1f5f9);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:3rem;overflow:hidden;}
+.profile-photo img{width:100%;height:100%;object-fit:cover;}
+.p-name{font-weight:900;font-size:1.2rem;}.p-desg{font-size:0.82rem;color:var(--primary);font-weight:700;}
+.p-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:0.62rem;font-weight:700;margin-top:4px;}
+.p-info{text-align:left;margin-top:12px;font-size:0.76rem;}
+.p-info-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border-light,#f1f5f9);}
+.p-info-lbl{color:var(--text-light);font-weight:600;}.p-info-val{font-weight:700;}
+.sec-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
+.sec-card h3{font-size:0.88rem;margin-bottom:12px;}
+
+/* Assignments table */
+.assign-tbl{width:100%;border-collapse:collapse;font-size:0.78rem;}
+.assign-tbl th{text-align:left;font-weight:700;font-size:0.64rem;text-transform:uppercase;color:var(--text-light);padding:6px 8px;border-bottom:2px solid var(--border-light);}
+.assign-tbl td{padding:8px;border-bottom:1px solid var(--border-light,#f1f5f9);font-weight:600;}
+
+/* Awards */
+.award-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;}
+.award-card{border:1px solid var(--border-light);border-radius:10px;padding:12px;display:flex;gap:10px;align-items:flex-start;}
+.award-icon{font-size:2rem;flex-shrink:0;}
+.award-title{font-weight:700;font-size:0.82rem;}
+.award-meta{font-size:0.66rem;color:var(--text-light);margin-top:2px;}
+.award-prize{font-size:0.68rem;color:var(--primary);font-weight:600;margin-top:4px;}
+
+/* Calendar (shared with student) */
+.cal-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.cal-stat{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;}
+.cal-stat.s-present{background:#D1FAE5;color:#059669;}.cal-stat.s-absent{background:#FEE2E2;color:#DC2626;}
+.cal-stat.s-late{background:#FEF3C7;color:#D97706;}.cal-stat.s-on_leave{background:#DBEAFE;color:#2563EB;}
+.cal-stat.s-pct{background:#F0F9FF;color:#0369A1;font-size:0.85rem;}
+.cal-nav{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.cal-nav button{border:none;background:var(--bg,#f1f5f9);border-radius:8px;padding:5px 10px;cursor:pointer;font-weight:700;}
+.cal-nav .cal-month{font-weight:900;font-size:0.92rem;flex:1;text-align:center;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.cal-hdr{font-size:0.56rem;text-align:center;font-weight:700;color:var(--text-light);padding:4px 0;}
+.cal-day{text-align:center;padding:8px 4px;border-radius:8px;font-size:0.78rem;font-weight:700;cursor:pointer;transition:all 0.15s;min-height:36px;display:flex;align-items:center;justify-content:center;}
+.cal-day:hover{transform:scale(1.1);box-shadow:0 2px 8px rgba(0,0,0,0.12);}
+.cal-day.selected{outline:2px solid var(--primary);outline-offset:1px;}
+.cal-day.present{background:#D1FAE5;color:#059669;}.cal-day.absent{background:#FEE2E2;color:#DC2626;}
+.cal-day.late{background:#FEF3C7;color:#D97706;}.cal-day.half_day{background:#FEF3C7;color:#D97706;}
+.cal-day.on_leave{background:#DBEAFE;color:#2563EB;}.cal-day.holiday{background:#F3F4F6;color:#9CA3AF;}
+.cal-day.weekend{background:#F9FAFB;color:#D1D5DB;}.cal-day.future{background:transparent;color:#D1D5DB;}
+.cal-day.empty{background:transparent;cursor:default;}
+.day-panel{margin-top:12px;padding:14px;border-radius:10px;background:var(--bg,#f1f5f9);display:none;}
+.day-panel.show{display:block;}
+.dp-date{font-weight:900;font-size:0.88rem;margin-bottom:6px;}
+.dp-status{font-weight:700;font-size:0.82rem;margin-bottom:8px;}
+.dp-times{display:flex;gap:16px;font-size:0.78rem;}
+.dp-times span{display:flex;align-items:center;gap:4px;}
+.dp-remarks{margin-top:6px;font-size:0.72rem;color:var(--text-light);font-style:italic;}
+
+/* Stats row in sidebar */
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px;}
+.stat-box{background:var(--bg,#f1f5f9);border-radius:8px;padding:8px;text-align:center;}
+.stat-num{font-size:1.3rem;font-weight:900;}.stat-lbl{font-size:0.56rem;text-transform:uppercase;font-weight:700;color:var(--text-light);}
+
+@media(max-width:768px){.profile-layout{grid-template-columns:1fr;}.cal-grid{gap:2px;}.cal-day{padding:6px 2px;font-size:0.68rem;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="profile-layout">
+<div>
+    <div class="profile-card">
+        <div class="profile-photo" id="photoBox" style="cursor:pointer;" title="Click to change photo" onclick="document.getElementById('photoInput').click();">👤</div>
+        <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto(this)">
+        <div id="photoStatus" style="font-size:0.62rem;color:var(--text-light);margin-bottom:4px;"></div>
+        <div class="p-name" id="pName">Loading...</div>
+        <div class="p-desg" id="pDesg"></div>
+        <div id="pBadge"></div>
+        <div class="p-info" id="pInfo"></div>
+        <div class="stat-row" id="pStats"></div>
+        <div style="margin-top:8px;text-align:center;">
+            <button style="background:var(--bg,#f1f5f9);color:var(--text);border:1px solid var(--border-light);padding:5px 10px;border-radius:8px;font-size:0.70rem;font-weight:700;cursor:pointer;" onclick="document.getElementById('photoInput').click();"><i class="fas fa-camera"></i> Update Photo</button>
+        </div>
+        <div id="lastUpdated" style="margin-top:10px;font-size:0.58rem;color:var(--text-light);text-align:center;"></div>
+    </div>
+</div>
+<div>
+    <!-- Assignments -->
+    <div class="sec-card">
+        <h3>📚 Teaching Assignments</h3>
+        <div id="assignArea"><div style="text-align:center;color:var(--text-light);padding:12px;">Loading...</div></div>
+    </div>
+    <!-- Contact & Details -->
+    <div class="sec-card">
+        <h3>📋 Contact & Details</h3>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;" id="detailGrid"></div>
+    </div>
+    <!-- Awards -->
+    <div class="sec-card">
+        <h3>🏆 Awards & Recognition</h3>
+        <div class="award-grid" id="awardGrid"><div style="text-align:center;color:var(--text-light);padding:12px;grid-column:1/-1;">Loading...</div></div>
+    </div>
+    <!-- Attendance Calendar -->
+    <div class="sec-card">
+        <h3>📅 Attendance</h3>
+        <div class="cal-summary" id="calSummary"></div>
+        <div class="cal-nav">
+            <button onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+            <div class="cal-month" id="calTitle">-</div>
+            <button onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="day-panel" id="dayPanel">
+            <div class="dp-date" id="dpDate"></div>
+            <div class="dp-status" id="dpStatus"></div>
+            <div class="dp-times" id="dpTimes"></div>
+            <div class="dp-remarks" id="dpRemarks"></div>
+        </div>
+    </div>
+</div></div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+var tid='{{ teacher_id | default("") }}';
+var T=null, calMonth=new Date().getMonth()+1, calYear=new Date().getFullYear(), calData=null;
+var MONTHS=['','January','February','March','April','May','June','July','August','September','October','November','December'];
+
+async function load(){
+try{
+    const r=await fetch(`/api/school/teachers/${tid}/profile-full`,{credentials:'same-origin'});
+    const d=await r.json();
+    if(d.error)return;
+    T=d.teacher;
+    const asgn=d.assignments||[];
+    const awards=d.awards||[];
+    const att=d.attendance_summary||{};
+
+    // Profile card
+    document.getElementById('pName').textContent=T.full_name;
+    document.getElementById('pDesg').textContent=T.designation||'Teacher';
+    if(T.photo_url) document.getElementById('photoBox').innerHTML=`<img src="${T.photo_url}">`;
+
+    const wsColors={available:'#D1FAE5',on_leave:'#FEF3C7',suspended:'#FEE2E2',resigned:'#F3E8FF'};
+    const wsLabels={available:'Active',on_leave:'On Leave',suspended:'Suspended',resigned:'Resigned'};
+    const ws=T.work_status||'available';
+    document.getElementById('pBadge').innerHTML=`<div class="p-badge" style="background:${wsColors[ws]||'#E2E8F0'};">${wsLabels[ws]||ws}</div>`
+        + (T.is_class_teacher?`<div class="p-badge" style="background:#DBEAFE;margin-left:4px;">🎓 CT: ${T.class_teacher_of}</div>`:'')
+        + (T.house_name?`<div class="p-badge" style="background:${T.house_color||'#6366F1'};color:white;margin-left:4px;">🏠 ${T.house_name}</div>`:'');
+
+    // Info rows
+    document.getElementById('pInfo').innerHTML=[
+        {l:'Employee ID',v:T.employee_id},
+        {l:'Qualification',v:T.qualification},
+        {l:'Specialization',v:T.specialization},
+        {l:'Experience',v:T.experience_years?T.experience_years+' years':''},
+        {l:'Joined',v:T.joining_date},
+        {l:'Phone',v:T.phone},
+        {l:'Email',v:T.email},
+        {l:'Address',v:T.address},
+    ].filter(x=>x.v).map(x=>`<div class="p-info-row"><span class="p-info-lbl">${x.l}</span><span class="p-info-val">${x.v}</span></div>`).join('');
+
+    // Stats
+    const tm=att.this_month||{};
+    const ov=att.overall||{};
+    document.getElementById('pStats').innerHTML=`
+        <div class="stat-box"><div class="stat-num" style="color:#059669;">${tm.percentage||0}%</div><div class="stat-lbl">This Month</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:#0369A1;">${ov.percentage||0}%</div><div class="stat-lbl">Overall</div></div>
+    `;
+
+    // Detail grid (Contact, Address, Emergency, Transport)
+    document.getElementById('detailGrid').innerHTML=[
+        {l:'Phone',v:T.phone},{l:'Email',v:T.email},{l:'Address',v:T.address},
+        {l:'City',v:T.city},{l:'State',v:T.state},{l:'Pincode',v:T.pincode},
+        {l:'Emergency Contact',v:T.emergency_contact},{l:'Emergency Name',v:T.emergency_contact_name},
+        {l:'Transport',v:T.uses_transport?'Yes 🚌 '+(T.transport_route||''):'No'},
+    ].map(x=>`<div><div style="font-size:0.58rem;text-transform:uppercase;font-weight:700;color:var(--text-light);">${x.l}</div><div style="font-size:0.85rem;font-weight:700;">${x.v||'-'}</div></div>`).join('');
+
+    // Assignments
+    if(asgn.length){
+        let html='<table class="assign-tbl"><thead><tr><th>Class</th><th>Section</th><th>Subject</th></tr></thead><tbody>';
+        asgn.forEach(a=>html+=`<tr><td>${a.class_name}</td><td>${a.section_name||'-'}</td><td>${a.subject_name}</td></tr>`);
+        html+='</tbody></table>';
+        document.getElementById('assignArea').innerHTML=html;
+    } else {
+        document.getElementById('assignArea').innerHTML='<div style="text-align:center;color:var(--text-light);padding:12px;">No teaching assignments</div>';
+    }
+
+    // Awards
+    if(awards.length){
+        document.getElementById('awardGrid').innerHTML=awards.map(a=>`<div class="award-card">
+            <div class="award-icon">${a.title.match(/^[^\s]+/)?.[0]||'🏆'}</div>
+            <div><div class="award-title">${a.title}</div>
+            <div class="award-meta">${a.month} ${a.year}</div>
+            ${a.prize?`<div class="award-prize">🎁 ${a.prize}</div>`:''}
+            ${a.description?`<div style="font-size:0.68rem;color:var(--text-light);margin-top:2px;">${a.description}</div>`:''}</div></div>`).join('');
+    } else {
+        document.getElementById('awardGrid').innerHTML='<div style="text-align:center;color:var(--text-light);padding:12px;grid-column:1/-1;">No awards yet</div>';
+    }
+
+    // Last updated
+    if(T.updated_at){document.getElementById('lastUpdated').innerHTML=`<i class="fas fa-clock"></i> Last updated: ${T.updated_at}`;}
+
+    loadCalendar();
+}catch(e){console.error(e);}}
+
+/* ── Photo Upload ── */
+async function uploadPhoto(input){
+    if(!input.files||!input.files[0])return;
+    var file=input.files[0];
+    if(file.size>512000){showToast('error','Photo must be under 500KB');return;}
+    var role='{{ user.role }}';
+    if(role==='school_admin'){
+        var fd=new FormData();fd.append('file',file);
+        try{var r=await fetch('/api/school/teachers/'+tid+'/photo',{method:'POST',body:fd,credentials:'same-origin'});
+        var d=await r.json();if(d.photo_url){document.getElementById('photoBox').innerHTML='<img src="'+d.photo_url+'">';showToast('success','Photo updated');}
+        else{showToast('error',d.error||'Failed');}}
+        catch(e){showToast('error','Upload failed');}
+    } else {
+        var fd=new FormData();fd.append('file',file);fd.append('entity_type','teacher');fd.append('entity_id',tid);
+        try{var r=await fetch('/api/school/photo-request',{method:'POST',body:fd,credentials:'same-origin'});
+        var d=await r.json();if(d.success){showToast('success','Photo submitted for admin approval');document.getElementById('photoStatus').textContent='Pending approval';}
+        else{showToast('error',d.detail||'Failed');}}
+        catch(e){showToast('error','Upload failed');}
+    }
+    input.value='';
+}
+window.uploadPhoto=uploadPhoto;
+
+/* ── Calendar ── */
+async function loadCalendar(){
+try{
+    const r=await fetch(`/api/school/teachers/${tid}/attendance-calendar?month=${calMonth}&year=${calYear}`,{credentials:'same-origin'});
+    calData=await r.json();
+    if(calData.error)return;
+    renderCalendar();
+}catch(e){console.error('Calendar error',e);}}
+
+function renderCalendar(){
+    if(!calData)return;
+    const s=calData.summary;
+    document.getElementById('calTitle').textContent=`${MONTHS[calData.month]} ${calData.year}`;
+
+    document.getElementById('calSummary').innerHTML=`
+        <div class="cal-stat s-pct">📊 ${s.percentage}%</div>
+        <div class="cal-stat s-present">✅ ${s.present} Present</div>
+        <div class="cal-stat s-absent">❌ ${s.absent} Absent</div>
+        ${s.late?`<div class="cal-stat s-late">⏰ ${s.late} Late</div>`:''}
+        ${s.on_leave?`<div class="cal-stat s-on_leave">📋 ${s.on_leave} On Leave</div>`:''}
+    `;
+
+    let html='<div class="cal-hdr">Mon</div><div class="cal-hdr">Tue</div><div class="cal-hdr">Wed</div><div class="cal-hdr">Thu</div><div class="cal-hdr">Fri</div><div class="cal-hdr">Sat</div><div class="cal-hdr">Sun</div>';
+    const firstDay=new Date(calData.year, calData.month-1, 1).getDay();
+    const offset=firstDay===0?6:firstDay-1;
+    for(let i=0;i<offset;i++) html+='<div class="cal-day empty"></div>';
+
+    calData.days.forEach(d=>{
+        let cls='cal-day';
+        if(d.is_weekend) cls+=' weekend';
+        else if(d.is_holiday) cls+=' holiday';
+        else if(d.is_future) cls+=' future';
+        else if(d.status) cls+=' '+d.status;
+        else cls+=' absent';
+        const click=(!d.is_weekend&&!d.is_future)?` onclick="showDay(${d.day})"`:'';
+        html+=`<div class="${cls}" data-day="${d.day}"${click}>${d.day}</div>`;
+    });
+    document.getElementById('calGrid').innerHTML=html;
+    document.getElementById('dayPanel').classList.remove('show');
+}
+
+function showDay(dayNum){
+    if(!calData)return;
+    const d=calData.days.find(x=>x.day===dayNum);
+    if(!d)return;
+
+    document.querySelectorAll('.cal-day.selected').forEach(el=>el.classList.remove('selected'));
+    const el=document.querySelector(`.cal-day[data-day="${dayNum}"]`);
+    if(el)el.classList.add('selected');
+
+    const panel=document.getElementById('dayPanel');
+    const dt=new Date(calData.year, calData.month-1, dayNum);
+    const dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    document.getElementById('dpDate').textContent=`${dayNames[dt.getDay()]}, ${dayNum} ${MONTHS[calData.month]} ${calData.year}`;
+
+    const icons={present:'✅ Present',absent:'❌ Absent',late:'⏰ Late',half_day:'½ Half Day',on_leave:'📋 On Leave',holiday:'🎉 Holiday'};
+    document.getElementById('dpStatus').textContent=icons[d.status]||d.status||'No record';
+
+    let times='';
+    if(d.check_in) times+=`<span>🟢 Check-in: <b>${d.check_in}</b></span>`;
+    if(d.check_out) times+=`<span>🔴 Check-out: <b>${d.check_out}</b></span>`;
+    if(!d.check_in&&!d.check_out&&d.status==='present') times='<span style="color:var(--text-light);">Time not recorded</span>';
+    document.getElementById('dpTimes').innerHTML=times;
+
+    let remarks=d.remarks?`Remarks: ${d.remarks}`:'';
+    if(d.source) remarks+=(remarks?' · ':'')+`Source: ${d.source.replace(/_/g,' ')}`;
+    document.getElementById('dpRemarks').textContent=remarks;
+    panel.classList.add('show');
+}
+
+window.changeMonth=function(delta){
+    calMonth+=delta;
+    if(calMonth>12){calMonth=1;calYear++;}
+    if(calMonth<1){calMonth=12;calYear--;}
+    loadCalendar();
+};
+
+window.showDay=showDay;
+load();
+})();
+</script>
+{% endblock %}

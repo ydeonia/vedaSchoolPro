@@ -21,7 +21,9 @@ class Activity(Base):
     venue = Column(String(200), nullable=True)
     max_participants = Column(Integer, nullable=True)
     eligible_classes = Column(JSONB, nullable=True)
-    status = Column(String(20), default="upcoming")
+    target_audience = Column(JSONB, nullable=True)  # ["all_students", "class_5", "teachers", "non_teaching_staff"]
+    status = Column(String(20), default="draft")  # draft, published, upcoming, open, ongoing, completed, cancelled
+    published_at = Column(DateTime, nullable=True)
     is_active = Column(Boolean, default=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())

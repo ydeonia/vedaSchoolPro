@@ -89,12 +89,13 @@ async function submitComplaint() {
     } catch(e) { showToast('error', 'Error', e.message); }
 }
 async function escalate(id) {
-    if (!confirm('Escalate this complaint to the Principal?')) return;
-    try {
-        await apiCall(`/api/student/complaints/${id}/escalate`, 'POST');
-        showToast('success', 'Escalated', 'Principal has been notified.');
-        setTimeout(() => location.reload(), 1000);
-    } catch(e) { showToast('error', 'Error', e.message); }
+    showConfirm('Confirm', 'Escalate this complaint to the Principal?', async () => {
+        try {
+            await apiCall(`/api/student/complaints/${id}/escalate`, 'POST');
+            showToast('success', 'Escalated', 'Principal has been notified.');
+            setTimeout(() => location.reload(), 1000);
+        } catch(e) { showToast('error', 'Error', e.message); }
+    }, {icon:'⚠️'});
 }
 </script>
 {% endblock %}

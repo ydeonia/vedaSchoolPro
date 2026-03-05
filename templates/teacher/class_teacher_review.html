@@ -1,0 +1,864 @@
+{% extends "base.html" %}
+{% block title %}Class Teacher Review{% endblock %}
+{% block page_title %}Class Teacher Review{% endblock %}
+{% block page_subtitle %}Review all subjects' marks and publish results{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Toast & Confirm overrides for this page */
+@keyframes slideIn { from { opacity:0; transform:translateX(60px); } to { opacity:1; transform:translateX(0); } }
+@keyframes slideOut { to { opacity:0; transform:translateX(60px); } }
+
+#ctToastContainer {
+    position:fixed; top:20px; right:20px; z-index:99999;
+    display:flex; flex-direction:column; gap:8px;
+}
+
+/* Page header */
+.ct-header {
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;
+    margin-bottom:20px;
+}
+.ct-header-left h1 {
+    font-size:1.4rem; font-weight:900; color:var(--text); margin:0;
+}
+.ct-header-left .ct-subtitle {
+    font-size:0.85rem; color:var(--text-secondary); margin-top:2px; font-weight:500;
+}
+.ct-class-badge {
+    display:inline-flex; align-items:center; gap:6px; padding:4px 14px;
+    background:var(--primary); color:white; border-radius:20px;
+    font-size:0.78rem; font-weight:700;
+}
+
+/* Not assigned message */
+.ct-not-assigned {
+    text-align:center; padding:60px 20px;
+    background:var(--bg-card); border-radius:16px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+.ct-not-assigned i { font-size:3rem; color:var(--text-secondary); opacity:0.3; }
+.ct-not-assigned h3 { margin-top:16px; color:var(--text); font-size:1.1rem; }
+.ct-not-assigned p { color:var(--text-secondary); font-size:0.85rem; margin-top:6px; }
+
+/* Cycles grid */
+.cycles-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+    gap:14px; margin-bottom:20px;
+}
+.cycle-card {
+    background:var(--bg-card); border-radius:14px; padding:18px 20px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.06); border:1.5px solid var(--border);
+    transition:border-color 0.2s, box-shadow 0.2s; cursor:default;
+}
+.cycle-card:hover { border-color:var(--primary); box-shadow:0 4px 16px rgba(0,0,0,0.08); }
+.cycle-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.cycle-card-top h3 { font-size:0.95rem; font-weight:800; color:var(--text); margin:0; }
+.cycle-deadline { font-size:0.72rem; color:var(--text-secondary); margin-bottom:14px; display:flex; align-items:center; gap:5px; }
+.cycle-deadline i { font-size:0.65rem; }
+
+/* Status badges */
+.status-badge {
+    display:inline-flex; align-items:center; gap:4px; padding:3px 10px;
+    border-radius:8px; font-size:0.68rem; font-weight:700; white-space:nowrap;
+}
+.status-badge.verification_pending { background:#FEF3C7; color:#B45309; }
+.status-badge.locked { background:#DBEAFE; color:#2563EB; }
+.status-badge.published { background:#D1FAE5; color:#059669; }
+
+/* Review panel */
+.review-panel {
+    background:var(--bg-card); border-radius:16px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.06); overflow:hidden;
+    margin-bottom:20px; border:1px solid var(--border);
+}
+.review-panel-header {
+    padding:18px 22px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+}
+.review-panel-header h2 { font-size:1.05rem; font-weight:800; margin:0; color:var(--text); }
+.review-back-btn {
+    display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+    border-radius:8px; border:1px solid var(--border); background:var(--bg-card);
+    color:var(--text-secondary); font-size:0.78rem; font-weight:600; cursor:pointer;
+    transition:all 0.2s;
+}
+.review-back-btn:hover { background:var(--bg); border-color:var(--primary); color:var(--primary); }
+
+/* Subject teacher pills */
+.subject-pills {
+    display:flex; flex-wrap:wrap; gap:8px; padding:14px 22px;
+    border-bottom:1px solid var(--border); background:var(--bg);
+}
+.subject-pill {
+    display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+    border-radius:20px; font-size:0.75rem; font-weight:600;
+    border:1px solid var(--border); background:var(--bg-card);
+}
+.subject-pill .pill-dot {
+    width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.subject-pill .pill-dot.submitted { background:#10B981; }
+.subject-pill .pill-dot.pending { background:#9CA3AF; }
+.subject-pill .pill-teacher { color:var(--text-secondary); font-size:0.68rem; }
+
+/* Compiled marks table */
+.compiled-table-wrap {
+    overflow-x:auto; padding:0;
+}
+.compiled-table {
+    width:100%; border-collapse:collapse; font-size:0.8rem; min-width:700px;
+}
+.compiled-table thead { background:var(--bg); }
+.compiled-table th {
+    padding:10px 8px; text-align:center; font-size:0.68rem;
+    text-transform:uppercase; color:var(--text-secondary); font-weight:700;
+    letter-spacing:0.03em; white-space:nowrap; position:sticky; top:0;
+    background:var(--bg); z-index:2; border-bottom:2px solid var(--border);
+}
+.compiled-table th:nth-child(1),
+.compiled-table th:nth-child(2),
+.compiled-table th:nth-child(3) { text-align:left; }
+.compiled-table td {
+    padding:8px 8px; border-bottom:1px solid var(--border);
+    text-align:center; vertical-align:middle;
+}
+.compiled-table td:nth-child(1),
+.compiled-table td:nth-child(2),
+.compiled-table td:nth-child(3) { text-align:left; }
+.compiled-table tr:hover { background:var(--bg); }
+.compiled-table tr.fail-row { background:#FEF2F2; }
+.compiled-table tr.fail-row:hover { background:#FEE2E2; }
+
+/* Marks cell styling */
+.mark-val { font-weight:700; font-size:0.82rem; }
+.mark-val.top-mark { color:#059669; }
+.mark-val.fail-mark { color:#DC2626; }
+.mark-code {
+    display:inline-block; padding:2px 7px; border-radius:6px;
+    font-size:0.65rem; font-weight:700;
+}
+.mark-code.ab { background:#FEE2E2; color:#DC2626; }
+.mark-code.ml { background:#FEF3C7; color:#B45309; }
+.mark-code.na { background:#F1F5F9; color:#64748B; }
+.mark-code.ex { background:#DBEAFE; color:#2563EB; }
+
+/* Rank styling */
+.rank-medal { font-size:1rem; }
+.rank-num { font-weight:700; color:var(--text-secondary); font-size:0.82rem; }
+
+/* Result badges */
+.result-badge {
+    display:inline-block; padding:3px 10px; border-radius:8px;
+    font-size:0.7rem; font-weight:700;
+}
+.result-badge.promoted { background:#D1FAE5; color:#059669; }
+.result-badge.compartment { background:#FEF3C7; color:#B45309; }
+.result-badge.detained { background:#FEE2E2; color:#DC2626; }
+
+/* Summary stats */
+.summary-stats {
+    display:flex; gap:12px; flex-wrap:wrap; padding:16px 22px;
+    border-top:1px solid var(--border); background:var(--bg);
+}
+.stat-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 16px; border-radius:10px;
+    background:var(--bg-card); border:1px solid var(--border);
+    font-size:0.78rem; font-weight:600; color:var(--text);
+}
+.stat-chip .stat-val { font-weight:900; }
+.stat-chip .stat-val.primary { color:var(--primary); }
+.stat-chip .stat-val.success { color:var(--success); }
+.stat-chip .stat-val.danger { color:var(--danger); }
+.stat-chip .stat-val.warning { color:var(--warning); }
+
+/* Remarks section */
+.remarks-section { padding:16px 22px; border-top:1px solid var(--border); }
+.remarks-section h3 {
+    font-size:0.88rem; font-weight:700; margin-bottom:12px; color:var(--text);
+}
+.remark-row {
+    display:flex; align-items:center; gap:10px; margin-bottom:8px;
+    padding:8px 12px; border-radius:10px; background:var(--bg);
+    border:1px solid var(--border); transition:all 0.2s;
+}
+.remark-row:hover { border-color:var(--primary); }
+.remark-name {
+    font-weight:700; font-size:0.8rem; color:var(--text); min-width:150px;
+    cursor:pointer; flex-shrink:0;
+}
+.remark-name:hover { color:var(--primary); }
+.remark-input {
+    flex:1; padding:7px 12px; border-radius:8px; border:1px solid var(--border);
+    font-size:0.8rem; background:var(--bg-card); color:var(--text);
+    font-family:inherit; resize:none; min-height:34px;
+}
+.remark-input:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(99,102,241,0.1); }
+.remarks-toggle {
+    display:flex; align-items:center; gap:6px; padding:8px 16px;
+    border-radius:8px; border:1px solid var(--border); background:var(--bg-card);
+    color:var(--text-secondary); font-size:0.78rem; font-weight:600;
+    cursor:pointer; transition:all 0.2s; margin-bottom:12px;
+}
+.remarks-toggle:hover { background:var(--bg); border-color:var(--primary); color:var(--primary); }
+.remarks-toggle i { font-size:0.7rem; transition:transform 0.2s; }
+.remarks-toggle.open i { transform:rotate(90deg); }
+
+/* Sticky action bar */
+.action-bar {
+    position:sticky; bottom:0; z-index:10;
+    background:var(--bg-card); border-top:2px solid var(--border);
+    padding:14px 22px; display:flex; align-items:center;
+    justify-content:space-between; gap:12px; flex-wrap:wrap;
+    box-shadow:0 -4px 16px rgba(0,0,0,0.06);
+}
+.action-bar-info { font-size:0.78rem; color:var(--text-secondary); }
+.action-bar-buttons { display:flex; gap:10px; align-items:center; }
+
+.btn-lock {
+    padding:10px 22px; border-radius:10px; border:none;
+    background:var(--warning); color:white; font-weight:700;
+    font-size:0.85rem; cursor:pointer; display:inline-flex;
+    align-items:center; gap:8px; transition:all 0.2s;
+}
+.btn-lock:hover { filter:brightness(1.1); transform:translateY(-1px); }
+
+.btn-publish {
+    padding:10px 22px; border-radius:10px; border:none;
+    background:var(--success); color:white; font-weight:700;
+    font-size:0.85rem; cursor:pointer; display:inline-flex;
+    align-items:center; gap:8px; transition:all 0.2s;
+}
+.btn-publish:hover { filter:brightness(1.1); transform:translateY(-1px); }
+
+.published-info {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 16px; border-radius:10px; background:#D1FAE5;
+    color:#059669; font-weight:700; font-size:0.82rem;
+}
+
+/* Loading spinner */
+.ct-loading {
+    text-align:center; padding:60px 20px;
+}
+.ct-loading i { font-size:2rem; color:var(--primary); }
+
+/* Empty state */
+.ct-empty {
+    text-align:center; padding:50px 20px;
+    background:var(--bg-card); border-radius:14px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.06);
+}
+.ct-empty i { font-size:2.5rem; color:var(--text-secondary); opacity:0.25; }
+.ct-empty h3 { margin-top:12px; font-size:1rem; color:var(--text); }
+.ct-empty p { color:var(--text-secondary); font-size:0.82rem; margin-top:4px; }
+
+/* Responsive */
+@media(max-width:768px) {
+    .ct-header { flex-direction:column; align-items:flex-start; }
+    .cycles-grid { grid-template-columns:1fr; }
+    .summary-stats { flex-direction:column; }
+    .action-bar { flex-direction:column; align-items:stretch; }
+    .action-bar-buttons { justify-content:center; }
+    .remark-row { flex-direction:column; align-items:stretch; }
+    .remark-name { min-width:auto; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="ctToastContainer"></div>
+
+<!-- Page header -->
+<div class="ct-header">
+    <div class="ct-header-left">
+        <h1><i class="fas fa-clipboard-check" style="color:var(--primary); margin-right:8px;"></i>Class Teacher Review</h1>
+        <div class="ct-subtitle" id="ctSubtitle">Loading assignment...</div>
+    </div>
+    <div id="ctClassBadge" style="display:none;">
+        <span class="ct-class-badge"><i class="fas fa-chalkboard"></i> <span id="ctClassName"></span></span>
+    </div>
+</div>
+
+<!-- Not assigned state -->
+<div id="notAssignedState" style="display:none;">
+    <div class="ct-not-assigned">
+        <i class="fas fa-user-slash"></i>
+        <h3>Not Assigned as Class Teacher</h3>
+        <p>You are not assigned as a class teacher for any section. Please contact your school administrator if you believe this is an error.</p>
+    </div>
+</div>
+
+<!-- Loading state -->
+<div id="loadingState">
+    <div class="ct-loading">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p style="margin-top:12px; color:var(--text-secondary); font-size:0.85rem;">Loading review data...</p>
+    </div>
+</div>
+
+<!-- Cycles list -->
+<div id="cyclesSection" style="display:none;">
+    <div style="margin-bottom:14px;">
+        <h2 style="font-size:1rem; font-weight:800; color:var(--text);"><i class="fas fa-layer-group" style="color:var(--warning); margin-right:6px;"></i>Exam Cycles Pending Review</h2>
+    </div>
+    <div class="cycles-grid" id="cyclesGrid"></div>
+</div>
+
+<!-- No cycles empty state -->
+<div id="noCyclesState" style="display:none;">
+    <div class="ct-empty">
+        <i class="fas fa-calendar-check"></i>
+        <h3>No Exam Cycles Available</h3>
+        <p>There are no exam cycles ready for review at this time. Check back after subject teachers submit their marks.</p>
+    </div>
+</div>
+
+<!-- Review Panel -->
+<div id="reviewPanel" style="display:none;">
+    <div class="review-panel">
+        <!-- Panel Header -->
+        <div class="review-panel-header">
+            <div>
+                <h2 id="reviewExamName">Exam Review</h2>
+                <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;" id="reviewCycleInfo"></div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span id="reviewStatusBadge"></span>
+                <button class="review-back-btn" onclick="backToCycles()">
+                    <i class="fas fa-arrow-left"></i> Back to Cycles
+                </button>
+            </div>
+        </div>
+
+        <!-- Subject Teachers Status -->
+        <div class="subject-pills" id="subjectPills"></div>
+
+        <!-- Compiled Marks Table -->
+        <div class="compiled-table-wrap" id="compiledTableWrap">
+            <div class="ct-loading" style="padding:40px;">
+                <i class="fas fa-spinner fa-spin"></i>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="summary-stats" id="summaryStats" style="display:none;"></div>
+
+        <!-- Remarks Section -->
+        <div class="remarks-section" id="remarksSection" style="display:none;">
+            <button class="remarks-toggle" id="remarksToggle" onclick="toggleRemarks()">
+                <i class="fas fa-chevron-right"></i> Student Remarks <span style="opacity:0.6; font-size:0.7rem;">(click to expand)</span>
+            </button>
+            <div id="remarksBody" style="display:none; max-height:400px; overflow-y:auto;"></div>
+        </div>
+
+        <!-- Sticky Action Bar -->
+        <div class="action-bar" id="actionBar" style="display:none;"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% raw %}
+// ── Toast & Confirm (page-specific, using #ctToastContainer) ──
+function ctShowToast(message, type='success', duration=4000) {
+    const toast = document.createElement('div');
+    const colors = {success:'#10B981',error:'#EF4444',warning:'#F59E0B',info:'#3B82F6'};
+    const icons = {success:'fa-check-circle',error:'fa-times-circle',warning:'fa-exclamation-triangle',info:'fa-info-circle'};
+    toast.style.cssText = `display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--bg-card);border-left:4px solid ${colors[type]};border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:300px;max-width:450px;animation:slideIn 0.3s ease;font-size:0.85rem;color:var(--text);`;
+    toast.innerHTML = `<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:1.1rem;"></i><span style="flex:1">${message}</span><i class="fas fa-times" style="cursor:pointer;color:var(--text-secondary);font-size:0.8rem;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('ctToastContainer').appendChild(toast);
+    setTimeout(() => { toast.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(),300); }, duration);
+}
+
+function ctShowConfirm(message, title='Confirm Action') {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99998;display:flex;align-items:center;justify-content:center;';
+        overlay.innerHTML = `<div class="modal-box" style="max-width:420px;padding:28px;background:var(--bg-card);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,0.2);">
+            <h3 style="margin-bottom:8px;color:var(--text);font-size:1.1rem;">${title}</h3>
+            <p style="color:var(--text-secondary);margin-bottom:24px;font-size:0.9rem;line-height:1.5;">${message}</p>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+                <button class="btn btn-ghost" id="ctConfirmCancel" style="padding:8px 20px;">Cancel</button>
+                <button class="btn btn-primary" id="ctConfirmOk" style="padding:8px 20px;">Confirm</button>
+            </div>
+        </div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#ctConfirmCancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.querySelector('#ctConfirmOk').onclick = () => { overlay.remove(); resolve(true); };
+    });
+}
+
+// ── State ──
+let isClassTeacher = false;
+let classInfo = {};
+let cycles = [];
+let currentCycleId = null;
+let reviewData = null;
+let studentRemarks = {};
+
+// ── Init ──
+async function init() {
+    try {
+        const res = await fetch('/api/report-card/class-teacher/my-reviews', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('Failed to load reviews');
+        const data = await res.json();
+
+        document.getElementById('loadingState').style.display = 'none';
+
+        if (data.error || !data.is_class_teacher) {
+            isClassTeacher = false;
+            document.getElementById('notAssignedState').style.display = 'block';
+            document.getElementById('ctSubtitle').textContent = 'No class assignment found';
+            return;
+        }
+
+        isClassTeacher = true;
+        classInfo = data.class_info || {};
+        cycles = data.cycles || [];
+
+        // Update header
+        const className = classInfo.class_name || 'Class';
+        const sectionName = classInfo.section_name || '';
+        document.getElementById('ctSubtitle').textContent = `${className} — Section ${sectionName}`;
+        document.getElementById('ctClassName').textContent = `${className} — ${sectionName}`;
+        document.getElementById('ctClassBadge').style.display = 'block';
+
+        renderCycles();
+    } catch (e) {
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('notAssignedState').style.display = 'block';
+        document.getElementById('ctSubtitle').textContent = 'Could not load data';
+        console.error('Init error:', e);
+    }
+}
+
+// ── Render Cycles ──
+function renderCycles() {
+    if (cycles.length === 0) {
+        document.getElementById('noCyclesState').style.display = 'block';
+        return;
+    }
+
+    document.getElementById('cyclesSection').style.display = 'block';
+    const grid = document.getElementById('cyclesGrid');
+
+    grid.innerHTML = cycles.map(c => {
+        const statusClass = c.status || 'verification_pending';
+        const statusLabels = {
+            verification_pending: 'Pending Verification',
+            locked: 'Locked & Verified',
+            published: 'Published'
+        };
+        const statusIcons = {
+            verification_pending: 'fa-clock',
+            locked: 'fa-lock',
+            published: 'fa-check-circle'
+        };
+        const deadlineStr = c.deadline ? new Date(c.deadline).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'No deadline';
+
+        return `<div class="cycle-card">
+            <div class="cycle-card-top">
+                <h3>${escHtml(c.exam_name || c.name || 'Exam Cycle')}</h3>
+                <span class="status-badge ${statusClass}">
+                    <i class="fas ${statusIcons[statusClass]}"></i> ${statusLabels[statusClass] || statusClass}
+                </span>
+            </div>
+            <div class="cycle-deadline"><i class="fas fa-calendar-alt"></i> Deadline: ${deadlineStr}</div>
+            <button class="btn btn-primary" style="width:100%; padding:9px;" onclick="loadReviewPanel('${c.id}')">
+                <i class="fas fa-search"></i> Review Marks
+            </button>
+        </div>`;
+    }).join('');
+}
+
+// ── Load Review Panel ──
+async function loadReviewPanel(cycleId) {
+    currentCycleId = cycleId;
+    const cycle = cycles.find(c => c.id == cycleId);
+
+    // Hide cycles, show review panel
+    document.getElementById('cyclesSection').style.display = 'none';
+    document.getElementById('noCyclesState').style.display = 'none';
+    document.getElementById('reviewPanel').style.display = 'block';
+
+    // Set header
+    document.getElementById('reviewExamName').textContent = cycle ? (cycle.exam_name || cycle.name || 'Exam Review') : 'Exam Review';
+
+    const statusClass = cycle ? (cycle.status || 'verification_pending') : 'verification_pending';
+    const statusLabels = { verification_pending:'Pending Verification', locked:'Locked & Verified', published:'Published' };
+    document.getElementById('reviewStatusBadge').innerHTML = `<span class="status-badge ${statusClass}"><i class="fas ${statusClass === 'published' ? 'fa-check-circle' : statusClass === 'locked' ? 'fa-lock' : 'fa-clock'}"></i> ${statusLabels[statusClass] || statusClass}</span>`;
+    document.getElementById('reviewCycleInfo').textContent = cycle && cycle.deadline ? `Deadline: ${new Date(cycle.deadline).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}` : '';
+
+    // Load data
+    document.getElementById('compiledTableWrap').innerHTML = '<div class="ct-loading" style="padding:40px;"><i class="fas fa-spinner fa-spin"></i></div>';
+    document.getElementById('summaryStats').style.display = 'none';
+    document.getElementById('remarksSection').style.display = 'none';
+    document.getElementById('actionBar').style.display = 'none';
+
+    try {
+        const res = await fetch(`/api/report-card/class-teacher/review-data?cycle_id=${cycleId}`, { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('Failed to load review data');
+        reviewData = await res.json();
+
+        if (reviewData.error) {
+            document.getElementById('compiledTableWrap').innerHTML = `<div class="ct-empty" style="border-radius:0;"><i class="fas fa-exclamation-circle"></i><h3>Error</h3><p>${escHtml(reviewData.error)}</p></div>`;
+            return;
+        }
+
+        renderSubjectPills(reviewData.subjects || []);
+        renderCompiledTable(reviewData);
+        renderSummaryStats(reviewData);
+        renderRemarks(reviewData.students || []);
+        renderActionBar(cycle);
+    } catch (e) {
+        document.getElementById('compiledTableWrap').innerHTML = `<div class="ct-empty" style="border-radius:0;"><i class="fas fa-exclamation-circle"></i><h3>Failed to Load</h3><p>Could not load review data. Please try again.</p></div>`;
+        console.error('Review load error:', e);
+    }
+}
+
+// ── Back to Cycles ──
+function backToCycles() {
+    document.getElementById('reviewPanel').style.display = 'none';
+    currentCycleId = null;
+    reviewData = null;
+    studentRemarks = {};
+    renderCycles();
+    if (cycles.length > 0) {
+        document.getElementById('cyclesSection').style.display = 'block';
+    } else {
+        document.getElementById('noCyclesState').style.display = 'block';
+    }
+}
+
+// ── Render Subject Teacher Pills ──
+function renderSubjectPills(subjects) {
+    const container = document.getElementById('subjectPills');
+    if (!subjects || subjects.length === 0) {
+        container.innerHTML = '<span style="color:var(--text-secondary); font-size:0.8rem; padding:4px 0;">No subject data available</span>';
+        return;
+    }
+    container.innerHTML = subjects.map(s => {
+        const isSubmitted = s.status === 'submitted' || s.marks_entered;
+        return `<div class="subject-pill">
+            <span class="pill-dot ${isSubmitted ? 'submitted' : 'pending'}"></span>
+            <span style="font-weight:700;">${escHtml(s.subject_name || s.name || '')}</span>
+            <span class="pill-teacher">${escHtml(s.teacher_name || '')}</span>
+            <span style="font-size:0.62rem; color:${isSubmitted ? '#10B981' : '#9CA3AF'};">${isSubmitted ? 'Submitted' : 'Pending'}</span>
+        </div>`;
+    }).join('');
+}
+
+// ── Render Compiled Table ──
+function renderCompiledTable(data) {
+    const subjects = data.subjects || [];
+    const students = data.students || [];
+    const container = document.getElementById('compiledTableWrap');
+
+    if (students.length === 0) {
+        container.innerHTML = '<div class="ct-empty" style="border-radius:0;"><i class="fas fa-user-graduate"></i><h3>No Student Data</h3><p>No student marks found for this exam cycle.</p></div>';
+        return;
+    }
+
+    // Find top marks per subject for highlighting
+    const topMarks = {};
+    subjects.forEach((subj, si) => {
+        let max = -1;
+        students.forEach(st => {
+            const m = st.marks && st.marks[si];
+            if (m && typeof m.value === 'number' && m.value > max) max = m.value;
+        });
+        topMarks[si] = max;
+    });
+
+    let html = '<table class="compiled-table"><thead><tr>';
+    html += '<th style="width:40px;">S.No</th>';
+    html += '<th style="min-width:160px;">Student Name</th>';
+    html += '<th style="width:60px;">Roll</th>';
+
+    subjects.forEach(s => {
+        html += `<th>${escHtml(s.subject_name || s.name || '')}${s.max_marks ? '<br><span style="font-weight:400; font-size:0.58rem;">(' + s.max_marks + ')</span>' : ''}</th>`;
+    });
+
+    html += '<th>Total</th><th>%</th><th>Grade</th><th>Rank</th><th>Result</th>';
+    html += '</tr></thead><tbody>';
+
+    students.forEach((st, idx) => {
+        const result = (st.result || '').toLowerCase();
+        const isFail = result === 'detained' || result === 'fail' || result === 'failed';
+        const isCompartment = result === 'compartment';
+
+        html += `<tr class="${isFail ? 'fail-row' : ''}">`;
+        html += `<td style="color:var(--text-secondary); font-weight:600;">${idx + 1}</td>`;
+        html += `<td style="font-weight:700;">${escHtml(st.name || '')}</td>`;
+        html += `<td style="color:var(--text-secondary);">${escHtml(st.roll || st.roll_no || '—')}</td>`;
+
+        // Subject marks
+        subjects.forEach((subj, si) => {
+            const m = st.marks && st.marks[si];
+            if (!m) {
+                html += '<td>—</td>';
+                return;
+            }
+            // Check for special codes
+            if (m.code) {
+                const codeClass = { 'AB':'ab', 'ML':'ml', 'NA':'na', 'EX':'ex' }[m.code.toUpperCase()] || 'na';
+                html += `<td><span class="mark-code ${codeClass}">${escHtml(m.code.toUpperCase())}</span></td>`;
+                return;
+            }
+            const val = m.value;
+            const isTop = val === topMarks[si] && val > 0;
+            const passingMarks = subj.passing_marks || subj.pass_marks || Math.floor((subj.max_marks || 100) * 0.33);
+            const isFailing = typeof val === 'number' && val < passingMarks;
+            let cls = '';
+            if (isTop) cls = 'top-mark';
+            else if (isFailing) cls = 'fail-mark';
+            html += `<td><span class="mark-val ${cls}">${val !== null && val !== undefined ? val : '—'}</span></td>`;
+        });
+
+        // Total, %, Grade
+        html += `<td style="font-weight:800;">${st.total !== null && st.total !== undefined ? st.total : '—'}</td>`;
+        html += `<td style="font-weight:700;">${st.percentage !== null && st.percentage !== undefined ? st.percentage + '%' : '—'}</td>`;
+        html += `<td><span style="font-weight:700; font-size:0.78rem;">${escHtml(st.grade || '—')}</span></td>`;
+
+        // Rank
+        if (st.rank === 1) {
+            html += '<td><span class="rank-medal" title="1st">&#x1F947;</span></td>';
+        } else if (st.rank === 2) {
+            html += '<td><span class="rank-medal" title="2nd">&#x1F948;</span></td>';
+        } else if (st.rank === 3) {
+            html += '<td><span class="rank-medal" title="3rd">&#x1F949;</span></td>';
+        } else {
+            html += `<td><span class="rank-num">${st.rank || '—'}</span></td>`;
+        }
+
+        // Result
+        if (result === 'promoted' || result === 'pass' || result === 'passed') {
+            html += '<td><span class="result-badge promoted">Promoted</span></td>';
+        } else if (isCompartment) {
+            html += '<td><span class="result-badge compartment">Compartment</span></td>';
+        } else if (isFail) {
+            html += '<td><span class="result-badge detained">Detained</span></td>';
+        } else {
+            html += `<td><span class="result-badge" style="background:var(--bg); color:var(--text-secondary);">${escHtml(st.result || '—')}</span></td>`;
+        }
+
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+// ── Render Summary Stats ──
+function renderSummaryStats(data) {
+    const students = data.students || [];
+    if (students.length === 0) return;
+
+    const total = students.length;
+    const passed = students.filter(s => {
+        const r = (s.result || '').toLowerCase();
+        return r === 'promoted' || r === 'pass' || r === 'passed';
+    }).length;
+    const failed = students.filter(s => {
+        const r = (s.result || '').toLowerCase();
+        return r === 'detained' || r === 'fail' || r === 'failed';
+    }).length;
+    const compartment = total - passed - failed;
+
+    const percentages = students.filter(s => typeof s.percentage === 'number').map(s => s.percentage);
+    const avgPct = percentages.length > 0 ? (percentages.reduce((a, b) => a + b, 0) / percentages.length).toFixed(1) : '—';
+    const highPct = percentages.length > 0 ? Math.max(...percentages).toFixed(1) : '—';
+    const lowPct = percentages.length > 0 ? Math.min(...percentages).toFixed(1) : '—';
+
+    const container = document.getElementById('summaryStats');
+    container.style.display = 'flex';
+    container.innerHTML = `
+        <div class="stat-chip"><i class="fas fa-users" style="color:var(--primary);"></i> Total: <span class="stat-val primary">${total}</span></div>
+        <div class="stat-chip"><i class="fas fa-check-circle" style="color:var(--success);"></i> Passed: <span class="stat-val success">${passed}</span></div>
+        <div class="stat-chip"><i class="fas fa-times-circle" style="color:var(--danger);"></i> Failed: <span class="stat-val danger">${failed}</span></div>
+        ${compartment > 0 ? `<div class="stat-chip"><i class="fas fa-exclamation-circle" style="color:var(--warning);"></i> Compartment: <span class="stat-val warning">${compartment}</span></div>` : ''}
+        <div class="stat-chip"><i class="fas fa-chart-line" style="color:var(--primary);"></i> Avg: <span class="stat-val primary">${avgPct}%</span></div>
+        <div class="stat-chip"><i class="fas fa-arrow-up" style="color:var(--success);"></i> Highest: <span class="stat-val success">${highPct}%</span></div>
+        <div class="stat-chip"><i class="fas fa-arrow-down" style="color:var(--danger);"></i> Lowest: <span class="stat-val danger">${lowPct}%</span></div>
+    `;
+}
+
+// ── Render Remarks ──
+function renderRemarks(students) {
+    if (students.length === 0) return;
+
+    document.getElementById('remarksSection').style.display = 'block';
+    studentRemarks = {};
+    students.forEach(st => { studentRemarks[st.id || st.student_id] = st.remark || st.remarks || ''; });
+
+    const body = document.getElementById('remarksBody');
+    body.innerHTML = students.map(st => {
+        const sid = st.id || st.student_id;
+        return `<div class="remark-row">
+            <span class="remark-name">${escHtml(st.name || '')}</span>
+            <input type="text" class="remark-input" placeholder="Add remark for ${escHtml(st.name || 'student')}..."
+                value="${escHtml(st.remark || st.remarks || '')}"
+                onchange="studentRemarks['${sid}'] = this.value"
+                oninput="studentRemarks['${sid}'] = this.value">
+        </div>`;
+    }).join('');
+}
+
+function toggleRemarks() {
+    const body = document.getElementById('remarksBody');
+    const toggle = document.getElementById('remarksToggle');
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : 'block';
+    toggle.classList.toggle('open', !isOpen);
+}
+
+// ── Render Action Bar ──
+function renderActionBar(cycle) {
+    if (!cycle) return;
+    const bar = document.getElementById('actionBar');
+    bar.style.display = 'flex';
+    const status = cycle.status || 'verification_pending';
+
+    if (status === 'verification_pending') {
+        bar.innerHTML = `
+            <div class="action-bar-info">
+                <i class="fas fa-info-circle" style="color:var(--warning);"></i>
+                Review all marks carefully before locking. Once locked, subject teachers cannot edit marks.
+            </div>
+            <div class="action-bar-buttons">
+                <button class="btn-lock" id="lockBtn" onclick="lockCycle()">
+                    <i class="fas fa-lock"></i> Lock & Verify
+                </button>
+            </div>
+        `;
+    } else if (status === 'locked') {
+        bar.innerHTML = `
+            <div class="action-bar-info">
+                <i class="fas fa-info-circle" style="color:var(--success);"></i>
+                Marks are locked. You can now publish results to make them visible to students and parents.
+            </div>
+            <div class="action-bar-buttons">
+                <button class="btn-publish" id="publishBtn" onclick="publishResults()">
+                    <i class="fas fa-paper-plane"></i> Publish Results
+                </button>
+            </div>
+        `;
+    } else if (status === 'published') {
+        const pubDate = cycle.published_at ? new Date(cycle.published_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
+        bar.innerHTML = `
+            <div class="action-bar-info">
+                <span class="published-info">
+                    <i class="fas fa-check-circle"></i> Published ${pubDate ? 'on ' + pubDate : ''}
+                </span>
+            </div>
+            <div class="action-bar-buttons">
+                <button class="btn btn-ghost" style="padding:10px 18px;" onclick="ctShowToast('Individual report card PDFs are available to students from their portal.', 'info', 5000)">
+                    <i class="fas fa-file-pdf" style="color:var(--danger);"></i> Download Report Cards
+                </button>
+            </div>
+        `;
+    }
+}
+
+// ── Lock Cycle ──
+async function lockCycle() {
+    const confirmed = await ctShowConfirm(
+        'Locking this cycle will prevent subject teachers from editing marks. You will still be able to review and publish results. Make sure all marks are correct before proceeding.',
+        'Lock & Verify Marks?'
+    );
+    if (!confirmed) return;
+
+    const btn = document.getElementById('lockBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Locking...'; }
+
+    try {
+        const res = await fetch('/api/report-card/class-teacher/lock', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cycle_id: currentCycleId,
+                remarks: studentRemarks
+            })
+        });
+        const result = await res.json();
+
+        if (!res.ok || result.error) {
+            throw new Error(result.error || 'Failed to lock cycle');
+        }
+
+        ctShowToast('Marks locked and verified successfully!', 'success');
+
+        // Update cycle status in local state
+        const cycle = cycles.find(c => c.id == currentCycleId);
+        if (cycle) cycle.status = 'locked';
+        renderActionBar(cycle);
+
+        // Update status badge
+        document.getElementById('reviewStatusBadge').innerHTML = '<span class="status-badge locked"><i class="fas fa-lock"></i> Locked & Verified</span>';
+    } catch (e) {
+        ctShowToast(e.message || 'Failed to lock cycle', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Lock & Verify'; }
+    }
+}
+
+// ── Publish Results ──
+async function publishResults() {
+    const confirmed = await ctShowConfirm(
+        'Publishing will make results visible to all students and parents. They will receive notifications. This action cannot be undone. Are you sure?',
+        'Publish Results?'
+    );
+    if (!confirmed) return;
+
+    const btn = document.getElementById('publishBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Publishing...'; }
+
+    try {
+        const res = await fetch('/api/report-card/class-teacher/publish', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cycle_id: currentCycleId })
+        });
+        const result = await res.json();
+
+        if (!res.ok || result.error) {
+            throw new Error(result.error || 'Failed to publish results');
+        }
+
+        ctShowToast('Results published successfully! Students have been notified.', 'success', 5000);
+
+        // Update cycle status
+        const cycle = cycles.find(c => c.id == currentCycleId);
+        if (cycle) {
+            cycle.status = 'published';
+            cycle.published_at = new Date().toISOString();
+        }
+        renderActionBar(cycle);
+
+        // Update status badge
+        document.getElementById('reviewStatusBadge').innerHTML = '<span class="status-badge published"><i class="fas fa-check-circle"></i> Published</span>';
+    } catch (e) {
+        ctShowToast(e.message || 'Failed to publish results', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Publish Results'; }
+    }
+}
+
+// ── Utility: HTML escape ──
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ── Boot ──
+document.addEventListener('DOMContentLoaded', init);
+{% endraw %}
+</script>
+{% endblock %}

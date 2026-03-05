@@ -14,6 +14,8 @@
     .live-card.blue::before { background: linear-gradient(90deg, #3B82F6, #60A5FA); }
     .live-card.orange::before { background: linear-gradient(90deg, #F59E0B, #FBBF24); }
     .live-card.purple::before { background: linear-gradient(90deg, #8B5CF6, #A78BFA); }
+    .live-card.pink::before { background: linear-gradient(90deg, #EC4899, #F472B6); }
+    .live-card.teal::before { background: linear-gradient(90deg, #14B8A6, #2DD4BF); }
     .live-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-light); font-weight: 700; }
     .live-value { font-size: 2rem; font-weight: 800; line-height: 1.1; margin: 4px 0; }
     .live-sub { font-size: 0.78rem; color: var(--text-secondary); }
@@ -51,7 +53,6 @@
     .qa-card:hover { background: var(--primary-50, rgba(99,102,241,0.1)); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
     .qa-card i { font-size: 1.3rem; color: var(--primary); }
     .qa-card span { font-size: 0.72rem; font-weight: 600; }
-    /* Pending action links - dark mode safe */
     .pending-action { text-decoration:none; display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--radius-sm); background:var(--bg-secondary); transition:all 0.2s; }
     .pending-action:hover { transform:translateX(3px); }
     .pending-action.has-items { background:rgba(217,119,6,0.08); }
@@ -60,12 +61,47 @@
     .pending-badge { padding:2px 10px; border-radius:12px; font-size:0.75rem; font-weight:800; background:var(--border); color:var(--text-light); }
     .pending-badge.active { background:var(--warning); color:white; }
     .pending-badge.danger { background:var(--danger); color:white; }
-    /* Milestones */
     .achievement-badge { padding:8px 14px; border-radius:10px; font-size:0.78rem; font-weight:700; }
     .achievement-badge.gold { background:rgba(245,158,11,0.12); color:#D97706; }
     .achievement-badge.green { background:rgba(34,197,94,0.12); color:#059669; }
-    @media (max-width: 1024px) { .live-grid { grid-template-columns: repeat(2, 1fr); } .cmd-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 640px) { .live-grid { grid-template-columns: 1fr; } .qa-grid { grid-template-columns: repeat(3, 1fr); } }
+
+    /* ── Student Summary Cards (Sapphire-style colorful) ── */
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .sum-card { border-radius: var(--radius); padding: 18px 20px; color: white; position: relative; overflow: hidden; transition: all 0.3s; cursor: pointer; text-decoration: none; display: block; }
+    .sum-card:hover { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .sum-card-icon { position: absolute; top: 14px; right: 14px; font-size: 1.5rem; opacity: 0.25; }
+    .sum-card-value { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+    .sum-card-label { font-size: 0.78rem; font-weight: 600; margin-top: 6px; opacity: 0.9; }
+    .sum-card.c-blue { background: linear-gradient(135deg, #3B82F6, #2563EB); }
+    .sum-card.c-green { background: linear-gradient(135deg, #10B981, #059669); }
+    .sum-card.c-orange { background: linear-gradient(135deg, #F59E0B, #D97706); }
+    .sum-card.c-red { background: linear-gradient(135deg, #EF4444, #DC2626); }
+    .sum-card.c-purple { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
+    .sum-card.c-teal { background: linear-gradient(135deg, #14B8A6, #0D9488); }
+
+    /* ── Charts Row ── */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .chart-card { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border-light); padding: 20px; }
+    .chart-card h3 { font-size: 0.88rem; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    /* Bar chart */
+    .bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding-top: 8px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .bar-fill { width: 100%; min-width: 20px; border-radius: 6px 6px 0 0; transition: height 0.8s ease; }
+    .bar-val { font-size: 0.7rem; font-weight: 700; color: var(--text); }
+    .bar-label { font-size: 0.65rem; color: var(--text-light); font-weight: 600; text-align: center; word-break: break-word; }
+    /* Pie chart (CSS-only donut) */
+    .pie-container { display: flex; align-items: center; justify-content: center; gap: 24px; }
+    .pie-donut { width: 140px; height: 140px; border-radius: 50%; position: relative; }
+    .pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 80px; height: 80px; border-radius: 50%; background: var(--bg-card); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .pie-center-val { font-size: 1.3rem; font-weight: 800; }
+    .pie-center-label { font-size: 0.65rem; color: var(--text-light); }
+    .pie-legend { display: flex; flex-direction: column; gap: 10px; }
+    .pie-legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+    .pie-legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .pie-legend-val { font-weight: 800; margin-left: auto; min-width: 30px; text-align: right; }
+
+    @media (max-width: 1024px) { .live-grid { grid-template-columns: repeat(2, 1fr); } .cmd-grid { grid-template-columns: 1fr; } .summary-grid { grid-template-columns: repeat(2, 1fr); } .charts-row { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .live-grid { grid-template-columns: 1fr; } .qa-grid { grid-template-columns: repeat(3, 1fr); } .summary-grid { grid-template-columns: 1fr 1fr; } }
 </style>
 {% endblock %}
 
@@ -82,6 +118,74 @@
 </div>
 {% endif %}
 
+<!-- ═══════ STUDENT SUMMARY (Sapphire-style colored cards) ═══════ -->
+<div class="summary-grid">
+    <a href="/school/students" class="sum-card c-blue">
+        <i class="fas fa-user-graduate sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.total_students }}</div>
+        <div class="sum-card-label">Total Students</div>
+    </a>
+    <a href="/school/students" class="sum-card c-green">
+        <i class="fas fa-check-circle sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.total_students - stats.inactive }}</div>
+        <div class="sum-card-label">Active Students</div>
+    </a>
+    <a href="/school/students?filter=inactive" class="sum-card c-orange">
+        <i class="fas fa-pause-circle sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.inactive }}</div>
+        <div class="sum-card-label">Inactive Students</div>
+    </a>
+    <a href="/school/students?filter=left" class="sum-card c-red">
+        <i class="fas fa-user-minus sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.left }}</div>
+        <div class="sum-card-label">Left / TC Issued</div>
+    </a>
+    <a href="/school/admissions" class="sum-card c-purple">
+        <i class="fas fa-user-plus sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.new_admissions_month }}</div>
+        <div class="sum-card-label">New Admissions (This Month)</div>
+    </a>
+    <a href="/school/teachers" class="sum-card c-teal">
+        <i class="fas fa-chalkboard-teacher sum-card-icon"></i>
+        <div class="sum-card-value">{{ stats.total_teachers }}</div>
+        <div class="sum-card-label">Total Teachers</div>
+    </a>
+</div>
+
+<!-- ═══════ CHARTS: Class-wise + Gender ═══════ -->
+<div class="charts-row">
+    <div class="chart-card">
+        <h3><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Student Class-wise Distribution</h3>
+        <div class="bar-chart" id="classBarChart"></div>
+    </div>
+    <div class="chart-card">
+        <h3><i class="fas fa-venus-mars" style="color:#EC4899;"></i> Gender Distribution</h3>
+        <div class="pie-container">
+            <div class="pie-donut" id="genderPie"></div>
+            <div class="pie-legend">
+                <div class="pie-legend-item">
+                    <span class="pie-legend-dot" style="background:#3B82F6;"></span>
+                    <span>Boys</span>
+                    <span class="pie-legend-val" style="color:#3B82F6;">{{ stats.male }}</span>
+                </div>
+                <div class="pie-legend-item">
+                    <span class="pie-legend-dot" style="background:#EC4899;"></span>
+                    <span>Girls</span>
+                    <span class="pie-legend-val" style="color:#EC4899;">{{ stats.female }}</span>
+                </div>
+                {% if stats.total_students - stats.male - stats.female > 0 %}
+                <div class="pie-legend-item">
+                    <span class="pie-legend-dot" style="background:#94A3B8;"></span>
+                    <span>Other</span>
+                    <span class="pie-legend-val" style="color:#94A3B8;">{{ stats.total_students - stats.male - stats.female }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════ LIVE STATS (unchanged) ═══════ -->
 <div class="live-grid">
     <div class="live-card green">
         <i class="fas fa-user-graduate live-icon"></i>
@@ -113,7 +217,7 @@
     <div class="live-card orange">
         <i class="fas fa-rupee-sign live-icon"></i>
         <div class="live-label">Fee Collection</div>
-        <div class="live-value" style="color:var(--success);">₹{{ "{:,.0f}".format(live.fee_today) }}</div>
+        <div class="live-value" style="color:var(--success);">&#8377;{{ "{:,.0f}".format(live.fee_today) }}</div>
         <div class="live-sub">collected today{% if live.fee_overdue_students > 0 %} · <span style="color:var(--danger);font-weight:700;">{{ live.fee_overdue_students }} defaulters</span>{% endif %}</div>
     </div>
 </div>
@@ -121,9 +225,9 @@
 <div class="cmd-grid">
     <div class="cmd-card">
         <h3><i class="fas fa-indian-rupee-sign" style="color:var(--success);"></i> Fee Summary — This Month{% if live.fee_overdue_students > 0 %}<span class="traffic-dot red"></span>{% else %}<span class="traffic-dot green"></span>{% endif %}</h3>
-        <div class="fee-row"><span class="fee-label">Collected Today</span><span class="fee-val green">₹{{ "{:,.0f}".format(live.fee_today) }}</span></div>
-        <div class="fee-row"><span class="fee-label">Collected This Month</span><span class="fee-val green">₹{{ "{:,.0f}".format(live.fee_month) }}</span></div>
-        <div class="fee-row"><span class="fee-label">Total Pending</span><span class="fee-val orange">₹{{ "{:,.0f}".format(live.fee_pending) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Collected Today</span><span class="fee-val green">&#8377;{{ "{:,.0f}".format(live.fee_today) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Collected This Month</span><span class="fee-val green">&#8377;{{ "{:,.0f}".format(live.fee_month) }}</span></div>
+        <div class="fee-row"><span class="fee-label">Total Pending</span><span class="fee-val orange">&#8377;{{ "{:,.0f}".format(live.fee_pending) }}</span></div>
         <div class="fee-row"><span class="fee-label">Students with Overdue</span><span class="fee-val red">{{ live.fee_overdue_students }}</span></div>
         <a href="/school/fee-collection" class="btn btn-primary btn-sm mt-2" style="width:100%;"><i class="fas fa-hand-holding-usd"></i> Collect Fees</a>
     </div>
@@ -178,7 +282,7 @@
     </div>
 </div>
 
-<!-- Milestones & Streaks -->
+<!-- Milestones -->
 <div class="card" style="border-left: 4px solid #F59E0B;">
     <div class="card-header"><h2><i class="fas fa-fire" style="color:#F59E0B;"></i> Today's Milestones</h2></div>
     <div class="card-body" style="display:flex; flex-wrap:wrap; gap:10px;">
@@ -196,10 +300,13 @@
         <div class="achievement-badge green">📋 Zero Pending Leaves</div>
         {% endif %}
         {% if live.fee_today > 0 %}
-        <div class="achievement-badge gold">💰 ₹{{ "{:,.0f}".format(live.fee_today) }} Collected Today!</div>
+        <div class="achievement-badge gold">💰 &#8377;{{ "{:,.0f}".format(live.fee_today) }} Collected Today!</div>
+        {% endif %}
+        {% if stats.new_admissions_month > 0 %}
+        <div class="achievement-badge green">🎓 {{ stats.new_admissions_month }} New Admission{{ 's' if stats.new_admissions_month > 1 else '' }} This Month</div>
         {% endif %}
         {% if live.att_pct < 85 and (live.periods_done == 0 or live.periods_expected == 0) and live.pending_leaves > 0 %}
-        <div style="font-size:0.82rem; color:var(--text-light);"><i class="fas fa-info-circle"></i> Complete tasks to unlock milestones! Mark attendance, complete periods, clear leaves.</div>
+        <div style="font-size:0.82rem; color:var(--text-light);"><i class="fas fa-info-circle"></i> Complete tasks to unlock milestones!</div>
         {% endif %}
     </div>
 </div>
@@ -217,8 +324,60 @@
             <a href="/school/students" class="qa-card"><i class="fas fa-user-graduate"></i><span>Students</span></a>
             <a href="/school/exams" class="qa-card"><i class="fas fa-file-alt"></i><span>Exams</span></a>
             <a href="/school/results" class="qa-card"><i class="fas fa-trophy"></i><span>Results</span></a>
+            <a href="/school/admissions" class="qa-card"><i class="fas fa-user-plus"></i><span>Admissions</span></a>
+            <a href="/school/certificates" class="qa-card"><i class="fas fa-certificate"></i><span>Certificates</span></a>
             <a href="/school/payment-settings" class="qa-card"><i class="fas fa-credit-card"></i><span>Payment Config</span></a>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Class-wise Bar Chart (pure CSS/JS, no library) ──
+(function() {
+    const data = {{ class_wise | safe }};
+    const container = document.getElementById('classBarChart');
+    if (!data || data.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:var(--text-light);font-size:0.82rem;padding:40px;">No class data available</div>';
+        return;
+    }
+    const maxVal = Math.max(...data.map(d => d.count));
+    const colors = ['#3B82F6','#10B981','#8B5CF6','#F59E0B','#EF4444','#EC4899','#14B8A6','#6366F1','#F97316','#06B6D4','#84CC16','#E11D48'];
+    container.innerHTML = data.map((d, i) => {
+        const h = maxVal > 0 ? Math.max((d.count / maxVal * 140), 4) : 4;
+        const color = colors[i % colors.length];
+        return `<div class="bar-col">
+            <div class="bar-val">${d.count}</div>
+            <div class="bar-fill" style="height:${h}px;background:${color};"></div>
+            <div class="bar-label">${d['class']}</div>
+        </div>`;
+    }).join('');
+})();
+
+// ── Gender Pie Chart (CSS conic-gradient donut) ──
+(function() {
+    const male = {{ stats.male }};
+    const female = {{ stats.female }};
+    const total = {{ stats.total_students }};
+    const other = total - male - female;
+    const pie = document.getElementById('genderPie');
+    if (total === 0) {
+        pie.innerHTML = '<div style="text-align:center;color:var(--text-light);font-size:0.82rem;">No data</div>';
+        return;
+    }
+    const malePct = (male / total * 100);
+    const femalePct = (female / total * 100);
+    const otherPct = (other / total * 100);
+    const maleEnd = malePct;
+    const femaleEnd = malePct + femalePct;
+
+    let gradient = `conic-gradient(#3B82F6 0% ${maleEnd}%, #EC4899 ${maleEnd}% ${femaleEnd}%`;
+    if (other > 0) gradient += `, #94A3B8 ${femaleEnd}% 100%`;
+    gradient += ')';
+
+    pie.style.background = gradient;
+    pie.innerHTML = `<div class="pie-center"><div class="pie-center-val">${total}</div><div class="pie-center-label">Total</div></div>`;
+})();
+</script>
 {% endblock %}

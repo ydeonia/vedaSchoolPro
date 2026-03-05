@@ -162,7 +162,7 @@ async function uploadContent(){
     document.getElementById('cTitle').value='';document.getElementById('cFile').value='';}}catch(e){showToast('error','Upload failed');}
 }
 
-async function deleteContent(id){if(!confirm('Delete?'))return;await apiCall('/api/school/digital-library/'+id,'DELETE');loadContent();}
+async function deleteContent(id){showConfirm('Delete Content','Delete this content?',async()=>{await apiCall('/api/school/digital-library/'+id,'DELETE');loadContent();},{icon:'🗑️',danger:true,yesText:'Delete'});}
 
 async function showDrill(id){
     try{const r=await fetch('/api/school/digital-library/'+id+'/analytics',{credentials:'same-origin'});const d=await r.json();

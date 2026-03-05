@@ -1,0 +1,1001 @@
+{% extends "base.html" %}
+{% block title %}Upload Marks{% endblock %}
+{% block page_title %}Upload Marks{% endblock %}
+{% block page_subtitle %}Upload marks for your assigned subjects{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Toast container */
+    #toastContainer {
+        position: fixed; top: 20px; right: 20px; z-index: 99999;
+        display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+    #toastContainer > div { pointer-events: auto; }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(40px); } }
+
+    /* Page header area */
+    .upload-header {
+        display: flex; align-items: center; justify-content: space-between;
+        margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+    }
+    .upload-header h2 { font-size: 1.2rem; font-weight: 800; color: var(--text); }
+    .upload-header p { font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px; }
+
+    /* Cycle cards */
+    .cycle-card {
+        background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow-sm);
+        margin-bottom: 16px; overflow: hidden; transition: var(--transition);
+        border: 1px solid var(--border-light);
+    }
+    .cycle-card:hover { box-shadow: var(--shadow-md); }
+    .cycle-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 22px; cursor: pointer; gap: 12px; flex-wrap: wrap;
+    }
+    .cycle-header:hover { background: rgba(79, 70, 229, 0.02); }
+    .cycle-title { font-weight: 800; font-size: 1rem; color: var(--text); }
+    .cycle-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .cycle-meta i { margin-right: 4px; font-size: 0.72rem; }
+    .cycle-badges { display: flex; gap: 6px; align-items: center; }
+    .cycle-body { display: none; border-top: 1px solid var(--border-light); padding: 0; }
+    .cycle-body.open { display: block; }
+    .cycle-chevron { transition: transform 0.3s; color: var(--text-light); font-size: 0.8rem; }
+    .cycle-chevron.rotated { transform: rotate(180deg); }
+
+    /* Subject rows inside cycles */
+    .subject-row {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 22px; border-bottom: 1px solid var(--border-light);
+        gap: 12px; flex-wrap: wrap; transition: background 0.15s;
+    }
+    .subject-row:last-child { border-bottom: none; }
+    .subject-row:hover { background: var(--bg); }
+    .subject-info { flex: 1; min-width: 200px; }
+    .subject-name { font-weight: 700; font-size: 0.92rem; color: var(--text); }
+    .subject-details { font-size: 0.75rem; color: var(--text-secondary); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .subject-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+    /* Badges */
+    .badge { padding: 4px 10px; border-radius: 8px; font-size: 0.7rem; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+    .badge-draft { background: var(--warning-light); color: var(--warning); }
+    .badge-submitted { background: var(--success-light); color: var(--success); }
+    .badge-locked { background: var(--danger-light); color: var(--danger); }
+    .badge-pending { background: var(--border-light); color: var(--text-secondary); }
+    .badge-info { background: var(--info-light); color: var(--info); }
+    .badge-success { background: var(--success-light); color: var(--success); }
+    .badge-danger { background: var(--danger-light); color: var(--danger); }
+    .badge-warning { background: var(--warning-light); color: var(--warning); }
+
+    /* Buttons */
+    .btn { padding: 7px 14px; border-radius: 8px; font-size: 0.78rem; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border: none; cursor: pointer; transition: var(--transition); }
+    .btn i { font-size: 0.72rem; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { opacity: 0.9; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { opacity: 0.9; }
+    .btn-warning { background: var(--warning); color: white; }
+    .btn-warning:hover { opacity: 0.9; }
+    .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-ghost:hover { background: var(--bg); color: var(--text); }
+    .btn-sm { padding: 5px 10px; font-size: 0.72rem; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Manual entry panel */
+    .manual-panel {
+        background: var(--bg-card); border-radius: var(--radius); box-shadow: var(--shadow);
+        margin-bottom: 20px; overflow: hidden; border: 2px solid var(--primary);
+        animation: panelIn 0.3s ease;
+    }
+    @keyframes panelIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .manual-panel-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 22px; background: linear-gradient(135deg, var(--primary-50), var(--primary-100));
+        border-bottom: 1px solid var(--border-light);
+    }
+    .manual-panel-header h3 { font-size: 1rem; font-weight: 800; color: var(--primary-dark); }
+    .manual-panel-body { padding: 0; overflow-x: auto; }
+
+    /* Marks table */
+    .marks-table {
+        width: 100%; border-collapse: collapse; min-width: 700px;
+    }
+    .marks-table thead { background: var(--bg); }
+    .marks-table th {
+        padding: 12px 14px; text-align: left; font-size: 0.72rem; text-transform: uppercase;
+        color: var(--text-secondary); font-weight: 700; letter-spacing: 0.5px; white-space: nowrap;
+    }
+    .marks-table td {
+        padding: 10px 14px; border-bottom: 1px solid var(--border-light);
+        font-size: 0.85rem; vertical-align: middle;
+    }
+    .marks-table tr:hover { background: rgba(79, 70, 229, 0.02); }
+    .marks-table tr.absent-row { background: rgba(239, 68, 68, 0.04); }
+
+    .marks-input {
+        width: 80px; padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+        text-align: center; font-weight: 700; font-size: 0.88rem; transition: var(--transition);
+        background: var(--bg-card);
+    }
+    .marks-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    .marks-input.pass { border-color: var(--success); background: rgba(16, 185, 129, 0.06); }
+    .marks-input.fail { border-color: var(--danger); background: rgba(239, 68, 68, 0.06); }
+    .marks-input:disabled { background: var(--border-light); color: var(--text-light); cursor: not-allowed; }
+
+    .form-select {
+        padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+        font-size: 0.82rem; font-weight: 600; background: var(--bg-card); cursor: pointer;
+        color: var(--text);
+    }
+    .form-select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+    .form-input {
+        padding: 8px 10px; border-radius: 8px; border: 1.5px solid var(--border);
+        font-size: 0.82rem; background: var(--bg-card); color: var(--text); width: 100%;
+    }
+    .form-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+
+    .grade-pill {
+        padding: 3px 10px; border-radius: 8px; font-size: 0.72rem; font-weight: 800;
+        display: inline-block; min-width: 32px; text-align: center;
+    }
+    .grade-high { background: var(--success-light); color: var(--success); }
+    .grade-mid { background: var(--info-light); color: var(--info); }
+    .grade-low { background: var(--warning-light); color: var(--warning); }
+    .grade-fail { background: var(--danger-light); color: var(--danger); }
+    .grade-na { background: var(--border-light); color: var(--text-light); }
+
+    .remarks-input {
+        width: 120px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+        font-size: 0.78rem; background: var(--bg-card); color: var(--text);
+    }
+    .remarks-input:focus { border-color: var(--primary); outline: none; }
+
+    /* Summary stats bar */
+    .summary-bar {
+        display: flex; gap: 12px; flex-wrap: wrap; padding: 16px 22px;
+        background: var(--bg); border-top: 1px solid var(--border-light);
+    }
+    .summary-pill {
+        padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    .summary-pill.blue { background: var(--info-light); color: var(--info); }
+    .summary-pill.green { background: var(--success-light); color: var(--success); }
+    .summary-pill.yellow { background: var(--warning-light); color: var(--warning); }
+    .summary-pill.red { background: var(--danger-light); color: var(--danger); }
+    .summary-pill.gray { background: var(--border-light); color: var(--text-secondary); }
+
+    /* Save bar */
+    .save-bar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 22px; background: var(--bg-card); border-top: 1px solid var(--border-light);
+        position: sticky; bottom: 0; z-index: 10;
+    }
+
+    /* Upload area / dropzone */
+    .upload-zone {
+        border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px 20px;
+        text-align: center; cursor: pointer; transition: var(--transition);
+        background: var(--bg); margin: 20px 22px;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--primary); background: var(--primary-50);
+    }
+    .upload-zone i.upload-icon { font-size: 2.5rem; color: var(--primary); margin-bottom: 12px; }
+    .upload-zone h4 { font-size: 0.95rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .upload-zone p { font-size: 0.78rem; color: var(--text-secondary); }
+    .upload-zone .file-info {
+        margin-top: 12px; padding: 10px 16px; background: var(--bg-card); border-radius: 8px;
+        display: inline-flex; align-items: center; gap: 10px; font-size: 0.82rem; font-weight: 600;
+        border: 1px solid var(--border-light);
+    }
+    .upload-zone .file-info i { color: var(--success); }
+
+    /* Progress bar */
+    .progress-track {
+        width: 100%; height: 6px; background: var(--border-light); border-radius: 10px;
+        margin-top: 12px; overflow: hidden; display: none;
+    }
+    .progress-fill {
+        height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-light));
+        border-radius: 10px; transition: width 0.3s ease; width: 0%;
+    }
+
+    /* Upload result */
+    .upload-result {
+        margin: 0 22px 16px; padding: 14px 18px; border-radius: 10px; font-size: 0.85rem;
+        font-weight: 600; display: none; align-items: center; gap: 10px;
+    }
+    .upload-result.success { background: var(--success-light); color: var(--success); display: flex; }
+    .upload-result.error { background: var(--danger-light); color: var(--danger); display: flex; }
+
+    /* Modal overlay */
+    .modal-overlay {
+        display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+        z-index: 99998; align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-box {
+        background: var(--bg-card); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        max-width: 90vw; animation: modalIn 0.25s ease;
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center; padding: 60px 20px; color: var(--text-light);
+    }
+    .empty-state i { font-size: 3rem; opacity: 0.25; display: block; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1.1rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 6px; }
+    .empty-state p { font-size: 0.82rem; color: var(--text-light); max-width: 380px; margin: 0 auto; }
+
+    /* Upload modal */
+    .upload-modal-body { padding: 22px; min-width: 500px; max-width: 90vw; }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid var(--border-light); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .subject-row { flex-direction: column; align-items: flex-start; }
+        .subject-actions { width: 100%; }
+        .upload-modal-body { min-width: auto; width: 95vw; }
+        .cycle-header { padding: 14px 16px; }
+        .subject-row { padding: 12px 16px; }
+        .manual-panel-header { padding: 12px 16px; }
+        .summary-bar { padding: 12px 16px; }
+        .save-bar { padding: 12px 16px; flex-direction: column; gap: 10px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="toastContainer"></div>
+
+<!-- Main cycles container -->
+<div id="cyclesContainer">
+    <div style="text-align:center; padding:60px 20px;">
+        <div class="spinner" style="width:32px; height:32px; border-width:3px;"></div>
+        <p style="margin-top:12px; color:var(--text-light); font-size:0.85rem;">Loading your exam cycles...</p>
+    </div>
+</div>
+
+<!-- Manual Entry Panel (initially hidden) -->
+<div id="manualPanel" style="display:none;"></div>
+
+<!-- Upload Modal -->
+<div class="modal-overlay" id="uploadModal">
+    <div class="modal-box upload-modal-body">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h3 style="font-size:1.05rem; font-weight:800; color:var(--text);">
+                <i class="fas fa-file-upload" style="color:var(--primary); margin-right:8px;"></i>Upload Excel
+            </h3>
+            <button class="btn btn-ghost btn-sm" onclick="closeUploadModal()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="uploadSubjectInfo" style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:16px;"></div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <h4>Drag and drop your Excel file here</h4>
+            <p>or click to browse (.xlsx, .xls files only)</p>
+            <div id="fileInfo" style="display:none;" class="file-info">
+                <i class="fas fa-file-excel"></i>
+                <span id="fileName"></span>
+                <span id="fileSize" style="color:var(--text-light); font-size:0.75rem;"></span>
+            </div>
+        </div>
+        <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none;" onchange="onFileSelected(this)">
+        <div class="progress-track" id="uploadProgress">
+            <div class="progress-fill" id="uploadProgressBar"></div>
+        </div>
+        <div class="upload-result" id="uploadResult">
+            <i class="fas fa-check-circle" id="uploadResultIcon"></i>
+            <span id="uploadResultText"></span>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:16px;">
+            <button class="btn btn-ghost" onclick="closeUploadModal()">Cancel</button>
+            <button class="btn btn-primary" id="uploadBtn" onclick="uploadFile()" disabled>
+                <i class="fas fa-upload"></i> Upload
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% raw %}
+// ============================================================
+// State
+// ============================================================
+let cyclesData = [];
+let manualState = { cycleId: null, subjectId: null, subjectName: '', maxMarks: 100, students: [] };
+let uploadState = { cycleId: null, subjectId: null, subjectName: '', file: null };
+
+// ============================================================
+// Toast + Confirm (custom in-app, no window.alert/confirm)
+// ============================================================
+function showToast(message, type='success', duration=4000) {
+    const toast = document.createElement('div');
+    const colors = {success:'#10B981',error:'#EF4444',warning:'#F59E0B',info:'#3B82F6'};
+    const icons = {success:'fa-check-circle',error:'fa-times-circle',warning:'fa-exclamation-triangle',info:'fa-info-circle'};
+    toast.style.cssText = `display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--bg-card);border-left:4px solid ${colors[type]};border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:300px;max-width:450px;animation:slideIn 0.3s ease;font-size:0.85rem;color:var(--text);`;
+    toast.innerHTML = `<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:1.1rem;"></i><span style="flex:1">${message}</span><i class="fas fa-times" style="cursor:pointer;color:var(--text-light);font-size:0.8rem;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('toastContainer').appendChild(toast);
+    setTimeout(() => { toast.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(),300); }, duration);
+}
+
+function showConfirm(message, title='Confirm Action') {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.innerHTML = `<div class="modal-box" style="max-width:420px;padding:28px;"><h3 style="margin-bottom:8px;color:var(--text);font-size:1.1rem;">${title}</h3><p style="color:var(--text-secondary);margin-bottom:24px;font-size:0.9rem;">${message}</p><div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove();resolve(false);" style="padding:8px 20px;">Cancel</button><button class="btn btn-primary" onclick="this.closest('.modal-overlay').remove();resolve(true);" style="padding:8px 20px;">Confirm</button></div></div>`;
+        document.body.appendChild(overlay);
+    });
+}
+
+// ============================================================
+// Init — Load Cycles
+// ============================================================
+document.addEventListener('DOMContentLoaded', loadCycles);
+
+async function loadCycles() {
+    try {
+        const res = await fetch('/api/report-card/teacher/my-cycles', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('Failed to load cycles');
+        const data = await res.json();
+        cyclesData = data.cycles || [];
+        renderCycles();
+    } catch (e) {
+        document.getElementById('cyclesContainer').innerHTML = `
+            <div class="card">
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>Could Not Load Data</h3>
+                    <p>${e.message}. Please refresh the page to try again.</p>
+                    <button class="btn btn-primary" style="margin-top:16px;" onclick="loadCycles()">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+            </div>`;
+    }
+}
+
+// ============================================================
+// Render Cycles
+// ============================================================
+function renderCycles() {
+    const container = document.getElementById('cyclesContainer');
+
+    if (!cyclesData.length) {
+        container.innerHTML = `
+            <div class="card">
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>No Exam Cycles Assigned</h3>
+                    <p>You have no exam cycles with subject assignments right now. Once the administrator assigns subjects to you in an active exam cycle, they will appear here.</p>
+                </div>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    cyclesData.forEach((cycle, ci) => {
+        const statusBadge = getCycleStatusBadge(cycle.status);
+        const deadlineStr = cycle.deadline ? formatDate(cycle.deadline) : 'No deadline';
+        const subjectCount = (cycle.subjects || []).length;
+
+        html += `
+        <div class="cycle-card" id="cycle-${cycle.id}">
+            <div class="cycle-header" onclick="toggleCycle(${ci})">
+                <div>
+                    <div class="cycle-title">${escHtml(cycle.exam_name || cycle.name)}</div>
+                    <div class="cycle-meta">
+                        <span><i class="fas fa-graduation-cap"></i>${escHtml(cycle.class_name || '')}</span>
+                        <span><i class="fas fa-clock"></i>Deadline: ${escHtml(deadlineStr)}</span>
+                        <span><i class="fas fa-book"></i>${subjectCount} subject${subjectCount !== 1 ? 's' : ''}</span>
+                    </div>
+                </div>
+                <div class="cycle-badges">
+                    ${statusBadge}
+                    <i class="fas fa-chevron-down cycle-chevron" id="chevron-${ci}"></i>
+                </div>
+            </div>
+            <div class="cycle-body" id="cycle-body-${ci}">`;
+
+        if (!cycle.subjects || !cycle.subjects.length) {
+            html += `
+                <div style="padding:30px 22px; text-align:center; color:var(--text-light); font-size:0.85rem;">
+                    <i class="fas fa-info-circle" style="margin-right:6px;"></i>No subjects assigned to you in this cycle.
+                </div>`;
+        } else {
+            cycle.subjects.forEach(sub => {
+                const statusBadge = getSubjectStatusBadge(sub.status);
+                const rowCountStr = sub.row_count != null ? `${sub.row_count} record${sub.row_count !== 1 ? 's' : ''}` : 'No data';
+                const lastUploaded = sub.last_uploaded ? timeAgo(sub.last_uploaded) : 'Never';
+                const isSubmitted = sub.status === 'submitted';
+                const isLocked = cycle.status === 'locked';
+                const canRetract = isSubmitted && !isLocked;
+
+                html += `
+                <div class="subject-row">
+                    <div class="subject-info">
+                        <div class="subject-name">${escHtml(sub.subject_name)}</div>
+                        <div class="subject-details">
+                            ${statusBadge}
+                            <span><i class="fas fa-database" style="margin-right:3px;"></i>${rowCountStr}</span>
+                            <span><i class="fas fa-clock" style="margin-right:3px;"></i>Last: ${escHtml(lastUploaded)}</span>
+                            ${sub.max_marks ? `<span><i class="fas fa-star" style="margin-right:3px;"></i>Max: ${sub.max_marks}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="subject-actions">
+                        <button class="btn btn-ghost btn-sm" onclick="downloadTemplate('${cycle.id}','${sub.subject_id}')" title="Download Template">
+                            <i class="fas fa-download"></i> Template
+                        </button>
+                        <button class="btn btn-ghost btn-sm" onclick="openUploadModal('${cycle.id}','${sub.subject_id}','${escAttr(sub.subject_name)}')" title="Upload Excel" ${isSubmitted ? 'disabled' : ''}>
+                            <i class="fas fa-file-upload"></i> Upload
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="openManualEntry('${cycle.id}','${sub.subject_id}','${escAttr(sub.subject_name)}',${sub.max_marks || 100})" title="Enter Manually" ${isSubmitted ? 'disabled' : ''}>
+                            <i class="fas fa-pen"></i> Manual
+                        </button>
+                        <button class="btn btn-success btn-sm" onclick="submitMarks('${cycle.id}','${sub.subject_id}','${escAttr(sub.subject_name)}')" ${isSubmitted ? 'disabled' : ''} title="Submit Final">
+                            <i class="fas fa-check-double"></i> Submit
+                        </button>
+                        ${canRetract ? `
+                        <button class="btn btn-warning btn-sm" onclick="retractSubmission('${cycle.id}','${sub.subject_id}','${escAttr(sub.subject_name)}')" title="Retract Submission">
+                            <i class="fas fa-undo"></i> Retract
+                        </button>` : ''}
+                    </div>
+                </div>`;
+            });
+        }
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function getCycleStatusBadge(status) {
+    const map = {
+        active: '<span class="badge badge-success"><i class="fas fa-circle" style="font-size:0.45rem;"></i> Active</span>',
+        locked: '<span class="badge badge-locked"><i class="fas fa-lock" style="font-size:0.6rem;"></i> Locked</span>',
+        draft: '<span class="badge badge-draft"><i class="fas fa-pencil-alt" style="font-size:0.6rem;"></i> Draft</span>',
+        completed: '<span class="badge badge-info"><i class="fas fa-check" style="font-size:0.6rem;"></i> Completed</span>',
+    };
+    return map[status] || `<span class="badge badge-pending">${escHtml(status || 'Unknown')}</span>`;
+}
+
+function getSubjectStatusBadge(status) {
+    const map = {
+        draft: '<span class="badge badge-draft"><i class="fas fa-pencil-alt"></i> Draft</span>',
+        submitted: '<span class="badge badge-submitted"><i class="fas fa-check-circle"></i> Submitted</span>',
+        pending: '<span class="badge badge-pending"><i class="fas fa-hourglass-half"></i> Pending</span>',
+    };
+    return map[status] || `<span class="badge badge-pending">${escHtml(status || 'Pending')}</span>`;
+}
+
+function toggleCycle(ci) {
+    const body = document.getElementById('cycle-body-' + ci);
+    const chevron = document.getElementById('chevron-' + ci);
+    body.classList.toggle('open');
+    chevron.classList.toggle('rotated');
+}
+
+// ============================================================
+// Download Template
+// ============================================================
+function downloadTemplate(cycleId, subjectId) {
+    window.location.href = `/api/report-card/teacher/download-template?cycle_id=${cycleId}&subject_id=${subjectId}`;
+}
+
+// ============================================================
+// Upload Excel
+// ============================================================
+function openUploadModal(cycleId, subjectId, subjectName) {
+    uploadState = { cycleId, subjectId, subjectName, file: null };
+    document.getElementById('uploadSubjectInfo').innerHTML =
+        `<i class="fas fa-book" style="margin-right:6px;"></i>Uploading marks for <strong>${escHtml(subjectName)}</strong>`;
+    document.getElementById('fileInfo').style.display = 'none';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('uploadBtn').disabled = true;
+    document.getElementById('uploadProgress').style.display = 'none';
+    document.getElementById('uploadProgressBar').style.width = '0%';
+    document.getElementById('uploadResult').className = 'upload-result';
+    document.getElementById('uploadResult').style.display = 'none';
+    document.getElementById('uploadModal').classList.add('active');
+
+    // Reset drop zone
+    const zone = document.getElementById('uploadZone');
+    zone.querySelector('h4').textContent = 'Drag and drop your Excel file here';
+    zone.querySelector('p').textContent = 'or click to browse (.xlsx, .xls files only)';
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('active');
+    uploadState.file = null;
+}
+
+function onFileSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['xlsx', 'xls'].includes(ext)) {
+        showToast('Please select an Excel file (.xlsx or .xls)', 'error');
+        input.value = '';
+        return;
+    }
+    uploadState.file = file;
+    document.getElementById('fileInfo').style.display = 'inline-flex';
+    document.getElementById('fileName').textContent = file.name;
+    document.getElementById('fileSize').textContent = formatFileSize(file.size);
+    document.getElementById('uploadBtn').disabled = false;
+    document.getElementById('uploadResult').style.display = 'none';
+}
+
+// Drag and drop
+(function() {
+    const zone = document.getElementById('uploadZone');
+    ['dragenter', 'dragover'].forEach(evt => {
+        zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        zone.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover'); });
+    });
+    zone.addEventListener('drop', e => {
+        const files = e.dataTransfer.files;
+        if (files && files[0]) {
+            document.getElementById('fileInput').files = files;
+            onFileSelected(document.getElementById('fileInput'));
+        }
+    });
+})();
+
+async function uploadFile() {
+    if (!uploadState.file) { showToast('No file selected', 'warning'); return; }
+
+    const btn = document.getElementById('uploadBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Uploading...';
+
+    const progressTrack = document.getElementById('uploadProgress');
+    const progressBar = document.getElementById('uploadProgressBar');
+    progressTrack.style.display = 'block';
+    progressBar.style.width = '0%';
+
+    const formData = new FormData();
+    formData.append('file', uploadState.file);
+
+    try {
+        // Simulate progress
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress = Math.min(progress + Math.random() * 20, 90);
+            progressBar.style.width = progress + '%';
+        }, 200);
+
+        const res = await fetch(
+            `/api/report-card/teacher/upload-marks?cycle_id=${uploadState.cycleId}&subject_id=${uploadState.subjectId}`,
+            { method: 'POST', credentials: 'same-origin', body: formData }
+        );
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Upload failed');
+
+        const resultDiv = document.getElementById('uploadResult');
+        resultDiv.className = 'upload-result success';
+        resultDiv.style.display = 'flex';
+        document.getElementById('uploadResultIcon').className = 'fas fa-check-circle';
+        document.getElementById('uploadResultText').textContent =
+            `Successfully imported ${data.count || 0} record${(data.count || 0) !== 1 ? 's' : ''}`;
+        showToast(`Marks uploaded successfully for ${uploadState.subjectName}`, 'success');
+
+        // Refresh cycles after upload
+        setTimeout(() => { closeUploadModal(); loadCycles(); }, 1500);
+    } catch (e) {
+        progressBar.style.width = '100%';
+        progressBar.style.background = 'var(--danger)';
+        const resultDiv = document.getElementById('uploadResult');
+        resultDiv.className = 'upload-result error';
+        resultDiv.style.display = 'flex';
+        document.getElementById('uploadResultIcon').className = 'fas fa-times-circle';
+        document.getElementById('uploadResultText').textContent = e.message || 'Upload failed';
+        showToast(e.message || 'Upload failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    }
+}
+
+// ============================================================
+// Manual Entry
+// ============================================================
+async function openManualEntry(cycleId, subjectId, subjectName, maxMarks) {
+    manualState = { cycleId, subjectId, subjectName, maxMarks: maxMarks || 100, students: [] };
+    const panel = document.getElementById('manualPanel');
+    panel.style.display = 'block';
+    panel.innerHTML = `
+        <div class="manual-panel">
+            <div class="manual-panel-header">
+                <h3><i class="fas fa-pen" style="margin-right:8px;"></i>Manual Entry: ${escHtml(subjectName)}</h3>
+                <button class="btn btn-ghost btn-sm" onclick="closeManualEntry()"><i class="fas fa-times"></i> Close</button>
+            </div>
+            <div class="manual-panel-body" style="text-align:center; padding:40px;">
+                <div class="spinner" style="width:28px; height:28px;"></div>
+                <p style="margin-top:10px; color:var(--text-light); font-size:0.82rem;">Loading students...</p>
+            </div>
+        </div>`;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+        const res = await fetch(
+            `/api/report-card/teacher/load-marks?cycle_id=${cycleId}&subject_id=${subjectId}`,
+            { credentials: 'same-origin' }
+        );
+        if (!res.ok) throw new Error('Failed to load marks data');
+        const data = await res.json();
+        manualState.students = data.students || [];
+        if (data.max_marks) manualState.maxMarks = data.max_marks;
+        renderManualTable();
+    } catch (e) {
+        panel.innerHTML = `
+            <div class="manual-panel">
+                <div class="manual-panel-header">
+                    <h3><i class="fas fa-pen" style="margin-right:8px;"></i>Manual Entry: ${escHtml(subjectName)}</h3>
+                    <button class="btn btn-ghost btn-sm" onclick="closeManualEntry()"><i class="fas fa-times"></i> Close</button>
+                </div>
+                <div class="manual-panel-body" style="padding:30px; text-align:center;">
+                    <i class="fas fa-exclamation-circle" style="font-size:2rem; color:var(--danger); opacity:0.5;"></i>
+                    <p style="margin-top:10px; color:var(--text-secondary);">${e.message}</p>
+                    <button class="btn btn-primary" style="margin-top:12px;" onclick="openManualEntry('${cycleId}','${subjectId}','${escAttr(subjectName)}',${maxMarks})">
+                        <i class="fas fa-redo"></i> Retry
+                    </button>
+                </div>
+            </div>`;
+    }
+}
+
+function renderManualTable() {
+    const { students, maxMarks, subjectName, cycleId, subjectId } = manualState;
+
+    if (!students.length) {
+        document.getElementById('manualPanel').querySelector('.manual-panel-body').innerHTML = `
+            <div style="padding:40px; text-align:center; color:var(--text-light);">
+                <i class="fas fa-users" style="font-size:2rem; opacity:0.3;"></i>
+                <p style="margin-top:10px;">No students found for this subject.</p>
+            </div>`;
+        return;
+    }
+
+    let html = `<table class="marks-table">
+        <thead><tr>
+            <th style="width:50px;">S.No</th>
+            <th>Student Name</th>
+            <th style="width:80px;">Roll No</th>
+            <th style="width:100px;">Marks (/${maxMarks})</th>
+            <th style="width:120px;">Special Code</th>
+            <th style="width:60px;">Grade</th>
+            <th style="width:140px;">Remarks</th>
+        </tr></thead><tbody>`;
+
+    students.forEach((s, i) => {
+        const marks = s.marks != null ? s.marks : '';
+        const specialCode = s.special_code || '-';
+        const remarks = s.remarks || '';
+        const isSpecial = specialCode !== '-' && specialCode !== '';
+        const gradeInfo = calcGrade(marks, maxMarks, isSpecial ? specialCode : null);
+
+        html += `<tr id="mrow-${i}" class="${isSpecial ? 'absent-row' : ''}">
+            <td style="font-weight:700; color:var(--text-light); font-size:0.8rem;">${i + 1}</td>
+            <td style="font-weight:600;">${escHtml(s.name || s.student_name || '')}</td>
+            <td style="font-size:0.82rem; color:var(--text-secondary);">${escHtml(s.roll_no || s.roll || '')}</td>
+            <td>
+                <input type="number" class="marks-input ${getMarksClass(marks, maxMarks, isSpecial)}"
+                    id="marks-${i}" min="0" max="${maxMarks}" step="0.5"
+                    value="${isSpecial ? '' : marks}" placeholder="${isSpecial ? '--' : '0'}"
+                    ${isSpecial ? 'disabled' : ''}
+                    oninput="onManualMarksChange(${i})">
+            </td>
+            <td>
+                <select class="form-select" id="code-${i}" onchange="onCodeChange(${i})" style="width:100%; font-size:0.78rem; padding:6px 8px;">
+                    <option value="-" ${specialCode === '-' ? 'selected' : ''}>-</option>
+                    <option value="AB" ${specialCode === 'AB' ? 'selected' : ''}>AB (Absent)</option>
+                    <option value="ML" ${specialCode === 'ML' ? 'selected' : ''}>ML (Medical Leave)</option>
+                    <option value="NA" ${specialCode === 'NA' ? 'selected' : ''}>NA (Not Applicable)</option>
+                    <option value="EX" ${specialCode === 'EX' ? 'selected' : ''}>EX (Exempted)</option>
+                </select>
+            </td>
+            <td><span class="grade-pill ${gradeInfo.cls}" id="grade-${i}">${gradeInfo.label}</span></td>
+            <td>
+                <input type="text" class="remarks-input" id="remarks-${i}"
+                    value="${escAttr(remarks)}" placeholder="Optional"
+                    maxlength="100">
+            </td>
+        </tr>`;
+    });
+
+    html += '</tbody></table>';
+
+    const panelBody = document.getElementById('manualPanel').querySelector('.manual-panel-body');
+    panelBody.innerHTML = html;
+
+    // Add summary + save bar below table
+    const panel = document.getElementById('manualPanel').querySelector('.manual-panel');
+
+    // Remove old bars if exist
+    const oldSummary = panel.querySelector('.summary-bar');
+    const oldSave = panel.querySelector('.save-bar');
+    if (oldSummary) oldSummary.remove();
+    if (oldSave) oldSave.remove();
+
+    // Summary bar
+    const summaryDiv = document.createElement('div');
+    summaryDiv.className = 'summary-bar';
+    summaryDiv.id = 'manualSummary';
+    panel.appendChild(summaryDiv);
+
+    // Save bar
+    const saveDiv = document.createElement('div');
+    saveDiv.className = 'save-bar';
+    saveDiv.innerHTML = `
+        <div style="font-size:0.82rem; color:var(--text-secondary);">
+            <strong>${students.length}</strong> students | Max marks: <strong>${maxMarks}</strong>
+        </div>
+        <button class="btn btn-primary" onclick="saveManualMarks()" id="saveManualBtn">
+            <i class="fas fa-save"></i> Save Marks
+        </button>`;
+    panel.appendChild(saveDiv);
+
+    updateManualSummary();
+}
+
+function onManualMarksChange(idx) {
+    const inp = document.getElementById('marks-' + idx);
+    let v = parseFloat(inp.value);
+    const maxMarks = manualState.maxMarks;
+
+    if (v > maxMarks) { inp.value = maxMarks; v = maxMarks; }
+    if (v < 0) { inp.value = 0; v = 0; }
+
+    manualState.students[idx].marks = isNaN(v) ? null : v;
+    manualState.students[idx].special_code = '-';
+    document.getElementById('code-' + idx).value = '-';
+    document.getElementById('mrow-' + idx).classList.remove('absent-row');
+
+    inp.className = 'marks-input ' + getMarksClass(isNaN(v) ? null : v, maxMarks, false);
+    const gradeInfo = calcGrade(isNaN(v) ? null : v, maxMarks, null);
+    const gradeEl = document.getElementById('grade-' + idx);
+    gradeEl.textContent = gradeInfo.label;
+    gradeEl.className = 'grade-pill ' + gradeInfo.cls;
+
+    updateManualSummary();
+}
+
+function onCodeChange(idx) {
+    const code = document.getElementById('code-' + idx).value;
+    const inp = document.getElementById('marks-' + idx);
+    const row = document.getElementById('mrow-' + idx);
+    const isSpecial = code !== '-';
+
+    manualState.students[idx].special_code = code;
+
+    if (isSpecial) {
+        inp.value = '';
+        inp.disabled = true;
+        inp.placeholder = '--';
+        inp.className = 'marks-input';
+        row.classList.add('absent-row');
+        manualState.students[idx].marks = null;
+
+        const gradeEl = document.getElementById('grade-' + idx);
+        gradeEl.textContent = code;
+        gradeEl.className = 'grade-pill grade-na';
+    } else {
+        inp.disabled = false;
+        inp.placeholder = '0';
+        row.classList.remove('absent-row');
+        onManualMarksChange(idx);
+    }
+
+    updateManualSummary();
+}
+
+function updateManualSummary() {
+    const { students, maxMarks } = manualState;
+    const summaryEl = document.getElementById('manualSummary');
+    if (!summaryEl) return;
+
+    const total = students.length;
+    const withMarks = students.filter(s => s.marks != null && (!s.special_code || s.special_code === '-'));
+    const absent = students.filter(s => s.special_code && s.special_code !== '-').length;
+    const entered = withMarks.length + absent;
+    const avg = withMarks.length > 0 ? Math.round(withMarks.reduce((a, s) => a + (s.marks || 0), 0) / withMarks.length * 10) / 10 : 0;
+    const passCount = withMarks.filter(s => (s.marks / maxMarks * 100) >= 33).length;
+    const failCount = withMarks.length - passCount;
+
+    summaryEl.innerHTML = `
+        <span class="summary-pill blue"><i class="fas fa-pen"></i> ${entered}/${total} Entered</span>
+        <span class="summary-pill green"><i class="fas fa-chart-bar"></i> Avg: ${avg}/${maxMarks}</span>
+        <span class="summary-pill yellow"><i class="fas fa-check"></i> Pass: ${passCount}</span>
+        <span class="summary-pill red"><i class="fas fa-times"></i> Fail: ${failCount}</span>
+        <span class="summary-pill gray"><i class="fas fa-user-slash"></i> Absent: ${absent}</span>`;
+}
+
+async function saveManualMarks() {
+    const btn = document.getElementById('saveManualBtn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Saving...';
+
+    const records = manualState.students.map((s, i) => ({
+        student_id: s.student_id || s.id,
+        marks: s.marks,
+        special_code: document.getElementById('code-' + i).value,
+        remarks: document.getElementById('remarks-' + i).value.trim()
+    }));
+
+    try {
+        const res = await fetch('/api/report-card/teacher/save-marks-manual', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                cycle_id: manualState.cycleId,
+                subject_id: manualState.subjectId,
+                records: records
+            })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Save failed');
+
+        showToast(`Marks saved for ${manualState.subjectName}`, 'success');
+        loadCycles();
+    } catch (e) {
+        showToast(e.message || 'Failed to save marks', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    }
+}
+
+function closeManualEntry() {
+    document.getElementById('manualPanel').style.display = 'none';
+    document.getElementById('manualPanel').innerHTML = '';
+}
+
+// ============================================================
+// Submit Marks
+// ============================================================
+async function submitMarks(cycleId, subjectId, subjectName) {
+    const confirmed = await showConfirm(
+        `Are you sure you want to submit marks for <strong>${escHtml(subjectName)}</strong>? Once submitted, you will not be able to edit the marks unless you retract the submission.`,
+        'Submit Final Marks'
+    );
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('/api/report-card/teacher/submit-marks', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cycle_id: cycleId, subject_id: subjectId })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Submission failed');
+
+        showToast(`Marks submitted for ${subjectName}`, 'success');
+        loadCycles();
+    } catch (e) {
+        showToast(e.message || 'Failed to submit marks', 'error');
+    }
+}
+
+// ============================================================
+// Retract Submission
+// ============================================================
+async function retractSubmission(cycleId, subjectId, subjectName) {
+    const confirmed = await showConfirm(
+        `Are you sure you want to retract the submission for <strong>${escHtml(subjectName)}</strong>? This will revert the marks to draft status and allow editing.`,
+        'Retract Submission'
+    );
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch('/api/report-card/teacher/retract-submission', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cycle_id: cycleId, subject_id: subjectId })
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || 'Retraction failed');
+
+        showToast(`Submission retracted for ${subjectName}`, 'info');
+        loadCycles();
+    } catch (e) {
+        showToast(e.message || 'Failed to retract submission', 'error');
+    }
+}
+
+// ============================================================
+// Grade Calculation
+// ============================================================
+function calcGrade(marks, maxMarks, specialCode) {
+    if (specialCode && specialCode !== '-') {
+        return { label: specialCode, cls: 'grade-na' };
+    }
+    if (marks == null || marks === '') {
+        return { label: '--', cls: 'grade-na' };
+    }
+    const pct = (marks / maxMarks) * 100;
+    if (pct >= 91) return { label: 'A1', cls: 'grade-high' };
+    if (pct >= 81) return { label: 'A2', cls: 'grade-high' };
+    if (pct >= 71) return { label: 'B1', cls: 'grade-mid' };
+    if (pct >= 61) return { label: 'B2', cls: 'grade-mid' };
+    if (pct >= 51) return { label: 'C1', cls: 'grade-low' };
+    if (pct >= 41) return { label: 'C2', cls: 'grade-low' };
+    if (pct >= 33) return { label: 'D', cls: 'grade-low' };
+    return { label: 'E (Fail)', cls: 'grade-fail' };
+}
+
+function getMarksClass(marks, maxMarks, isSpecial) {
+    if (isSpecial) return '';
+    if (marks == null || marks === '') return '';
+    const pct = (marks / maxMarks) * 100;
+    return pct >= 33 ? 'pass' : 'fail';
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function escAttr(str) {
+    if (!str) return '';
+    return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (e) { return dateStr; }
+}
+
+function timeAgo(dateStr) {
+    if (!dateStr) return 'Never';
+    try {
+        const d = new Date(dateStr);
+        const now = new Date();
+        const diff = Math.floor((now - d) / 1000);
+        if (diff < 60) return 'Just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+    } catch (e) { return dateStr; }
+}
+
+function formatFileSize(bytes) {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+{% endraw %}
+</script>
+{% endblock %}

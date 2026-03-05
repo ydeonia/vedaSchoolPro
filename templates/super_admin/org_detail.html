@@ -44,7 +44,7 @@
         <h2>{{ org.name }}</h2>
         <div class="meta">
             <span><i class="fas fa-envelope"></i> {{ org.email or '—' }}</span>
-            <span><i class="fas fa-phone"></i> {{ org.phone or '—' }}</span>
+            <span><i class="fas fa-phone"></i> {% if org.phone %}+91 {{ org.phone }}{% else %}—{% endif %}</span>
             <span><i class="fas fa-map-marker-alt"></i> {{ org.city or '—' }}, {{ org.state or '' }}</span>
             <span><i class="fas fa-calendar"></i> Since {{ org.created_at.strftime('%d %b %Y') if org.created_at else '—' }}</span>
         </div>
@@ -152,7 +152,7 @@
         <div style="margin-bottom:10px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Email</label>
         <input id="chEmail" type="email" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
         <div style="margin-bottom:10px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Phone</label>
-        <input id="chPhone" type="tel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
+        <div style="display:flex;gap:0;margin-top:4px;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1.5px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input id="chPhone" type="tel" maxlength="10" inputmode="numeric" placeholder="9876543210" style="flex:1;padding:8px;border-radius:0 8px 8px 0;border:1.5px solid var(--border);box-sizing:border-box;"></div></div>
         <div style="margin-bottom:14px;"><label style="font-size:0.6rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Password</label>
         <input id="chPassword" value="Chairman@123" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);margin-top:4px;box-sizing:border-box;"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">

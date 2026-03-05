@@ -1,0 +1,896 @@
+{% extends "base.html" %}
+{% block title %}Exam Cycles{% endblock %}
+{% block page_title %}Exam Cycles{% endblock %}
+{% block page_subtitle %}Manage report card exam cycles, teacher uploads, and publishing{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--bg-card, white); border-radius: var(--radius, 12px); box-shadow: var(--shadow-sm); padding: 18px 20px; text-align: center; border-top: 3px solid var(--primary); transition: all 0.3s; }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1)); }
+    .stat-val { font-size: 1.8rem; font-weight: 800; line-height: 1.2; }
+    .stat-label { font-size: 0.72rem; color: var(--text-secondary, var(--text-light)); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .cycle-card { background: var(--bg-card, white); border-radius: var(--radius, 12px); box-shadow: var(--shadow-sm); margin-bottom: 14px; overflow: hidden; transition: all 0.2s; border-left: 4px solid var(--border-light, #E5E7EB); }
+    .cycle-card:hover { box-shadow: var(--shadow, 0 4px 12px rgba(0,0,0,0.08)); }
+    .cycle-card.status-open { border-left-color: #3B82F6; }
+    .cycle-card.status-verification_pending { border-left-color: #F59E0B; }
+    .cycle-card.status-locked { border-left-color: #F97316; }
+    .cycle-card.status-published { border-left-color: #10B981; }
+    .cycle-card.status-reopened { border-left-color: #EF4444; }
+
+    .cycle-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; gap: 12px; flex-wrap: wrap; }
+    .cycle-info { flex: 1; min-width: 200px; }
+    .cycle-name { font-weight: 700; font-size: 1rem; color: var(--text); }
+    .cycle-meta { font-size: 0.78rem; color: var(--text-secondary, var(--text-light)); margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .cycle-meta i { margin-right: 3px; }
+    .cycle-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+    .progress-section { padding: 0 20px 16px; }
+    .progress-bar-wrap { background: var(--bg, #F3F4F6); border-radius: 8px; height: 8px; overflow: hidden; margin-top: 6px; }
+    .progress-bar-fill { height: 100%; border-radius: 8px; transition: width 0.6s ease; background: linear-gradient(90deg, #3B82F6, #10B981); }
+    .progress-label { font-size: 0.75rem; color: var(--text-secondary, var(--text-light)); font-weight: 600; }
+
+    .teacher-status-row { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px 16px; }
+    .teacher-chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 8px; font-size: 0.72rem; font-weight: 600; background: var(--bg, #F3F4F6); color: var(--text-secondary, var(--text-light)); }
+    .teacher-chip.submitted { background: rgba(16, 185, 129, 0.1); color: #059669; }
+    .teacher-chip.draft { background: rgba(245, 158, 11, 0.1); color: #D97706; }
+    .teacher-chip.pending { background: var(--bg, #F3F4F6); color: var(--text-secondary, var(--text-light)); }
+
+    .badge-open { background: rgba(59,130,246,0.1); color: #3B82F6; }
+    .badge-verification_pending { background: rgba(245,158,11,0.1); color: #D97706; }
+    .badge-locked { background: rgba(249,115,22,0.1); color: #F97316; }
+    .badge-published { background: rgba(16,185,129,0.1); color: #10B981; }
+    .badge-reopened { background: rgba(239,68,68,0.1); color: #EF4444; }
+
+    .group-card { background: var(--bg-card, white); border-radius: var(--radius, 12px); box-shadow: var(--shadow-sm); margin-bottom: 16px; }
+    .group-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; cursor: pointer; user-select: none; }
+    .group-header:hover { background: var(--bg, #F9FAFB); }
+    .group-body { display: none; border-top: 1px solid var(--border-light, #E5E7EB); padding: 16px 20px; }
+    .group-body.open { display: block; }
+    .group-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 8px; margin-bottom: 6px; background: var(--bg, #F9FAFB); }
+    .group-item:last-child { margin-bottom: 0; }
+    .add-group-row { display: flex; gap: 8px; align-items: end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-light, #E5E7EB); }
+
+    .audit-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .audit-table th { padding: 8px 10px; background: var(--bg, #F3F4F6); font-size: 0.68rem; text-transform: uppercase; color: var(--text-secondary, var(--text-light)); text-align: left; white-space: nowrap; }
+    .audit-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-light, #E5E7EB); color: var(--text); }
+    .audit-table tr:hover { background: var(--bg, #F9FAFB); }
+
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    @media (max-width: 768px) {
+        .stats-row { grid-template-columns: repeat(2, 1fr); }
+        .form-row-2, .form-row-3 { grid-template-columns: 1fr; }
+        .cycle-header { flex-direction: column; align-items: flex-start; }
+        .cycle-actions { width: 100%; justify-content: flex-start; }
+    }
+
+    .skeleton { background: linear-gradient(90deg, var(--bg, #F3F4F6) 25%, var(--bg-card, #E5E7EB) 50%, var(--bg, #F3F4F6) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .loading-spinner { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--text-secondary, var(--text-light)); }
+    .loading-spinner i { font-size: 2rem; color: var(--primary); }
+
+    .modal-body-scroll { max-height: 60vh; overflow-y: auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
+    <div>
+        <h2 style="font-size:1.1rem; font-weight:800; color:var(--text); margin:0;">Report Card System</h2>
+        <p style="font-size:0.78rem; color:var(--text-secondary, var(--text-light)); margin:2px 0 0;">Manage exam cycles, track teacher uploads, publish results</p>
+    </div>
+    <button class="btn btn-primary" onclick="openModal('createCycleModal')">
+        <i class="fas fa-plus"></i> Create Exam Cycle
+    </button>
+</div>
+
+<!-- Stats Row -->
+<div class="stats-row" id="statsRow">
+    <div class="stat-card" style="border-top-color:var(--primary);">
+        <div class="stat-val" style="color:var(--primary);" id="statTotal">--</div>
+        <div class="stat-label">Total Cycles</div>
+    </div>
+    <div class="stat-card" style="border-top-color:#3B82F6;">
+        <div class="stat-val" style="color:#3B82F6;" id="statOpen">--</div>
+        <div class="stat-label">Open</div>
+    </div>
+    <div class="stat-card" style="border-top-color:#10B981;">
+        <div class="stat-val" style="color:#10B981;" id="statPublished">--</div>
+        <div class="stat-label">Published</div>
+    </div>
+    <div class="stat-card" style="border-top-color:#F59E0B;">
+        <div class="stat-val" style="color:#F59E0B;" id="statPending">--</div>
+        <div class="stat-label">Pending Verification</div>
+    </div>
+</div>
+
+<!-- Exam Groups Section -->
+<div class="group-card">
+    <div class="group-header" onclick="toggleGroupPanel()">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <i class="fas fa-layer-group" style="color:var(--primary); font-size:1rem;"></i>
+            <div>
+                <div style="font-weight:700; font-size:0.92rem; color:var(--text);">Exam Groups</div>
+                <div style="font-size:0.72rem; color:var(--text-secondary, var(--text-light));">Term 1, Term 2, Half-Yearly, Annual, etc.</div>
+            </div>
+        </div>
+        <i class="fas fa-chevron-down" id="groupChevron" style="color:var(--text-secondary, var(--text-light)); transition: transform 0.2s;"></i>
+    </div>
+    <div class="group-body" id="groupBody">
+        <div id="groupList">
+            <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+        </div>
+        <div class="add-group-row">
+            <div class="form-group" style="flex:2; margin:0;">
+                <label class="form-label" style="font-size:0.72rem;">Group Name</label>
+                <input type="text" id="newGroupName" class="form-input" placeholder="e.g., Term 1, Half-Yearly" style="padding:8px 12px;">
+            </div>
+            <div class="form-group" style="flex:1; margin:0;">
+                <label class="form-label" style="font-size:0.72rem;">Display Order</label>
+                <input type="number" id="newGroupOrder" class="form-input" placeholder="1" value="1" style="padding:8px 12px;">
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="addExamGroup()" style="padding:8px 16px; align-self:flex-end;">
+                <i class="fas fa-plus"></i> Add Group
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Exam Cycles List -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin:20px 0 12px; flex-wrap:wrap; gap:8px;">
+    <h3 style="font-size:0.95rem; font-weight:700; color:var(--text); margin:0;">
+        <i class="fas fa-clipboard-list" style="color:var(--primary); margin-right:6px;"></i> Exam Cycles
+    </h3>
+    <div style="display:flex; gap:8px; align-items:center;">
+        <select id="filterStatus" class="form-select" onchange="loadExamCycles()" style="padding:6px 12px; font-size:0.8rem; min-width:140px;">
+            <option value="">All Statuses</option>
+            <option value="open">Open</option>
+            <option value="verification_pending">Pending Verification</option>
+            <option value="locked">Locked</option>
+            <option value="published">Published</option>
+            <option value="reopened">Reopened</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadExamCycles()" title="Refresh">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+    </div>
+</div>
+
+<div id="cyclesArea">
+    <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+</div>
+
+<!-- ==================== MODALS ==================== -->
+
+<!-- Create Exam Cycle Modal -->
+<div class="modal-overlay" id="createCycleModal" style="display:none;">
+    <div class="modal modal-lg" style="max-height:90vh; overflow-y:auto;">
+        <div class="modal-header" style="position:sticky; top:0; background:var(--bg-card, white); z-index:10; padding:20px 24px 14px;">
+            <h2><i class="fas fa-plus-circle" style="color:var(--primary); margin-right:8px;"></i> Create Exam Cycle</h2>
+            <button class="modal-close" onclick="closeModal('createCycleModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="createCycleForm">
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Cycle Name <span class="required" style="color:var(--danger);">*</span></label>
+                        <input type="text" name="name" class="form-input" placeholder="e.g., Mid-Term Exam 2026" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Exam Group <span class="required" style="color:var(--danger);">*</span></label>
+                        <select name="exam_group_id" class="form-select" id="cycleGroupSelect" required>
+                            <option value="">Select Group</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Class <span class="required" style="color:var(--danger);">*</span></label>
+                        <select name="class_id" class="form-select" id="cycleClassSelect" onchange="loadCycleSections()" required>
+                            <option value="">Select Class</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Section</label>
+                        <select name="section_id" class="form-select" id="cycleSectionSelect">
+                            <option value="">All Sections</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Report Card Template</label>
+                        <select name="template_id" class="form-select" id="cycleTemplateSelect">
+                            <option value="">Default Template</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label class="form-label">Max Marks <span class="required" style="color:var(--danger);">*</span></label>
+                        <input type="number" name="max_marks" class="form-input" value="100" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Passing Marks <span class="required" style="color:var(--danger);">*</span></label>
+                        <input type="number" name="passing_marks" class="form-input" value="33" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Weightage %</label>
+                        <input type="number" name="weightage" class="form-input" value="100" min="0" max="100" step="0.1">
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Marks Deadline <span class="required" style="color:var(--danger);">*</span></label>
+                        <input type="date" name="marks_deadline" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Result Date</label>
+                        <input type="date" name="result_date" class="form-input">
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label class="form-label">Rank Scope</label>
+                        <select name="rank_scope" class="form-select">
+                            <option value="section">Section</option>
+                            <option value="class">Class (all sections)</option>
+                        </select>
+                    </div>
+                    <div></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer" style="position:sticky; bottom:0; background:var(--bg-card, white); z-index:10;">
+            <button class="btn btn-secondary" onclick="closeModal('createCycleModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createExamCycle()" id="createCycleBtn">
+                <i class="fas fa-check"></i> Create Cycle
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Grace Marks Modal -->
+<div class="modal-overlay" id="graceModal" style="display:none;">
+    <div class="modal" style="max-width:500px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-hand-holding-heart" style="color:var(--warning); margin-right:8px;"></i> Apply Grace Marks</h2>
+            <button class="modal-close" onclick="closeModal('graceModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="graceCycleId">
+            <div class="form-group">
+                <label class="form-label">Subject <span class="required" style="color:var(--danger);">*</span></label>
+                <select id="graceSubject" class="form-select">
+                    <option value="">Loading subjects...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Grace Marks <span class="required" style="color:var(--danger);">*</span></label>
+                <input type="number" id="graceAmount" class="form-input" placeholder="e.g., 5" min="1" max="50">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reason <span class="required" style="color:var(--danger);">*</span></label>
+                <textarea id="graceReason" class="form-input" rows="3" placeholder="Provide reason for applying grace marks (required for audit)" style="resize:vertical;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('graceModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="applyGraceMarks()" id="graceBtn">
+                <i class="fas fa-check"></i> Apply Grace
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Reopen Modal -->
+<div class="modal-overlay" id="reopenModal" style="display:none;">
+    <div class="modal" style="max-width:480px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-lock-open" style="color:var(--danger); margin-right:8px;"></i> Reopen Exam Cycle</h2>
+            <button class="modal-close" onclick="closeModal('reopenModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="reopenCycleId">
+            <div style="background:rgba(239,68,68,0.08); padding:14px 16px; border-radius:10px; margin-bottom:16px; border:1px solid rgba(239,68,68,0.15);">
+                <div style="font-weight:700; font-size:0.85rem; color:var(--danger); margin-bottom:6px;">
+                    <i class="fas fa-exclamation-triangle"></i> Warning
+                </div>
+                <p style="font-size:0.78rem; color:var(--text-secondary, var(--text-light)); margin:0; line-height:1.5;">
+                    Reopening this cycle will allow teachers to modify their uploaded marks. Published results will be temporarily hidden from students and parents until the cycle is locked and published again. This action is logged in the audit trail.
+                </p>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Reason for Reopening <span class="required" style="color:var(--danger);">*</span></label>
+                <textarea id="reopenReason" class="form-input" rows="3" placeholder="Explain why this cycle needs to be reopened (required)" style="resize:vertical;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('reopenModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="reopenCycle()" id="reopenBtn" style="background:var(--danger);">
+                <i class="fas fa-lock-open"></i> Reopen Cycle
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Audit Log Modal -->
+<div class="modal-overlay" id="auditModal" style="display:none;">
+    <div class="modal modal-xl" style="max-height:85vh;">
+        <div class="modal-header" style="position:sticky; top:0; background:var(--bg-card, white); z-index:10;">
+            <h2><i class="fas fa-history" style="color:var(--primary); margin-right:8px;"></i> Audit Log</h2>
+            <button class="modal-close" onclick="closeModal('auditModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body modal-body-scroll" style="padding:0;">
+            <div id="auditContent">
+                <div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% raw %}
+<script>
+// ==================== STATE ====================
+let examGroups = [];
+let examCycles = [];
+let classesData = [];
+let classSectionsMap = {};
+let templatesData = [];
+
+// ==================== INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', function() {
+    loadExamGroups();
+    loadExamCycles();
+    loadClassesData();
+    loadTemplatesData();
+});
+
+// ==================== DATA LOADING ====================
+
+async function loadClassesData() {
+    try {
+        const result = await apiCall('/api/report-card/classes');
+        if (result.error) return;
+        classesData = result.classes || [];
+        classSectionsMap = result.sections_map || {};
+        populateClassDropdowns();
+    } catch(e) {}
+}
+
+async function loadTemplatesData() {
+    try {
+        const result = await apiCall('/api/report-card/templates');
+        if (result.error) return;
+        templatesData = result.templates || [];
+        const sel = document.getElementById('cycleTemplateSelect');
+        sel.innerHTML = '<option value="">Default Template</option>';
+        templatesData.forEach(t => {
+            sel.innerHTML += `<option value="${t.id}">${t.name}</option>`;
+        });
+    } catch(e) {}
+}
+
+function populateClassDropdowns() {
+    const sel = document.getElementById('cycleClassSelect');
+    sel.innerHTML = '<option value="">Select Class</option>';
+    classesData.forEach(c => {
+        sel.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+    });
+}
+
+function loadCycleSections() {
+    const classId = document.getElementById('cycleClassSelect').value;
+    const sec = document.getElementById('cycleSectionSelect');
+    sec.innerHTML = '<option value="">All Sections</option>';
+    if (classId && classSectionsMap[classId]) {
+        classSectionsMap[classId].forEach(s => {
+            sec.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+    }
+}
+
+// ==================== EXAM GROUPS ====================
+
+async function loadExamGroups() {
+    try {
+        const result = await apiCall('/api/report-card/exam-groups');
+        if (result.error) {
+            document.getElementById('groupList').innerHTML = '<div style="padding:12px; font-size:0.82rem; color:var(--text-secondary);">Could not load exam groups</div>';
+            return;
+        }
+        examGroups = result.groups || [];
+        renderExamGroups();
+        populateGroupDropdown();
+    } catch(e) {
+        document.getElementById('groupList').innerHTML = '<div style="padding:12px; font-size:0.82rem; color:var(--danger);">Error loading groups</div>';
+    }
+}
+
+function renderExamGroups() {
+    const container = document.getElementById('groupList');
+    if (examGroups.length === 0) {
+        container.innerHTML = '<div style="padding:16px; text-align:center; font-size:0.82rem; color:var(--text-secondary, var(--text-light));"><i class="fas fa-folder-open" style="display:block; font-size:1.5rem; margin-bottom:8px; opacity:0.3;"></i>No exam groups yet. Add your first group below.</div>';
+        return;
+    }
+    container.innerHTML = examGroups.map(g => `
+        <div class="group-item">
+            <div>
+                <span style="font-weight:600; font-size:0.88rem; color:var(--text);">${escapeHtml(g.name)}</span>
+                <span style="font-size:0.72rem; color:var(--text-secondary, var(--text-light)); margin-left:8px;">Order: ${g.display_order || 0}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="deleteExamGroup('${g.id}', '${escapeHtml(g.name)}')" style="color:var(--danger);" title="Delete group">
+                <i class="fas fa-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function populateGroupDropdown() {
+    const sel = document.getElementById('cycleGroupSelect');
+    sel.innerHTML = '<option value="">Select Group</option>';
+    examGroups.forEach(g => {
+        sel.innerHTML += `<option value="${g.id}">${escapeHtml(g.name)}</option>`;
+    });
+}
+
+function toggleGroupPanel() {
+    const body = document.getElementById('groupBody');
+    const chevron = document.getElementById('groupChevron');
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open');
+    chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+async function addExamGroup() {
+    const name = document.getElementById('newGroupName').value.trim();
+    const order = parseInt(document.getElementById('newGroupOrder').value) || 1;
+    if (!name) {
+        showToast('warning', 'Please enter a group name');
+        return;
+    }
+    try {
+        const result = await apiCall('/api/report-card/exam-groups', 'POST', { name, display_order: order });
+        if (result.error) {
+            showToast('error', result.error);
+            return;
+        }
+        showToast('success', 'Exam group created successfully');
+        document.getElementById('newGroupName').value = '';
+        document.getElementById('newGroupOrder').value = (examGroups.length + 2);
+        loadExamGroups();
+    } catch(e) {
+        showToast('error', 'Failed to create group');
+    }
+}
+
+function deleteExamGroup(id, name) {
+    showConfirm('Delete Group', `Are you sure you want to delete the exam group <strong>${name}</strong>?<br>Cycles linked to this group will be unlinked.`, async () => {
+        try {
+            const result = await apiCall(`/api/report-card/exam-groups/${id}`, 'DELETE');
+            if (result.error) {
+                showToast('error', result.error);
+                return;
+            }
+            showToast('success', 'Exam group deleted');
+            loadExamGroups();
+        } catch(e) {
+            showToast('error', 'Failed to delete group');
+        }
+    }, { icon: '🗑️', danger: true, yesText: 'Delete' });
+}
+
+// ==================== EXAM CYCLES ====================
+
+async function loadExamCycles() {
+    const area = document.getElementById('cyclesArea');
+    area.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    const status = document.getElementById('filterStatus').value;
+    let url = '/api/report-card/exam-cycles';
+    if (status) url += `?status=${status}`;
+
+    try {
+        const result = await apiCall(url);
+        if (result.error) {
+            area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color:var(--danger);"></i><h3>Error Loading Cycles</h3><p>${escapeHtml(result.error)}</p></div></div></div>`;
+            return;
+        }
+        examCycles = result.cycles || [];
+        updateStats();
+        renderExamCycles();
+    } catch(e) {
+        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color:var(--danger);"></i><h3>Connection Error</h3><p>Could not reach the server. Please try again.</p></div></div></div>';
+    }
+}
+
+function updateStats() {
+    const total = examCycles.length;
+    const open = examCycles.filter(c => c.status === 'open' || c.status === 'reopened').length;
+    const published = examCycles.filter(c => c.status === 'published').length;
+    const pending = examCycles.filter(c => c.status === 'verification_pending').length;
+
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statOpen').textContent = open;
+    document.getElementById('statPublished').textContent = published;
+    document.getElementById('statPending').textContent = pending;
+}
+
+function renderExamCycles() {
+    const area = document.getElementById('cyclesArea');
+    if (examCycles.length === 0) {
+        area.innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <i class="fas fa-clipboard-list" style="font-size:2.5rem; color:var(--primary); opacity:0.4;"></i>
+                        <h3>No Exam Cycles Found</h3>
+                        <p>Create your first exam cycle to start managing report cards.</p>
+                        <button class="btn btn-primary" onclick="openModal('createCycleModal')" style="margin-top:8px;">
+                            <i class="fas fa-plus"></i> Create Exam Cycle
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        return;
+    }
+
+    area.innerHTML = examCycles.map(c => {
+        const statusLabel = formatStatus(c.status);
+        const deadlineStr = c.marks_deadline ? new Date(c.marks_deadline).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : 'No deadline';
+        const className = c.class_name || 'N/A';
+        const sectionName = c.section_name ? ` - ${c.section_name}` : '';
+        const groupName = c.exam_group_name || '';
+
+        return `
+        <div class="cycle-card status-${c.status}" id="cycle-${c.id}">
+            <div class="cycle-header">
+                <div class="cycle-info">
+                    <div class="cycle-name">${escapeHtml(c.name)}</div>
+                    <div class="cycle-meta">
+                        <span><i class="fas fa-graduation-cap"></i> ${escapeHtml(className)}${escapeHtml(sectionName)}</span>
+                        ${groupName ? `<span><i class="fas fa-layer-group"></i> ${escapeHtml(groupName)}</span>` : ''}
+                        <span><i class="fas fa-calendar-alt"></i> ${deadlineStr}</span>
+                        <span class="badge badge-${c.status}" style="padding:3px 10px; border-radius:8px; font-size:0.68rem; font-weight:700;">${statusLabel}</span>
+                    </div>
+                </div>
+                <div class="cycle-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="viewProgress('${c.id}')" title="View upload progress">
+                        <i class="fas fa-chart-pie"></i> Progress
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openGraceModal('${c.id}')" title="Apply grace marks">
+                        <i class="fas fa-hand-holding-heart"></i> Grace
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="viewAuditLog('${c.id}')" title="View audit log">
+                        <i class="fas fa-history"></i>
+                    </button>
+                    ${c.status === 'published' ? `
+                        <button class="btn btn-ghost btn-sm" onclick="openReopenModal('${c.id}')" title="Reopen cycle" style="color:var(--danger);">
+                            <i class="fas fa-lock-open"></i>
+                        </button>
+                    ` : ''}
+                    ${c.status !== 'published' && c.status !== 'locked' ? `
+                        <button class="btn btn-ghost btn-sm" onclick="deleteExamCycle('${c.id}', '${escapeHtml(c.name)}')" title="Delete cycle" style="color:var(--danger);">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+            <div class="progress-section" id="progress-${c.id}" style="display:none;"></div>
+        </div>`;
+    }).join('');
+}
+
+function formatStatus(status) {
+    const map = {
+        'open': 'Open',
+        'verification_pending': 'Pending Verification',
+        'locked': 'Locked',
+        'published': 'Published',
+        'reopened': 'Reopened'
+    };
+    return map[status] || status;
+}
+
+// ==================== CREATE CYCLE ====================
+
+async function createExamCycle() {
+    const form = document.getElementById('createCycleForm');
+    const data = getFormData('createCycleForm');
+
+    if (!data.name || !data.name.trim()) {
+        showToast('warning', 'Cycle name is required');
+        return;
+    }
+    if (!data.exam_group_id) {
+        showToast('warning', 'Please select an exam group');
+        return;
+    }
+    if (!data.class_id) {
+        showToast('warning', 'Please select a class');
+        return;
+    }
+    if (!data.marks_deadline) {
+        showToast('warning', 'Marks deadline is required');
+        return;
+    }
+    if (!data.max_marks || parseInt(data.max_marks) < 1) {
+        showToast('warning', 'Max marks must be at least 1');
+        return;
+    }
+
+    const payload = {
+        name: data.name.trim(),
+        exam_group_id: data.exam_group_id,
+        class_id: data.class_id,
+        section_id: data.section_id || null,
+        template_id: data.template_id || null,
+        max_marks: parseInt(data.max_marks),
+        passing_marks: parseInt(data.passing_marks) || 0,
+        weightage: parseFloat(data.weightage) || 100,
+        marks_deadline: data.marks_deadline,
+        result_date: data.result_date || null,
+        rank_scope: data.rank_scope || 'section'
+    };
+
+    const btn = document.getElementById('createCycleBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+    try {
+        const result = await apiCall('/api/report-card/exam-cycles', 'POST', payload);
+        if (result.error) {
+            showToast('error', result.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> Create Cycle';
+            return;
+        }
+        showToast('success', 'Exam cycle created successfully');
+        closeModal('createCycleModal');
+        form.reset();
+        loadExamCycles();
+    } catch(e) {
+        showToast('error', 'Failed to create exam cycle');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> Create Cycle';
+}
+
+// ==================== VIEW PROGRESS ====================
+
+async function viewProgress(cycleId) {
+    const section = document.getElementById(`progress-${cycleId}`);
+    const isVisible = section.style.display !== 'none';
+
+    if (isVisible) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    section.innerHTML = '<div class="loading-spinner" style="padding:16px;"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    try {
+        const result = await apiCall(`/api/report-card/upload-progress/${cycleId}`);
+        if (result.error) {
+            section.innerHTML = `<div style="padding:8px 0; font-size:0.82rem; color:var(--danger);">${escapeHtml(result.error)}</div>`;
+            return;
+        }
+
+        const total = result.teachers ? result.teachers.length : 0;
+        const submitted = result.teachers ? result.teachers.filter(t => t.status === 'submitted').length : 0;
+        const draft = result.teachers ? result.teachers.filter(t => t.status === 'draft').length : 0;
+        const pending = total - submitted - draft;
+        const pct = total > 0 ? Math.round((submitted / total) * 100) : 0;
+
+        let html = `
+            <div class="progress-label">${submitted} of ${total} teachers uploaded (${pct}%)</div>
+            <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" style="width:${pct}%;"></div>
+            </div>
+        `;
+
+        if (result.teachers && result.teachers.length > 0) {
+            html += '<div class="teacher-status-row" style="margin-top:10px;">';
+            result.teachers.forEach(t => {
+                let chipClass = 'pending';
+                let icon = 'fa-clock';
+                if (t.status === 'submitted') { chipClass = 'submitted'; icon = 'fa-check-circle'; }
+                else if (t.status === 'draft') { chipClass = 'draft'; icon = 'fa-pencil-alt'; }
+
+                html += `<span class="teacher-chip ${chipClass}" title="${escapeHtml(t.name)}: ${t.status}">
+                    <i class="fas ${icon}"></i> ${escapeHtml(t.name)}
+                </span>`;
+            });
+            html += '</div>';
+        } else {
+            html += '<div style="font-size:0.78rem; color:var(--text-secondary); margin-top:8px;">No teacher data available for this cycle.</div>';
+        }
+
+        section.innerHTML = html;
+    } catch(e) {
+        section.innerHTML = '<div style="padding:8px 0; font-size:0.82rem; color:var(--danger);">Failed to load progress</div>';
+    }
+}
+
+// ==================== GRACE MARKS ====================
+
+async function openGraceModal(cycleId) {
+    document.getElementById('graceCycleId').value = cycleId;
+    document.getElementById('graceAmount').value = '';
+    document.getElementById('graceReason').value = '';
+
+    const subjectSelect = document.getElementById('graceSubject');
+    subjectSelect.innerHTML = '<option value="">Loading...</option>';
+    openModal('graceModal');
+
+    try {
+        const result = await apiCall(`/api/report-card/upload-progress/${cycleId}`);
+        if (result.subjects && result.subjects.length > 0) {
+            subjectSelect.innerHTML = '<option value="">Select Subject</option>';
+            result.subjects.forEach(s => {
+                subjectSelect.innerHTML += `<option value="${s.id}">${escapeHtml(s.name)}</option>`;
+            });
+        } else {
+            subjectSelect.innerHTML = '<option value="">No subjects found</option>';
+        }
+    } catch(e) {
+        subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
+    }
+}
+
+async function applyGraceMarks() {
+    const cycleId = document.getElementById('graceCycleId').value;
+    const subjectId = document.getElementById('graceSubject').value;
+    const amount = parseInt(document.getElementById('graceAmount').value);
+    const reason = document.getElementById('graceReason').value.trim();
+
+    if (!subjectId) {
+        showToast('warning', 'Please select a subject');
+        return;
+    }
+    if (!amount || amount < 1) {
+        showToast('warning', 'Enter a valid grace marks amount');
+        return;
+    }
+    if (!reason) {
+        showToast('warning', 'Reason is required for audit trail');
+        return;
+    }
+
+    const btn = document.getElementById('graceBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying...';
+
+    try {
+        const result = await apiCall('/api/report-card/admin/apply-grace', 'POST', {
+            cycle_id: cycleId,
+            subject_id: subjectId,
+            grace_marks: amount,
+            reason: reason
+        });
+        if (result.error) {
+            showToast('error', result.error);
+        } else {
+            showToast('success', result.message || 'Grace marks applied successfully');
+            closeModal('graceModal');
+        }
+    } catch(e) {
+        showToast('error', 'Failed to apply grace marks');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-check"></i> Apply Grace';
+}
+
+// ==================== REOPEN CYCLE ====================
+
+function openReopenModal(cycleId) {
+    document.getElementById('reopenCycleId').value = cycleId;
+    document.getElementById('reopenReason').value = '';
+    openModal('reopenModal');
+}
+
+async function reopenCycle() {
+    const cycleId = document.getElementById('reopenCycleId').value;
+    const reason = document.getElementById('reopenReason').value.trim();
+
+    if (!reason) {
+        showToast('warning', 'Please provide a reason for reopening');
+        return;
+    }
+
+    const btn = document.getElementById('reopenBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Reopening...';
+
+    try {
+        const result = await apiCall(`/api/report-card/exam-cycles/${cycleId}/reopen`, 'POST', { reason });
+        if (result.error) {
+            showToast('error', result.error);
+        } else {
+            showToast('success', result.message || 'Exam cycle reopened');
+            closeModal('reopenModal');
+            loadExamCycles();
+        }
+    } catch(e) {
+        showToast('error', 'Failed to reopen cycle');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-lock-open"></i> Reopen Cycle';
+}
+
+// ==================== DELETE CYCLE ====================
+
+function deleteExamCycle(id, name) {
+    showConfirm('Delete Exam Cycle', `Are you sure you want to delete <strong>${name}</strong>?<br>All associated data will be permanently removed.`, async () => {
+        try {
+            const result = await apiCall(`/api/report-card/exam-cycles/${id}`, 'DELETE');
+            if (result.error) {
+                showToast('error', result.error);
+                return;
+            }
+            showToast('success', 'Exam cycle deleted');
+            loadExamCycles();
+        } catch(e) {
+            showToast('error', 'Failed to delete cycle');
+        }
+    }, { icon: '🗑️', danger: true, yesText: 'Delete' });
+}
+
+// ==================== AUDIT LOG ====================
+
+async function viewAuditLog(cycleId) {
+    openModal('auditModal');
+    const content = document.getElementById('auditContent');
+    content.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-spin"></i></div>';
+
+    try {
+        const result = await apiCall(`/api/report-card/admin/audit-log?cycle_id=${cycleId}`);
+        if (result.error) {
+            content.innerHTML = `<div style="padding:24px; text-align:center; color:var(--danger); font-size:0.85rem;">${escapeHtml(result.error)}</div>`;
+            return;
+        }
+
+        const logs = result.logs || [];
+        if (logs.length === 0) {
+            content.innerHTML = '<div style="padding:30px; text-align:center;"><i class="fas fa-clipboard-check" style="font-size:2rem; color:var(--text-secondary); opacity:0.3; display:block; margin-bottom:10px;"></i><p style="font-size:0.85rem; color:var(--text-secondary);">No audit log entries for this cycle yet.</p></div>';
+            return;
+        }
+
+        let html = '<table class="audit-table"><thead><tr><th>Action</th><th>Field</th><th>Old Value</th><th>New Value</th><th>Changed By</th><th>Date</th><th>IP</th><th>Reason</th></tr></thead><tbody>';
+        logs.forEach(log => {
+            const dateStr = log.created_at ? new Date(log.created_at).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '-';
+            html += `<tr>
+                <td><span style="font-weight:600;">${escapeHtml(log.action || '-')}</span></td>
+                <td>${escapeHtml(log.field || '-')}</td>
+                <td style="color:var(--danger);">${escapeHtml(log.old_value || '-')}</td>
+                <td style="color:var(--success);">${escapeHtml(log.new_value || '-')}</td>
+                <td>${escapeHtml(log.changed_by || '-')}</td>
+                <td style="white-space:nowrap;">${dateStr}</td>
+                <td style="font-family:monospace; font-size:0.72rem;">${escapeHtml(log.ip_address || '-')}</td>
+                <td style="max-width:180px; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(log.reason || '')}">${escapeHtml(log.reason || '-')}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    } catch(e) {
+        content.innerHTML = '<div style="padding:24px; text-align:center; color:var(--danger); font-size:0.85rem;">Failed to load audit log</div>';
+    }
+}
+
+// ==================== UTILITY ====================
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+</script>
+{% endraw %}
+{% endblock %}

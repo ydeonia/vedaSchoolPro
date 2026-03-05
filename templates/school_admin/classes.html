@@ -121,12 +121,13 @@ async function submitClassForm() {
 }
 
 async function quickAddClasses() {
-    if (!confirm('This will create Nursery, LKG, UKG, Class 1 to Class 12 with Section A. Continue?')) return;
-    try {
-        await apiCall('/api/school/classes/quick-setup', 'POST');
-        showToast('success', 'Classes Created!', 'All standard classes with Section A have been created');
-        setTimeout(() => window.location.reload(), 1000);
-    } catch (e) {}
+    showConfirm('Confirm', 'This will create Nursery, LKG, UKG, Class 1 to Class 12 with Section A. Continue?', async () => {
+        try {
+            await apiCall('/api/school/classes/quick-setup', 'POST');
+            showToast('success', 'Classes Created!', 'All standard classes with Section A have been created');
+            setTimeout(() => window.location.reload(), 1000);
+        } catch (e) {}
+    }, {icon:'⚠️'});
 }
 
 async function addSection(classId, className) {
@@ -140,12 +141,13 @@ async function addSection(classId, className) {
 }
 
 async function deleteSection(sectionId, label) {
-    if (!confirm(`Delete ${label}?`)) return;
-    try {
-        await apiCall(`/api/school/sections/${sectionId}`, 'DELETE');
-        showToast('success', 'Deleted', `${label} removed`);
-        setTimeout(() => window.location.reload(), 800);
-    } catch (e) {}
+    showConfirm('Delete Section', `Delete ${label}?`, async () => {
+        try {
+            await apiCall(`/api/school/sections/${sectionId}`, 'DELETE');
+            showToast('success', 'Deleted', `${label} removed`);
+            setTimeout(() => window.location.reload(), 800);
+        } catch (e) {}
+    }, {icon:'🗑️', danger:true, yesText:'Delete'});
 }
 </script>
 {% endblock %}

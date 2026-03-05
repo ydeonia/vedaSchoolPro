@@ -12,14 +12,31 @@
 .adm-table td{padding:10px;border-bottom:1px solid var(--border-light);vertical-align:middle;}
 .adm-table tr:hover{background:rgba(67,56,202,0.03);}
 .adm-table tr.suspended{background:rgba(220,38,38,0.05);}
-.adm-name{font-weight:800;}.adm-email{font-size:0.68rem;color:var(--text-light);}
+.adm-name{font-weight:800;cursor:pointer;color:#4338CA;}.adm-name:hover{text-decoration:underline;}
+.adm-email{font-size:0.68rem;color:var(--text-light);}
 .pill{padding:2px 8px;border-radius:6px;font-size:0.58rem;font-weight:800;display:inline-block;}
 .pill-g{background:#D1FAE5;color:#065F46;}.pill-r{background:#FEE2E2;color:#991B1B;}.pill-y{background:#FEF3C7;color:#92400E;}
 .act-btn{padding:4px 8px;border-radius:6px;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;margin:1px;}
 .act-suspend{background:#FEF3C7;color:#92400E;}.act-activate{background:#D1FAE5;color:#065F46;}
 .act-delete{background:#FEE2E2;color:#991B1B;}.act-email{background:#DBEAFE;color:#1D4ED8;}
-.act-reset{background:#EDE9FE;color:#7C3AED;}
-.avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.65rem;color:white;flex-shrink:0;background:#4338CA;}
+.act-reset{background:#EDE9FE;color:#7C3AED;}.act-edit{background:#E0E7FF;color:#4338CA;}
+.avatar{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.65rem;color:white;flex-shrink:0;background:#4338CA;overflow:hidden;}
+.avatar img{width:100%;height:100%;object-fit:cover;}
+/* Edit modal detail view */
+.detail-grid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:0.75rem;margin-bottom:14px;}
+.detail-grid .lbl{font-weight:800;color:var(--text-light);font-size:0.62rem;text-transform:uppercase;padding-top:4px;}
+.detail-grid .val{padding:4px 0;}
+.tab-row{display:flex;gap:0;border-bottom:2px solid var(--border-light);margin-bottom:14px;}
+.tab-btn{padding:8px 16px;font-size:0.7rem;font-weight:800;cursor:pointer;border-bottom:3px solid transparent;color:var(--text-light);}
+.tab-btn:hover{color:var(--text);}.tab-btn.active{color:#4338CA;border-bottom-color:#4338CA;}
+.tab-panel{display:none;}.tab-panel.active{display:block;}
+.log-table{width:100%;border-collapse:collapse;font-size:0.68rem;}
+.log-table th{font-size:0.56rem;font-weight:800;text-transform:uppercase;color:var(--text-light);padding:6px 8px;text-align:left;border-bottom:1px solid var(--border-light);}
+.log-table td{padding:6px 8px;border-bottom:1px solid var(--border-light);}
+.photo-upload-area{width:80px;height:80px;border-radius:14px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;background:var(--bg);}
+.photo-upload-area img{width:100%;height:100%;object-fit:cover;}
+.photo-upload-area:hover{border-color:#4338CA;background:rgba(67,56,202,0.05);}
+.photo-upload-area .upload-hint{font-size:0.5rem;text-align:center;color:var(--text-light);}
 </style>
 {% endblock %}
 {% block content %}
@@ -44,15 +61,22 @@
                 <tr class="{{ 'suspended' if not admin.is_active else '' }}" data-name="{{ admin.first_name }} {{ admin.last_name or '' }}" data-email="{{ admin.email or '' }}" data-branch="{{ admin.branch.name if admin.branch else '' }}" data-status="{{ 'active' if admin.is_active else 'suspended' }}">
                     <td>
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <div class="avatar">{{ admin.first_name[0]|upper }}{{ (admin.last_name or ' ')[0]|upper }}</div>
+                            <div class="avatar">
+                                {% if admin.avatar_url %}
+                                <img src="{{ admin.avatar_url }}" alt="">
+                                {% else %}
+                                {{ admin.first_name[0]|upper }}{{ (admin.last_name or ' ')[0]|upper }}
+                                {% endif %}
+                            </div>
                             <div>
-                                <div class="adm-name">{{ admin.first_name }} {{ admin.last_name or '' }}{% if admin.is_first_admin %} <span style="font-size:0.52rem;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:4px;">👑 First Admin</span>{% endif %}</div>
+                                <div class="adm-name" onclick="viewAdmin('{{ admin.id }}')">{{ admin.first_name }} {{ admin.last_name or '' }}{% if admin.is_first_admin %} <span style="font-size:0.52rem;background:#EDE9FE;color:#7C3AED;padding:1px 5px;border-radius:4px;">👑 First Admin</span>{% endif %}</div>
+                                {% if admin.designation %}<div style="font-size:0.6rem;color:var(--text-light);">{{ admin.designation }}</div>{% endif %}
                             </div>
                         </div>
                     </td>
                     <td>
                         <div class="adm-email">{{ admin.email or '—' }}</div>
-                        <div class="adm-email">{{ admin.phone or '' }}</div>
+                        <div class="adm-email">{% if admin.phone %}+91 {{ admin.phone }}{% endif %}</div>
                     </td>
                     <td style="font-size:0.72rem;">{{ admin.branch.name if admin.branch else '—' }}</td>
                     <td>
@@ -70,13 +94,14 @@
                         {% endif %}
                     </td>
                     <td style="white-space:nowrap;">
+                        <button class="act-btn act-edit" onclick="viewAdmin('{{ admin.id }}')" title="View / Edit"><i class="fas fa-pen"></i></button>
                         {% if admin.is_active %}
                         <button class="act-btn act-suspend" onclick="suspendAdmin('{{ admin.id }}','{{ admin.first_name }}')" title="Suspend"><i class="fas fa-ban"></i></button>
                         {% else %}
                         <button class="act-btn act-activate" onclick="activateAdmin('{{ admin.id }}','{{ admin.first_name }}')" title="Activate"><i class="fas fa-check"></i></button>
                         <button class="act-btn act-delete" onclick="deleteAdmin('{{ admin.id }}','{{ admin.first_name }}',{{ 'true' if not admin.is_active else 'false' }})" title="Delete"><i class="fas fa-trash"></i></button>
                         {% endif %}
-                        <button class="act-btn act-reset" onclick="resetPwd('{{ admin.id }}','{{ admin.first_name }}')" title="Reset Password"><i class="fas fa-key"></i></button>
+                        <button class="act-btn act-reset" onclick="resetPwd('{{ admin.id }}','{{ admin.first_name }}','{{ admin.email or '' }}')" title="Reset Password"><i class="fas fa-key"></i></button>
                         <button class="act-btn act-email" onclick="emailAdmin('{{ admin.email }}','{{ admin.first_name }}')" title="Send Email"><i class="fas fa-envelope"></i></button>
                     </td>
                 </tr>
@@ -106,11 +131,83 @@
                 <div class="form-row"><div class="form-group"><label class="form-label">First Name <span class="required">*</span></label><input type="text" name="first_name" class="form-input" required></div>
                 <div class="form-group"><label class="form-label">Last Name</label><input type="text" name="last_name" class="form-input"></div></div>
                 <div class="form-row"><div class="form-group"><label class="form-label">Email <span class="required">*</span></label><input type="email" name="email" class="form-input" required></div>
-                <div class="form-group"><label class="form-label">Phone</label><input type="tel" name="phone" class="form-input"></div></div>
-                <div class="form-group"><label class="form-label">Password <span class="required">*</span></label><input type="password" name="password" class="form-input" required><div class="form-hint">Min 6 chars. Admin can change after first login.</div></div>
+                <div class="form-group"><label class="form-label">Phone</label><div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1.5px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input type="tel" name="phone" class="form-input" placeholder="9876543210" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div></div></div>
+                <div class="form-group"><label class="form-label">Password <span class="required">*</span></label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <div style="position:relative;flex:1;"><input type="password" name="password" id="addAdminPwd" class="form-input" required oninput="checkAddPwdStrength(this.value)" style="padding-right:40px;">
+                        <button type="button" onclick="togglePwdField('addAdminPwd',this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);font-size:0.82rem;"><i class="fas fa-eye"></i></button></div>
+                        <button type="button" onclick="autoFillAdminPwd()" class="btn btn-secondary" style="padding:8px 10px;font-size:0.72rem;white-space:nowrap;" title="Auto-generate"><i class="fas fa-magic"></i></button>
+                        <button type="button" onclick="copyAdminPwd()" class="btn btn-secondary" style="padding:8px 10px;font-size:0.72rem;" title="Copy"><i class="fas fa-copy"></i></button>
+                    </div>
+                    <div id="addPwdStrengthBar" style="height:4px;border-radius:4px;margin-top:5px;background:#e2e8f0;overflow:hidden;"><div id="addPwdStrengthFill" style="height:100%;width:0;transition:all .3s;border-radius:4px;"></div></div>
+                    <div id="addPwdStrengthText" style="font-size:0.68rem;font-weight:700;margin-top:2px;color:var(--text-light);"></div>
+                    <div class="form-hint">Min 6 chars. Admin can change after first login.</div></div>
             </form>
         </div>
         <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('addAdminModal')">Cancel</button><button class="btn btn-primary" onclick="submitAdminForm()"><i class="fas fa-plus"></i> Create Admin</button></div>
+    </div>
+</div>
+
+<!-- View / Edit Admin Modal -->
+<div class="modal-overlay" id="editAdminModal" style="display:none;">
+    <div class="modal" style="max-width:640px;">
+        <div class="modal-header"><h2 id="editTitle">Admin Details</h2><button class="modal-close" onclick="closeModal('editAdminModal')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body" style="padding:0;">
+            <div class="tab-row">
+                <div class="tab-btn active" onclick="editTab(this,'edit-info')">Profile</div>
+                <div class="tab-btn" onclick="editTab(this,'edit-logs')">Login Logs</div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div class="tab-panel active" id="panel-edit-info" style="padding:0 20px 16px;">
+                <div style="display:flex;gap:18px;align-items:flex-start;margin-bottom:16px;">
+                    <div>
+                        <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
+                            <div id="editAvatar" class="upload-hint"><i class="fas fa-camera" style="font-size:1.2rem;color:var(--text-light);"></i><br>Photo</div>
+                        </div>
+                        <input type="file" id="photoInput" accept="image/*" style="display:none;" onchange="uploadPhoto()">
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-size:0.62rem;font-weight:800;text-transform:uppercase;color:var(--text-light);margin-bottom:2px;">Branch</div>
+                        <div id="editBranch" style="font-size:0.8rem;font-weight:800;margin-bottom:8px;"></div>
+                        <div style="display:flex;gap:6px;">
+                            <span class="pill" id="editStatus"></span>
+                            <span class="pill pill-y" id="editFirstAdmin" style="display:none;">👑 First Admin</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="editAdminForm">
+                    <input type="hidden" id="editAdminId">
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">First Name <span class="required">*</span></label><input type="text" id="editFirstName" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">Last Name</label><input type="text" id="editLastName" class="form-input"></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Email</label><input type="email" id="editEmail" class="form-input"></div>
+                        <div class="form-group"><label class="form-label">Phone</label><div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1.5px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input type="tel" id="editPhone" class="form-input" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div></div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group"><label class="form-label">Designation</label><input type="text" id="editDesignation" class="form-input" placeholder="e.g. Principal, Clerk, Accountant"></div>
+                        <div class="form-group">
+                            <label class="form-label">Member Since</label>
+                            <input type="text" id="editCreatedAt" class="form-input" disabled style="opacity:0.6;">
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Login Logs Tab -->
+            <div class="tab-panel" id="panel-edit-logs" style="padding:0 20px 16px;">
+                <div id="logsContainer">
+                    <p style="font-size:0.72rem;color:var(--text-light);">Loading login history...</p>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('editAdminModal')">Close</button>
+            <button class="btn btn-primary" onclick="saveAdminEdit()"><i class="fas fa-save"></i> Save Changes</button>
+        </div>
     </div>
 </div>
 
@@ -127,16 +224,70 @@
     </div>
 </div>
 
-<!-- Reset Password Modal -->
+<!-- Reset Password Modal — Enhanced -->
 <div class="modal-overlay" id="resetPwdModal" style="display:none;">
-    <div class="modal" style="max-width:400px;">
+    <div class="modal" style="max-width:480px;">
         <div class="modal-header"><h2>🔑 Reset Password</h2><button class="modal-close" onclick="closeModal('resetPwdModal')"><i class="fas fa-times"></i></button></div>
         <div class="modal-body">
-            <p style="font-size:0.75rem;color:var(--text-light);" id="resetInfo"></p>
-            <div class="form-group"><label class="form-label">New Password</label><input id="newPwd" type="password" class="form-input" placeholder="Min 6 characters"></div>
-            <div class="form-group"><label class="form-label">Confirm</label><input id="confirmPwd" type="password" class="form-input" placeholder="Type again"></div>
+            <p style="font-size:0.78rem;color:var(--text-light);margin-bottom:14px;" id="resetInfo"></p>
+            <div id="resetPwdSuccess" style="display:none;background:var(--success-light,#dcfce7);color:var(--success,#16a34a);padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:0.82rem;font-weight:600;"></div>
+
+            <!-- Method Tabs -->
+            <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--bg,#f1f5f9);border-radius:10px;padding:4px;">
+                <button class="rpw-tab active" onclick="switchResetTab('manual')" id="tabManual" style="flex:1;padding:8px 6px;border:none;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;transition:all .2s;background:var(--primary);color:#fff;">Set Password</button>
+                <button class="rpw-tab" onclick="switchResetTab('generate')" id="tabGenerate" style="flex:1;padding:8px 6px;border:none;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent;color:var(--text-secondary);">Auto-Generate</button>
+                <button class="rpw-tab" onclick="switchResetTab('sendlink')" id="tabSendLink" style="flex:1;padding:8px 6px;border:none;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;transition:all .2s;background:transparent;color:var(--text-secondary);">Send Reset Link</button>
+            </div>
+
+            <!-- Tab 1: Manual Set Password -->
+            <div id="resetPanel-manual">
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label class="form-label">New Password</label>
+                    <div style="position:relative;">
+                        <input id="newPwd" type="password" class="form-input" placeholder="Min 6 characters" oninput="checkPwdStrength(this.value)" style="padding-right:40px;">
+                        <button type="button" onclick="togglePwdField('newPwd',this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);font-size:0.82rem;"><i class="fas fa-eye"></i></button>
+                    </div>
+                    <div id="pwdStrengthBar" style="height:4px;border-radius:4px;margin-top:6px;background:#e2e8f0;overflow:hidden;"><div id="pwdStrengthFill" style="height:100%;width:0;transition:all .3s;border-radius:4px;"></div></div>
+                    <div id="pwdStrengthText" style="font-size:0.68rem;font-weight:700;margin-top:3px;color:var(--text-light);"></div>
+                </div>
+                <div class="form-group" style="margin-bottom:10px;">
+                    <label class="form-label">Confirm Password</label>
+                    <input id="confirmPwd" type="password" class="form-input" placeholder="Type again">
+                </div>
+            </div>
+
+            <!-- Tab 2: Auto-Generate -->
+            <div id="resetPanel-generate" style="display:none;">
+                <div style="background:var(--bg,#f1f5f9);border-radius:10px;padding:16px;text-align:center;margin-bottom:12px;">
+                    <div style="font-size:0.68rem;font-weight:700;color:var(--text-light);text-transform:uppercase;margin-bottom:6px;">Generated Password</div>
+                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                        <code id="generatedPwd" style="font-size:1.15rem;font-weight:800;letter-spacing:1px;color:var(--primary);background:#fff;padding:8px 18px;border-radius:8px;border:1.5px dashed var(--primary-light,#c7d2fe);user-select:all;">—</code>
+                        <button onclick="copyGeneratedPwd()" style="border:none;background:var(--primary);color:#fff;width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:0.82rem;" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+                    </div>
+                    <div id="copyConfirm" style="font-size:0.68rem;color:var(--success,#16a34a);font-weight:700;margin-top:4px;opacity:0;transition:opacity .3s;">Copied!</div>
+                </div>
+                <button class="btn btn-secondary" onclick="generateNewPwd()" style="width:100%;margin-bottom:10px;"><i class="fas fa-sync-alt"></i> Generate Another</button>
+                <div style="display:flex;gap:8px;">
+                    <label style="display:flex;align-items:center;gap:4px;font-size:0.72rem;color:var(--text-secondary);cursor:pointer;">
+                        <input type="checkbox" id="genSendEmail" checked style="accent-color:var(--primary);"> Email password to admin
+                    </label>
+                </div>
+            </div>
+
+            <!-- Tab 3: Send Reset Link -->
+            <div id="resetPanel-sendlink" style="display:none;">
+                <div style="background:var(--bg,#f1f5f9);border-radius:10px;padding:20px;text-align:center;">
+                    <i class="fas fa-envelope" style="font-size:2rem;color:var(--primary);margin-bottom:10px;"></i>
+                    <p style="font-size:0.82rem;color:var(--text-secondary);margin:0 0 6px;">A password reset link will be sent to the admin's email.</p>
+                    <p style="font-size:0.72rem;color:var(--text-light);margin:0;" id="resetEmailTarget"></p>
+                    <p style="font-size:0.68rem;color:var(--warning,#d97706);margin:8px 0 0;"><i class="fas fa-clock"></i> Link expires in <strong>24 hours</strong></p>
+                </div>
+            </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('resetPwdModal')">Cancel</button><button class="btn btn-primary" onclick="doResetPwd()"><i class="fas fa-key"></i> Reset</button></div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('resetPwdModal')">Cancel</button>
+            <button class="btn btn-primary" id="resetPwdAction" onclick="doResetPwd()"><i class="fas fa-key"></i> Set Password</button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -184,19 +335,97 @@ function deleteAdmin(id,name,isSuspended){
     },{icon:'🗑️',yesText:'Delete Permanently',danger:true});
 }
 
-let _resetId=null;
-function resetPwd(id,name){
-    _resetId=id;
-    document.getElementById('resetInfo').textContent='Set new password for '+name;
+/* ═══ Password Utility ═══ */
+function _genPassword(len=12){
+    const up='ABCDEFGHJKLMNPQRSTUVWXYZ',lo='abcdefghjkmnpqrstuvwxyz',di='23456789',sp='@#$!%&';
+    let pwd=up[Math.random()*up.length|0]+lo[Math.random()*lo.length|0]+di[Math.random()*di.length|0]+sp[Math.random()*sp.length|0];
+    const all=up+lo+di+sp; for(let i=pwd.length;i<len;i++) pwd+=all[Math.random()*all.length|0];
+    return pwd.split('').sort(()=>Math.random()-.5).join('');
+}
+function _pwdScore(p){
+    let s=0; if(p.length>=6) s++; if(p.length>=10) s++; if(/[A-Z]/.test(p)) s++; if(/[0-9]/.test(p)) s++; if(/[^A-Za-z0-9]/.test(p)) s++;
+    return s; // 0-5
+}
+function _renderStrength(val,barId,fillId,textId){
+    const colors=['#ef4444','#f97316','#eab308','#22c55e','#16a34a'];
+    const labels=['Very Weak','Weak','Fair','Strong','Very Strong'];
+    const pct=val===0?0:val*20;
+    document.getElementById(fillId).style.width=pct+'%';
+    document.getElementById(fillId).style.background=colors[Math.max(0,val-1)]||'#e2e8f0';
+    document.getElementById(textId).textContent=val?labels[val-1]:'';
+    document.getElementById(textId).style.color=colors[Math.max(0,val-1)]||'var(--text-light)';
+}
+function checkPwdStrength(v){ _renderStrength(_pwdScore(v),'pwdStrengthBar','pwdStrengthFill','pwdStrengthText'); }
+function checkAddPwdStrength(v){ _renderStrength(_pwdScore(v),'addPwdStrengthBar','addPwdStrengthFill','addPwdStrengthText'); }
+function togglePwdField(id,btn){
+    const f=document.getElementById(id); const show=f.type==='password'; f.type=show?'text':'password';
+    btn.innerHTML=show?'<i class="fas fa-eye-slash"></i>':'<i class="fas fa-eye"></i>';
+}
+function autoFillAdminPwd(){ const p=_genPassword(); const f=document.getElementById('addAdminPwd'); f.type='text'; f.value=p; checkAddPwdStrength(p); showToast('success','Password generated'); }
+function copyAdminPwd(){ const v=document.getElementById('addAdminPwd').value; if(!v){showToast('error','Generate first');return;} navigator.clipboard.writeText(v); showToast('success','Copied to clipboard'); }
+
+/* ═══ Reset Password Modal ═══ */
+let _resetId=null, _resetName='', _resetEmail='', _resetMode='manual';
+function resetPwd(id,name,email){
+    _resetId=id; _resetName=name; _resetEmail=email||''; _resetMode='manual';
+    document.getElementById('resetInfo').textContent='Reset password for '+name;
     document.getElementById('newPwd').value='';document.getElementById('confirmPwd').value='';
+    document.getElementById('resetEmailTarget').textContent=_resetEmail?'Email: '+_resetEmail:'No email on file — link cannot be sent';
+    document.getElementById('resetPwdSuccess').style.display='none';
+    checkPwdStrength('');
+    switchResetTab('manual');
+    generateNewPwd();
     openModal('resetPwdModal');
 }
+function switchResetTab(tab){
+    _resetMode=tab;
+    ['manual','generate','sendlink'].forEach(t=>{
+        document.getElementById('resetPanel-'+t).style.display=t===tab?'':'none';
+        const btn=document.getElementById('tab'+t.charAt(0).toUpperCase()+t.slice(1));
+        if(btn){btn.style.background=t===tab?'var(--primary)':'transparent';btn.style.color=t===tab?'#fff':'var(--text-secondary)';}
+    });
+    // Tab id fixup
+    document.getElementById('tabManual').style.background=tab==='manual'?'var(--primary)':'transparent';
+    document.getElementById('tabManual').style.color=tab==='manual'?'#fff':'var(--text-secondary)';
+    document.getElementById('tabGenerate').style.background=tab==='generate'?'var(--primary)':'transparent';
+    document.getElementById('tabGenerate').style.color=tab==='generate'?'#fff':'var(--text-secondary)';
+    document.getElementById('tabSendLink').style.background=tab==='sendlink'?'var(--primary)':'transparent';
+    document.getElementById('tabSendLink').style.color=tab==='sendlink'?'#fff':'var(--text-secondary)';
+    const btn=document.getElementById('resetPwdAction');
+    if(tab==='manual'){btn.innerHTML='<i class="fas fa-key"></i> Set Password';btn.onclick=doResetPwd;}
+    else if(tab==='generate'){btn.innerHTML='<i class="fas fa-magic"></i> Set & Send Password';btn.onclick=doResetGenerated;}
+    else{btn.innerHTML='<i class="fas fa-paper-plane"></i> Send Reset Link';btn.onclick=doSendResetLink;}
+}
+function generateNewPwd(){ const p=_genPassword(); document.getElementById('generatedPwd').textContent=p; }
+function copyGeneratedPwd(){ const t=document.getElementById('generatedPwd').textContent; if(t==='—')return; navigator.clipboard.writeText(t); document.getElementById('copyConfirm').style.opacity='1'; setTimeout(()=>document.getElementById('copyConfirm').style.opacity='0',1500); }
+
 async function doResetPwd(){
     const p=document.getElementById('newPwd').value,c=document.getElementById('confirmPwd').value;
     if(p.length<6){showToast('error','Min 6 characters');return;}
     if(p!==c){showToast('error','Passwords do not match');return;}
     const d=await apiCall(`/api/super-admin/admins/${_resetId}/reset-password`,'POST',{password:p});
     if(d.success){showToast('success',d.message);closeModal('resetPwdModal');}else showToast('error',d.error||'Failed');
+}
+async function doResetGenerated(){
+    const p=document.getElementById('generatedPwd').textContent;
+    if(!p||p==='—'){showToast('error','Generate a password first');return;}
+    const sendEmail=document.getElementById('genSendEmail').checked;
+    const d=await apiCall(`/api/super-admin/admins/${_resetId}/reset-password`,'POST',{password:p,send_email:sendEmail});
+    if(d.success){
+        const msg=d.email_sent?'Password reset & emailed to admin':'Password reset! Copy it — email not configured.';
+        document.getElementById('resetPwdSuccess').textContent=msg;
+        document.getElementById('resetPwdSuccess').style.display='block';
+        showToast('success',msg);
+    } else showToast('error',d.error||'Failed');
+}
+async function doSendResetLink(){
+    if(!_resetEmail){showToast('error','Admin has no email on file');return;}
+    const d=await apiCall(`/api/super-admin/admins/${_resetId}/send-reset-link`,'POST');
+    if(d.success){
+        document.getElementById('resetPwdSuccess').textContent='Reset link sent to '+_resetEmail;
+        document.getElementById('resetPwdSuccess').style.display='block';
+        showToast('success','Reset link sent!');
+    } else showToast('error',d.error||'Failed');
 }
 
 function emailAdmin(email,name){
@@ -213,6 +442,128 @@ async function sendEmail(){
     const d=await apiCall('/api/super-admin/send-email','POST',{to:to,subject:subject,body:body});
     if(d.success){showToast('success','Email sent');closeModal('emailModal');}
     else showToast('error',d.error||'Email sending not configured yet');
+}
+
+/* ═══ Edit / View Admin ═══ */
+function editTab(el,tab){
+    el.parentElement.querySelectorAll('.tab-btn').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('panel-'+tab).classList.add('active');
+}
+
+let _currentAdmin = null;
+
+async function viewAdmin(adminId){
+    // Load admin details via API
+    const r = await apiCall(`/api/super-admin/admins/${adminId}`, 'GET');
+    if(r.error){ showToast('error', r.error); return; }
+
+    _currentAdmin = r.admin;
+    const a = r.admin;
+
+    document.getElementById('editAdminId').value = a.id;
+    document.getElementById('editTitle').textContent = a.first_name + ' ' + a.last_name;
+    document.getElementById('editFirstName').value = a.first_name;
+    document.getElementById('editLastName').value = a.last_name;
+    document.getElementById('editEmail').value = a.email;
+    document.getElementById('editPhone').value = a.phone;
+    document.getElementById('editDesignation').value = a.designation;
+    document.getElementById('editBranch').textContent = a.branch_name || '—';
+    document.getElementById('editCreatedAt').value = a.created_at || '';
+
+    // Status pill
+    const statusEl = document.getElementById('editStatus');
+    if(a.is_active){ statusEl.className='pill pill-g'; statusEl.textContent='Active'; }
+    else { statusEl.className='pill pill-r'; statusEl.textContent='Suspended'; }
+
+    // First admin badge
+    document.getElementById('editFirstAdmin').style.display = a.is_first_admin ? 'inline-block' : 'none';
+
+    // Avatar
+    const avatarEl = document.getElementById('editAvatar');
+    if(a.avatar_url){
+        avatarEl.innerHTML = '<img src="'+a.avatar_url+'" alt="">';
+    } else {
+        avatarEl.innerHTML = '<i class="fas fa-camera" style="font-size:1.2rem;color:var(--text-light);"></i><br>Photo';
+        avatarEl.className = 'upload-hint';
+    }
+
+    // Login logs
+    const logsHtml = buildLogsTable(r.login_logs || []);
+    document.getElementById('logsContainer').innerHTML = logsHtml;
+
+    // Reset to profile tab
+    document.querySelectorAll('#editAdminModal .tab-btn')[0].click();
+
+    openModal('editAdminModal');
+}
+
+function buildLogsTable(logs){
+    if(!logs.length) return '<div class="empty-state" style="padding:20px;"><i class="fas fa-shield-alt"></i><h3 style="font-size:0.82rem;">No login records</h3><p style="font-size:0.68rem;">Login attempts will appear here once the admin logs in.</p></div>';
+
+    let html = '<table class="log-table"><thead><tr><th>Time</th><th>IP</th><th>Browser</th><th>OS</th><th>Result</th></tr></thead><tbody>';
+    logs.forEach(function(l){
+        const cls = l.success ? 'color:#065F46;' : 'color:#991B1B;font-weight:800;';
+        const icon = l.success ? '✅' : '❌';
+        html += '<tr>';
+        html += '<td>'+l.time+'</td>';
+        html += '<td>'+l.ip+'</td>';
+        html += '<td>'+l.browser+'</td>';
+        html += '<td>'+l.os+'</td>';
+        html += '<td style="'+cls+'">'+icon+' '+(l.success ? 'Success' : (l.reason||'Failed'))+'</td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+}
+
+async function saveAdminEdit(){
+    const id = document.getElementById('editAdminId').value;
+    const data = {
+        first_name: document.getElementById('editFirstName').value,
+        last_name: document.getElementById('editLastName').value,
+        email: document.getElementById('editEmail').value,
+        phone: document.getElementById('editPhone').value,
+        designation: document.getElementById('editDesignation').value,
+    };
+    if(!data.first_name){ showToast('error','First name is required'); return; }
+    const r = await apiCall(`/api/super-admin/admins/${id}`, 'PUT', data);
+    if(r.success){
+        showToast('success', r.message);
+        setTimeout(()=>location.reload(), 800);
+    } else {
+        showToast('error', r.error || 'Update failed');
+    }
+}
+
+async function uploadPhoto(){
+    const fileInput = document.getElementById('photoInput');
+    if(!fileInput.files.length) return;
+    const id = document.getElementById('editAdminId').value;
+    if(!id){ showToast('error','Please open an admin profile first'); return; }
+
+    const formData = new FormData();
+    formData.append('photo', fileInput.files[0]);
+
+    try {
+        const resp = await fetch(`/api/super-admin/admins/${id}/photo`, {
+            method: 'POST',
+            body: formData,
+        });
+        const r = await resp.json();
+        if(r.success){
+            showToast('success', 'Photo updated');
+            // Update avatar preview
+            const avatarEl = document.getElementById('editAvatar');
+            avatarEl.innerHTML = '<img src="'+r.url+'?t='+Date.now()+'" alt="">';
+        } else {
+            showToast('error', r.error || 'Upload failed');
+        }
+    } catch(e){
+        showToast('error', 'Upload failed');
+    }
+    fileInput.value = '';
 }
 </script>
 {% endblock %}

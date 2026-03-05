@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Employees{% endblock %}
-{% block page_title %}👥 Employee Management{% endblock %}
-{% block page_subtitle %}All staff — Teaching & Non-Teaching{% endblock %}
+{% block title %}Non-Teaching Staff{% endblock %}
+{% block page_title %}👥 Non-Teaching Staff{% endblock %}
+{% block page_subtitle %}Manage support staff — Peons, Drivers, Guards, Clerks & more{% endblock %}
 {% block extra_css %}
 <style>
 .emp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
-.emp-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:16px;border-left:4px solid var(--primary);transition:all 0.15s;}
+.emp-card{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:16px;border-left:4px solid var(--primary);transition:all 0.15s;}
 .emp-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1);}
 .emp-name{font-weight:900;font-size:0.95rem;}.emp-desig{font-size:0.82rem;color:var(--primary);font-weight:700;}
 .emp-meta{font-size:0.72rem;color:var(--text-light);margin-top:2px;}
@@ -15,7 +15,7 @@
 .ea-btn{padding:5px 10px;border-radius:8px;font-size:0.70rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;display:flex;align-items:center;gap:4px;text-decoration:none;color:inherit;}
 .ea-btn:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
 .ea-btn.danger:hover{background:#FEE2E2;border-color:#DC2626;color:#DC2626;}
-.form-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.form-card{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
 .f-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
 .f-grp{display:flex;flex-direction:column;gap:3px;}
 .f-grp label{font-size:0.60rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
@@ -23,7 +23,7 @@
 .btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
 .btn-secondary{padding:10px 20px;border-radius:10px;background:var(--bg);color:var(--text-secondary);border:1px solid var(--border);font-weight:700;cursor:pointer;}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;}
-.modal-box{background:white;border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;}
+.modal-box{background:var(--bg-card, white);border-radius:16px;padding:24px;width:90%;max-width:700px;max-height:85vh;overflow-y:auto;}
 .filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .filter-bar select,.filter-bar input{padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;}
 @media(max-width:768px){.f-grid{grid-template-columns:1fr 1fr;}}
@@ -78,7 +78,7 @@
         <div class="emp-actions">
             <button class="ea-btn" onclick="openEdit('{{ e.id }}')"><i class="fas fa-edit"></i> Edit</button>
             <a href="/api/school/hr/employee-id-card/{{ e.id }}" target="_blank" class="ea-btn"><i class="fas fa-id-card"></i> ID Card</a>
-            <button class="ea-btn danger" onclick="if(confirm('Remove?'))apiCall('/api/school/hr/employees/{{ e.id }}','DELETE').then(()=>location.reload())"><i class="fas fa-trash"></i></button>
+            <button class="ea-btn danger" onclick="confirmRemoveEmployee('{{ e.id }}')"><i class="fas fa-trash"></i></button>
         </div>
     </div>
     {% endfor %}
@@ -129,6 +129,12 @@
 {% endblock %}
 {% block extra_js %}
 <script>
+function confirmRemoveEmployee(id){
+showConfirm('Confirm','Remove this employee?', async () => {
+await apiCall('/api/school/hr/employees/'+id,'DELETE');location.reload();
+}, {icon:'🗑️', danger:true, yesText:'Delete'});
+}
+
 function filterEmp(){const t=document.getElementById('filterType').value,s=document.getElementById('filterSearch').value.toLowerCase();
 document.querySelectorAll('.emp-card').forEach(c=>{c.style.display=(!t||c.dataset.type===t)&&(!s||c.dataset.name.includes(s))?'block':'none';});}
 

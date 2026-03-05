@@ -76,12 +76,16 @@ class LeaveRequest(Base):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
     reason = Column(Text, nullable=False)
-    status = Column(SAEnum(LeaveStatus), default=LeaveStatus.PENDING)
+    status = Column(SAEnum(LeaveStatus, values_callable=lambda x: [e.value for e in x]), default=LeaveStatus.PENDING)
 
     # Approval
     reviewed_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
     admin_remarks = Column(Text, nullable=True)
+
+    # On-behalf tracking
+    applied_on_behalf_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    on_behalf_name = Column(String(200), nullable=True)  # Cached name of person who raised it
 
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
     updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())

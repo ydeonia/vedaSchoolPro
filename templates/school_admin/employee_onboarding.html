@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Employee Onboarding{% endblock %}
-{% block page_title %}🧑‍🏫 Employee Onboarding Wizard{% endblock %}
-{% block page_subtitle %}Recruit teachers & staff — CBSE/NCTE compliant{% endblock %}
+{% block page_title %}Employee Onboarding Wizard{% endblock %}
+{% block page_subtitle %}Recruit teachers &amp; staff - CBSE/NCTE compliant{% endblock %}
 {% block extra_css %}
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;900&display=swap');
@@ -15,464 +15,294 @@
 .wiz-card{background:var(--bg-card,white);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:28px;margin-bottom:16px;}
 .wiz-card h2{font-size:1.1rem;font-weight:900;margin-bottom:4px;}.wiz-card p.sub{font-size:0.75rem;color:var(--text-light);margin-bottom:16px;}
 .f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
-.f-grid.col2{grid-template-columns:1fr 1fr;}
+.f-grid.col2{grid-template-columns:1fr 1fr;}.f-grid.col4{grid-template-columns:1fr 1fr 1fr 1fr;}
 .f-grp{display:flex;flex-direction:column;gap:3px;}
 .f-grp label{font-size:0.60rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:0.3px;}
 .f-grp label .req{color:var(--danger,#dc2626);}
 .f-grp input,.f-grp select,.f-grp textarea{padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.85rem;transition:border 0.2s;background:var(--bg-card,white);color:var(--text,#333);}
 .f-grp input:focus,.f-grp select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
-.f-grp .f-help{font-size:0.58rem;color:var(--text-light);}
-.f-grp .f-validation{font-size:0.6rem;margin-top:2px;font-weight:600;min-height:14px;transition:all 0.2s;}
+.f-grp .f-help{font-size:0.58rem;color:var(--text-light);}.f-grp .f-validation{font-size:0.6rem;margin-top:2px;font-weight:600;min-height:14px;}
+.f-grp input.valid{border-color:#10B981!important;}.f-grp input.invalid{border-color:#DC2626!important;}
 .wiz-nav{display:flex;justify-content:space-between;margin-top:16px;}
 .btn-wiz{padding:10px 24px;border-radius:12px;font-weight:700;font-size:0.85rem;cursor:pointer;border:none;display:flex;align-items:center;gap:6px;transition:all 0.2s;}
 .btn-next{background:var(--primary);color:white;box-shadow:0 4px 12px rgba(79,70,229,0.2);}.btn-next:hover{transform:translateY(-1px);}
-.btn-prev{background:var(--bg,#f1f5f9);color:var(--text);}
-.btn-success{background:#059669;color:white;}
-/* Compliance banner */
+.btn-prev{background:var(--bg,#f1f5f9);color:var(--text);}.btn-success{background:#059669;color:white;}
 .compliance-banner{padding:14px 18px;border-radius:12px;margin-bottom:16px;border:1.5px solid #C7D2FE;background:linear-gradient(135deg,#EEF2FF,#F0F4FF);}
 .compliance-banner h4{font-size:0.72rem;font-weight:900;color:#4338CA;margin-bottom:4px;}
 .compliance-banner p{font-size:0.65rem;color:#4338CA;margin:0;line-height:1.6;}
-/* Qual card */
 .qual-info{padding:12px;border-radius:10px;background:var(--bg,#f1f5f9);margin-top:10px;font-size:0.72rem;color:var(--text-secondary);line-height:1.7;}
-.qual-info strong{color:var(--text);}
-/* Doc items */
+.phone-row{display:flex;gap:6px;}.phone-row select{width:100px;flex-shrink:0;font-size:0.78rem;padding:9px 4px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);}.phone-row input{flex:1;}
+.photo-upload{display:flex;align-items:center;gap:16px;padding:14px;border-radius:12px;border:2px dashed var(--border);background:var(--bg,#f8fafc);margin-bottom:14px;cursor:pointer;}.photo-upload:hover{border-color:var(--primary);}
+.photo-preview{width:80px;height:100px;border-radius:10px;background:var(--bg,#e2e8f0);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}.photo-preview img{width:100%;height:100%;object-fit:cover;}
 .doc-checklist{display:grid;gap:8px;}
 .doc-item{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:10px 14px;border-radius:10px;border:1.5px solid var(--border-light);background:var(--bg-card,white);}
-.doc-item.mandatory{border-left:3px solid var(--danger,#dc2626);}
-.doc-item.uploaded{border-color:#059669;background:#F0FDF4;}
-.doc-icon{font-size:1.2rem;}.doc-name{font-weight:700;font-size:0.82rem;}.doc-desc{font-size:0.60rem;color:var(--text-light);}
-.doc-status{font-size:0.62rem;font-weight:700;padding:3px 8px;border-radius:6px;}
-.doc-status.pending{background:#FEF3C7;color:#92400E;}.doc-status.done{background:#D1FAE5;color:#059669;}
-.doc-upload-btn{padding:4px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--primary);color:var(--primary);background:transparent;}
-.doc-upload-btn:hover{background:var(--primary);color:white;}
-/* Summary */
+.doc-item.mandatory{border-left:3px solid var(--danger,#dc2626);}.doc-item.uploaded{border-color:#059669;background:#F0FDF4;}
+.doc-icon{font-size:1rem;color:var(--text-light);}.doc-name{font-weight:700;font-size:0.82rem;}.doc-desc{font-size:0.60rem;color:var(--text-light);}
+.doc-status{font-size:0.62rem;font-weight:700;padding:3px 8px;border-radius:6px;}.doc-status.pending{background:#FEF3C7;color:#92400E;}.doc-status.done{background:#D1FAE5;color:#059669;}
+.doc-upload-btn{padding:4px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;cursor:pointer;border:1px solid var(--primary);color:var(--primary);background:transparent;}.doc-upload-btn:hover{background:var(--primary);color:white;}
 .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .sum-section{padding:14px;border-radius:10px;background:var(--bg,#f1f5f9);}
 .sum-section h4{font-size:0.68rem;text-transform:uppercase;font-weight:700;color:var(--text-light);margin-bottom:8px;}
 .sum-row{display:flex;justify-content:space-between;font-size:0.78rem;padding:2px 0;}.sum-row .sl{color:var(--text-light);}.sum-row .sv{font-weight:700;}
-@media(max-width:768px){.f-grid{grid-template-columns:1fr;}.summary-grid{grid-template-columns:1fr;}}
+.section-title{font-weight:700;font-size:0.78rem;margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border-light);}
+.emp-id-card{display:inline-block;background:linear-gradient(135deg,#EEF2FF,#E0E7FF);padding:14px 32px;border-radius:14px;border:2px solid #818CF8;margin:16px auto;}
+.emp-id-card .label{font-size:0.62rem;text-transform:uppercase;font-weight:700;color:#6366F1;letter-spacing:1px;}
+.emp-id-card .value{font-size:1.9rem;font-weight:900;color:#4338CA;letter-spacing:2px;}
+@media(max-width:768px){.f-grid,.f-grid.col4{grid-template-columns:1fr;}.summary-grid{grid-template-columns:1fr;}}
 </style>
 {% endblock %}
 {% block content %}
 <div class="wiz-wrap">
-    <!-- Compliance Banner -->
     <div class="compliance-banner">
-        <h4>🏛️ CBSE / NCTE / RTE Compliant Recruitment</h4>
-        <p>This wizard follows qualification norms set by CBSE Affiliation Bye-laws, NCTE (National Council for Teacher Education), and NEP 2020. Teacher eligibility (CTET/STET), minimum qualifications for PRT/TGT/PGT, and mandatory document requirements are enforced.</p>
+        <h4>CBSE / NCTE / RTE Compliant Recruitment</h4>
+        <p>This wizard follows CBSE Affiliation Bye-laws, NCTE, and NEP 2020 norms.</p>
     </div>
-
     <div class="wiz-progress" id="wizProgress"></div>
 
-    <!-- Step 1: Basic Info -->
     <div class="wiz-card wiz-step" id="step1">
-        <h2>📝 Step 1: Personal Information</h2>
-        <p class="sub">Employee details as per government records.</p>
+        <h2>Step 1: Personal Information</h2><p class="sub">Employee details as per government records</p>
+        <div class="photo-upload" onclick="document.getElementById('photoInput').click()">
+            <div class="photo-preview" id="photoPreview"><span style="font-size:2rem;color:var(--text-light);"><i class="fas fa-user-circle"></i></span></div>
+            <div><div style="font-weight:700;font-size:0.85rem;">Upload Passport Photo <span style="color:var(--danger);">*</span></div>
+            <div style="font-size:0.65rem;color:var(--text-light);">JPG/PNG, max 2MB</div><div class="f-validation" id="photoHelp"></div></div>
+            <input type="file" id="photoInput" style="display:none;" accept=".jpg,.jpeg,.png" onchange="handlePhotoUpload(this)">
+        </div>
         <div class="f-grid">
-            <div class="f-grp"><label>First Name <span class="req">*</span></label><input id="eFname" required></div>
+            <div class="f-grp"><label>First Name <span class="req">*</span></label><input id="eFname" placeholder="As per Aadhaar"></div>
             <div class="f-grp"><label>Last Name <span class="req">*</span></label><input id="eLname"></div>
-            <div class="f-grp"><label>Date of Birth <span class="req">*</span></label><input id="eDOB" type="date"></div>
+            <div class="f-grp"><label>Father / Husband Name</label><input id="eFather"></div>
         </div>
         <div class="f-grid">
-            <div class="f-grp"><label>Gender <span class="req">*</span></label><select id="eGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Date of Birth <span class="req">*</span></label><input id="eDOB" type="date" onchange="calcAge(this)"><div class="f-validation" id="dobHelp"></div></div>
+            <div class="f-grp"><label>Gender <span class="req">*</span></label><select id="eGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Transgender</option></select></div>
+            <div class="f-grp"><label>Marital Status</label><select id="eMarital"><option value="">Select</option><option>Single</option><option>Married</option><option>Widowed</option><option>Divorced</option></select></div>
+        </div>
+        <div class="f-grid">
             <div class="f-grp"><label>Blood Group</label><select id="eBlood"><option value="">Select</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
-            <div class="f-grp"><label>Nationality</label><input id="eNationality" value="Indian"></div>
+            <div class="f-grp"><label>Nationality</label><select id="eNationality"><option value="">Select</option>
+<optgroup label="India &amp; SAARC"><option value="Indian" selected>Indian</option><option value="Nepali">Nepali</option><option value="Bhutanese">Bhutanese</option><option value="Sri Lankan">Sri Lankan</option><option value="Bangladeshi">Bangladeshi</option><option value="Pakistani">Pakistani</option><option value="Maldivian">Maldivian</option><option value="Afghan">Afghan</option><option value="Myanmar">Myanmar</option></optgroup>
+<optgroup label="Middle East"><option>Bahraini</option><option>Emirati</option><option>Iraqi</option><option>Jordanian</option><option>Kuwaiti</option><option>Omani</option><option>Qatari</option><option>Saudi</option><option>Yemeni</option></optgroup>
+<optgroup label="East &amp; SE Asia"><option>Chinese</option><option>Japanese</option><option>Korean</option><option>Indonesian</option><option>Malaysian</option><option>Filipino</option><option>Singaporean</option><option>Thai</option><option>Vietnamese</option></optgroup>
+<optgroup label="Europe"><option>British</option><option>French</option><option>German</option><option>Italian</option><option>Spanish</option><option>Dutch</option><option>Polish</option><option>Portuguese</option><option>Russian</option><option>Swedish</option><option>Swiss</option><option>Ukrainian</option></optgroup>
+<optgroup label="Americas"><option>American</option><option>Canadian</option><option>Brazilian</option><option>Mexican</option></optgroup>
+<optgroup label="Africa &amp; Oceania"><option>Australian</option><option>New Zealander</option><option>Egyptian</option><option>Ethiopian</option><option>Kenyan</option><option>Nigerian</option><option>South African</option></optgroup>
+<optgroup label="Other"><option>NRI (Indian Origin)</option><option>OCI Holder</option><option>Other</option></optgroup></select></div>
+            <div class="f-grp"><label>Religion</label><select id="eReligion"><option value="">Select</option><option>Hindu</option><option>Muslim</option><option>Christian</option><option>Sikh</option><option>Buddhist</option><option>Jain</option><option>Other</option></select></div>
         </div>
         <div class="f-grid">
-            <div class="f-grp"><label>Phone <span class="req">*</span></label><input id="ePhone" type="tel" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'');validatePhone(this)">
-                <div class="f-help f-validation" id="phoneHelp"></div></div>
-            <div class="f-grp"><label>Email</label><input id="eEmail" type="email"></div>
-            <div class="f-grp"><label>Aadhaar Number <span class="req">*</span></label><input id="eAadhaar" maxlength="14" oninput="formatAadhaar(this)" placeholder="1234 5678 9012">
-                <div class="f-help">12-digit unique ID. Mandatory per Govt of India.</div>
-                <div class="f-validation" id="aadhaarHelp"></div></div>
+            <div class="f-grp"><label>Category</label><select id="eCategory"><option value="">Select</option><option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option></select></div>
+            <div class="f-grp"><label>Mother Tongue</label><select id="eMotherTongue"><option value="">Select</option>
+<optgroup label="Indian Languages"><option>Hindi</option><option>English</option><option>Bengali</option><option>Telugu</option><option>Marathi</option><option>Tamil</option><option>Urdu</option><option>Gujarati</option><option>Kannada</option><option>Malayalam</option><option>Odia</option><option>Punjabi</option><option>Assamese</option><option>Maithili</option><option>Sanskrit</option><option>Kashmiri</option><option>Konkani</option><option>Sindhi</option><option>Nepali</option><option>Dogri</option><option>Manipuri</option><option>Bodo</option><option>Santali</option></optgroup>
+<optgroup label="Foreign Languages"><option>French</option><option>Spanish</option><option>German</option><option>Japanese</option><option>Chinese (Mandarin)</option><option>Korean</option><option>Russian</option><option>Arabic</option><option>Portuguese</option><option>Italian</option><option>Turkish</option><option>Thai</option><option>Vietnamese</option><option>Dutch</option><option>Swedish</option><option>Polish</option></optgroup>
+<optgroup label="Other"><option>Sign Language</option><option>Braille</option><option>Other</option></optgroup></select></div>
+            <div class="f-grp"><label>Languages Known <span style="font-size:0.5rem;color:var(--text-light);">(Ctrl+click)</span></label><select id="eLangs" multiple size="4" style="min-height:80px;"><option value="">Select</option>
+<optgroup label="Indian Languages"><option>Hindi</option><option>English</option><option>Bengali</option><option>Telugu</option><option>Marathi</option><option>Tamil</option><option>Urdu</option><option>Gujarati</option><option>Kannada</option><option>Malayalam</option><option>Odia</option><option>Punjabi</option><option>Assamese</option><option>Maithili</option><option>Sanskrit</option><option>Kashmiri</option><option>Konkani</option><option>Sindhi</option><option>Nepali</option><option>Dogri</option><option>Manipuri</option><option>Bodo</option><option>Santali</option></optgroup>
+<optgroup label="Foreign Languages"><option>French</option><option>Spanish</option><option>German</option><option>Japanese</option><option>Chinese (Mandarin)</option><option>Korean</option><option>Russian</option><option>Arabic</option><option>Portuguese</option><option>Italian</option><option>Turkish</option><option>Thai</option><option>Vietnamese</option><option>Dutch</option><option>Swedish</option><option>Polish</option></optgroup>
+<optgroup label="Other"><option>Sign Language</option><option>Braille</option><option>Other</option></optgroup></select><div class="f-help">Hold Ctrl/Cmd to select multiple</div></div>
         </div>
-        <div class="f-grp"><label>Residential Address <span class="req">*</span></label><textarea id="eAddress" rows="2"></textarea></div>
-        <div class="f-grid col2">
-            <div class="f-grp"><label>PAN Number</label><input id="ePAN" maxlength="10" style="text-transform:uppercase;" oninput="validatePAN(this)" placeholder="ABCDE1234F">
-                <div class="f-help">Optional for support staff. Format: ABCDE1234F</div>
-                <div class="f-validation" id="panHelp"></div></div>
-            <div class="f-grp"><label>Emergency Contact</label><input id="eEmergency"></div>
+        <div class="section-title">Contact</div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Mobile <span class="req">*</span></label><div class="phone-row"><select id="ePhoneCode"><option value="+91" selected>+91 IN</option>
+<option value="+93">+93 AF</option><option value="+880">+880 BD</option><option value="+975">+975 BT</option>
+<option value="+86">+86 CN</option><option value="+20">+20 EG</option><option value="+33">+33 FR</option>
+<option value="+49">+49 DE</option><option value="+62">+62 ID</option><option value="+98">+98 IR</option>
+<option value="+964">+964 IQ</option><option value="+972">+972 IL</option><option value="+39">+39 IT</option>
+<option value="+81">+81 JP</option><option value="+962">+962 JO</option><option value="+254">+254 KE</option>
+<option value="+82">+82 KR</option><option value="+965">+965 KW</option><option value="+60">+60 MY</option>
+<option value="+960">+960 MV</option><option value="+230">+230 MU</option><option value="+52">+52 MX</option>
+<option value="+95">+95 MM</option><option value="+977">+977 NP</option><option value="+31">+31 NL</option>
+<option value="+64">+64 NZ</option><option value="+234">+234 NG</option><option value="+968">+968 OM</option>
+<option value="+92">+92 PK</option><option value="+63">+63 PH</option><option value="+48">+48 PL</option>
+<option value="+351">+351 PT</option><option value="+974">+974 QA</option><option value="+7">+7 RU</option>
+<option value="+966">+966 SA</option><option value="+65">+65 SG</option><option value="+27">+27 ZA</option>
+<option value="+34">+34 ES</option><option value="+94">+94 LK</option><option value="+46">+46 SE</option>
+<option value="+41">+41 CH</option><option value="+66">+66 TH</option><option value="+90">+90 TR</option>
+<option value="+256">+256 UG</option><option value="+380">+380 UA</option><option value="+971">+971 AE</option>
+<option value="+44">+44 UK</option><option value="+1">+1 US</option><option value="+84">+84 VN</option>
+<option value="+967">+967 YE</option><option value="+61">+61 AU</option><option value="+55">+55 BR</option>
+<option value="+1">+1 CA</option></select><input id="ePhone" type="tel" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'');validatePhone(this)"></div><div class="f-validation" id="phoneHelp"></div></div>
+            <div class="f-grp"><label>Alt Phone</label><div class="phone-row"><select id="eAltCode"><option value="+91">+91 IN</option>
+<option value="+93">+93 AF</option><option value="+880">+880 BD</option><option value="+975">+975 BT</option>
+<option value="+86">+86 CN</option><option value="+20">+20 EG</option><option value="+33">+33 FR</option>
+<option value="+49">+49 DE</option><option value="+62">+62 ID</option><option value="+98">+98 IR</option>
+<option value="+964">+964 IQ</option><option value="+972">+972 IL</option><option value="+39">+39 IT</option>
+<option value="+81">+81 JP</option><option value="+962">+962 JO</option><option value="+254">+254 KE</option>
+<option value="+82">+82 KR</option><option value="+965">+965 KW</option><option value="+60">+60 MY</option>
+<option value="+960">+960 MV</option><option value="+230">+230 MU</option><option value="+52">+52 MX</option>
+<option value="+95">+95 MM</option><option value="+977">+977 NP</option><option value="+31">+31 NL</option>
+<option value="+64">+64 NZ</option><option value="+234">+234 NG</option><option value="+968">+968 OM</option>
+<option value="+92">+92 PK</option><option value="+63">+63 PH</option><option value="+48">+48 PL</option>
+<option value="+351">+351 PT</option><option value="+974">+974 QA</option><option value="+7">+7 RU</option>
+<option value="+966">+966 SA</option><option value="+65">+65 SG</option><option value="+27">+27 ZA</option>
+<option value="+34">+34 ES</option><option value="+94">+94 LK</option><option value="+46">+46 SE</option>
+<option value="+41">+41 CH</option><option value="+66">+66 TH</option><option value="+90">+90 TR</option>
+<option value="+256">+256 UG</option><option value="+380">+380 UA</option><option value="+971">+971 AE</option>
+<option value="+44">+44 UK</option><option value="+1">+1 US</option><option value="+84">+84 VN</option>
+<option value="+967">+967 YE</option><option value="+61">+61 AU</option><option value="+55">+55 BR</option>
+<option value="+1">+1 CA</option></select><input id="eAltPhone" type="tel" maxlength="10" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div></div>
+            <div class="f-grp"><label>Email</label><input id="eEmail" type="email" onblur="validateEmail(this)"><div class="f-validation" id="emailHelp"></div></div>
+        </div>
+        <div class="section-title">Identity</div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Aadhaar <span class="req">*</span></label><input id="eAadhaar" maxlength="14" oninput="formatAadhaar(this)" placeholder="1234 5678 9012"><div class="f-help">12-digit UID</div><div class="f-validation" id="aadhaarHelp"></div></div>
+            <div class="f-grp"><label>PAN</label><input id="ePAN" maxlength="10" style="text-transform:uppercase;" oninput="validatePAN(this)" placeholder="ABCDE1234F"><div class="f-validation" id="panHelp"></div></div>
+            <div class="f-grp"><label>UAN (EPF)</label><input id="eUAN" maxlength="12" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+        </div>
+        <div class="section-title">Address</div>
+        <div class="f-grp" style="margin-bottom:10px;"><label>Address <span class="req">*</span></label><textarea id="eAddress" rows="2"></textarea></div>
+        <div class="f-grid col4">
+            <div class="f-grp"><label>City</label><input id="eCity"></div>
+            <div class="f-grp"><label>State</label><select id="eState"><option value="">Select</option>
+<optgroup label="States"><option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option></optgroup>
+<optgroup label="Union Territories"><option>Andaman &amp; Nicobar</option><option>Chandigarh</option><option>Dadra &amp; Nagar Haveli</option><option>Daman &amp; Diu</option><option>Delhi</option><option>Jammu &amp; Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option></optgroup></select></div>
+            <div class="f-grp"><label>PIN Code</label><input id="ePIN" maxlength="6" pattern="[0-9]{6}" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')" placeholder="110001"><div class="f-help">6-digit postal code</div></div>
+            <div class="f-grp"><label>Emergency</label><input id="eEmergency" placeholder="Name - Phone"></div>
+        </div>
+        <div class="f-grid col2" style="margin-top:8px;">
+            <div class="f-grp"><label>Hobbies / Interests</label><input id="eHobbies" placeholder="Reading, Cricket, Music..."></div>
+            <div class="f-grp"><label>Special Skills</label><input id="eSkills" placeholder="Typing, Calligraphy, Coding..."></div>
         </div>
     </div>
-
-    <!-- Step 2: Role & Designation -->
     <div class="wiz-card wiz-step" id="step2" style="display:none;">
-        <h2>💼 Step 2: Role & Designation</h2>
-        <p class="sub">Select employee type, designation, and teaching level per CBSE norms.</p>
+        <h2>Step 2: Role &amp; Designation</h2><p class="sub">Per CBSE norms</p>
         <div class="f-grid">
-            <div class="f-grp"><label>Employee Type <span class="req">*</span></label><select id="eType" onchange="updateDesignations()">
-                <option value="">Select</option>
-                <option value="teaching">🧑‍🏫 Teaching Staff</option>
-                <option value="non_teaching">👥 Non-Teaching Staff</option>
-                <option value="admin">🔑 Administrative</option>
-                <option value="support">🔧 Support Staff</option>
-            </select></div>
-            <div class="f-grp"><label>Designation <span class="req">*</span></label><select id="eDesignation"><option value="">Select Type First</option></select></div>
-            <div class="f-grp"><label>Department</label><select id="eDept">
-                <option value="">Select</option>
-                <option>Science</option><option>Mathematics</option><option>English</option><option>Hindi</option><option>Sanskrit</option>
-                <option>Social Studies</option><option>Computer Science</option><option>Physical Education</option>
-                <option>Music</option><option>Art & Craft</option><option>Commerce</option><option>Administration</option>
-                <option>Accounts</option><option>Library</option><option>Maintenance</option>
-            </select></div>
+            <div class="f-grp"><label>Staff Category <span class="req">*</span></label><select id="eType" onchange="updateDesignations()"><option value="">Select</option><option value="teaching">Teaching Staff</option><option value="non_teaching">Non-Teaching</option><option value="admin">Administrative</option><option value="support">Support Staff</option></select></div>
+            <div class="f-grp"><label>Designation <span class="req">*</span></label><select id="eDesignation" onchange="autoFillDept();showQualGuidance()"><option value="">Select Type First</option></select></div>
+            <div class="f-grp"><label>Department</label><select id="eDept"><option value="">Select</option><option>Science</option><option>Mathematics</option><option>English</option><option>Hindi</option><option>Sanskrit</option><option>Social Studies</option><option>Computer Science</option><option>Physical Education</option><option>Music</option><option>Art &amp; Craft</option><option>Commerce</option><option>Administration</option><option>Accounts</option><option>Library</option><option>Maintenance</option><option>Security</option><option>Transport</option></select></div>
         </div>
-        <div class="f-grid col2">
-            <div class="f-grp"><label>Date of Joining <span class="req">*</span></label><input id="eDOJ" type="date"></div>
-            <div class="f-grp"><label>Employment Type</label><select id="eEmpType">
-                <option>Permanent</option><option>Contractual</option><option>Probation</option><option>Part-Time</option><option>Guest Faculty</option>
-            </select></div>
+        <div class="f-grid">
+            <div class="f-grp"><label>DOJ <span class="req">*</span></label><input id="eDOJ" type="date"></div>
+            <div class="f-grp"><label>Employment Type <span class="req">*</span></label><select id="eEmpType"><option value="Permanent">Permanent</option><option value="Contractual">Contractual</option><option value="Probation">Probation</option><option value="Part-Time">Part-Time</option><option value="Guest Faculty">Guest Faculty</option></select></div>
+            <div class="f-grp"><label>Reporting To</label><select id="eReporting"><option value="">Select</option><option>Principal</option><option>Vice Principal</option><option>Academic Coordinator</option><option>HR Manager</option></select></div>
         </div>
         <div id="qualGuidance" class="qual-info" style="display:none;"></div>
     </div>
-
-    <!-- Step 3: Qualifications -->
     <div class="wiz-card wiz-step" id="step3" style="display:none;">
-        <h2>🎓 Step 3: Qualifications & Certifications</h2>
-        <p class="sub">As per NCTE/CBSE Affiliation Bye-laws, minimum qualifications are mandatory.</p>
+        <h2>Step 3: Qualifications</h2><p class="sub">NCTE/CBSE mandatory qualifications</p>
+        <div id="qualHint" style="display:none;padding:10px 14px;border-radius:10px;background:#DBEAFE;border:1px solid #93C5FD;margin-bottom:14px;font-size:0.78rem;color:#1D4ED8;"><i class="fas fa-info-circle"></i> All fields optional for non-teaching/support staff</div>
+        <div class="section-title">Academic</div>
         <div class="f-grid col2">
-            <div class="f-grp"><label>Highest Qualification <span class="req">*</span></label><select id="eQual">
-                <option value="">Select</option>
-                <option>Ph.D</option><option>M.Phil</option><option>Post Graduation (M.A/M.Sc/M.Com)</option>
-                <option>B.Ed + Post Graduation</option><option>Graduation (B.A/B.Sc/B.Com)</option>
-                <option>B.Ed + Graduation</option><option>D.Ed / D.El.Ed</option>
-                <option>B.El.Ed (4-year integrated)</option><option>B.P.Ed</option><option>M.P.Ed</option>
-                <option>B.Tech / B.E</option><option>MCA / M.Sc (CS)</option><option>Diploma</option>
-                <option>Senior Secondary (12th)</option><option>Secondary (10th)</option><option>Other</option>
-            </select></div>
-            <div class="f-grp"><label>Specialization / Subject</label><input id="eSpecial" placeholder="e.g. Physics, English Literature"></div>
+            <div class="f-grp"><label>10th Board <span class="req qual-req">*</span></label><select id="e10Board"><option value="">Select</option><option>CBSE</option><option>ICSE</option><option>State Board</option><option>NIOS</option><option>IB</option><option>Other</option></select></div>
+            <div class="f-grp"><label>10th Year &amp; %</label><div style="display:flex;gap:6px;"><input id="e10Year" type="number" placeholder="2005" style="width:80px;"><input id="e10Pct" type="number" placeholder="85" style="width:80px;"></div></div>
         </div>
         <div class="f-grid col2">
-            <div class="f-grp"><label>University / Board</label><input id="eUniv" placeholder="Delhi University, NCTE approved..."></div>
-            <div class="f-grp"><label>Graduation Year</label><input id="eGradYear" type="number" placeholder="2015"></div>
+            <div class="f-grp"><label>12th Board <span class="req qual-req">*</span></label><select id="e12Board"><option value="">Select</option><option>CBSE</option><option>ISC</option><option>State Board</option><option>NIOS</option><option>IB</option><option>Other</option></select></div>
+            <div class="f-grp"><label>12th Stream &amp; Year</label><div style="display:flex;gap:6px;"><select id="e12Stream" style="flex:1;"><option value="">Stream</option><option>Science (PCM)</option><option>Science (PCB)</option><option>Commerce</option><option>Arts</option><option>Vocational</option></select><input id="e12Year" type="number" placeholder="2007" style="width:80px;"></div></div>
         </div>
-        <hr style="margin:14px 0;border-color:var(--border-light);">
-        <p style="font-weight:700;font-size:0.78rem;margin-bottom:8px;">🏛️ Professional / Teaching Certifications</p>
+        <div class="section-title">Higher Education</div>
+        <div class="f-grid col2">
+            <div class="f-grp"><label>Highest Qualification <span class="req qual-req">*</span></label><select id="eQual"><option value="">Select</option><option>Ph.D</option><option>M.Phil</option><option>Post Graduation</option><option>B.Ed + PG</option><option>Graduation</option><option>B.Ed + Graduation</option><option>D.Ed / D.El.Ed</option><option>B.El.Ed</option><option>B.P.Ed</option><option>M.P.Ed</option><option>B.Tech / B.E</option><option>MCA / M.Sc(CS)</option><option>Diploma</option><option>12th</option><option>10th</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Specialization</label><input id="eSpecial" placeholder="Physics, English..."></div>
+        </div>
         <div class="f-grid">
-            <div class="f-grp"><label>B.Ed</label><select id="eBEd">
-                <option value="">Not Applicable</option><option value="yes">Yes — NCTE Recognized</option><option value="special">B.Ed (Special Education)</option><option value="no">No</option>
-            </select><div class="f-help">Mandatory for TGT/PGT per CBSE Bye-laws</div></div>
-            <div class="f-grp"><label>CTET / STET</label><select id="eCTET">
-                <option value="">Not Applicable</option><option value="ctet1">CTET Paper-I (Class 1-5)</option><option value="ctet2">CTET Paper-II (Class 6-8)</option><option value="both">CTET Both Papers</option><option value="stet">State TET Qualified</option><option value="no">Not Qualified</option>
-            </select><div class="f-help">CTET mandatory for PRT (Paper-I), TGT (Paper-II) per NCTE</div></div>
-            <div class="f-grp"><label>NET / SET / JRF</label><select id="eNET">
-                <option value="">Not Applicable</option><option>UGC NET</option><option>UGC NET + JRF</option><option>State SET</option><option>None</option>
-            </select></div>
+            <div class="f-grp"><label>University</label><input id="eUniv"></div>
+            <div class="f-grp"><label>Year</label><input id="eGradYear" type="number" placeholder="2015"></div>
+            <div class="f-grp"><label>Grade/CGPA/%</label><input id="eGrade" placeholder="8.5 or 78%"></div>
         </div>
-        <div class="f-grid col2">
-            <div class="f-grp"><label>Previous Teaching Experience (years)</label><input id="eExp" type="number" value="0"></div>
-            <div class="f-grp"><label>Previous School Name</label><input id="ePrevSchool"></div>
+        <div class="section-title">Professional Certifications</div>
+        <div class="f-grid">
+            <div class="f-grp"><label>B.Ed</label><select id="eBEd"><option value="">N/A</option><option value="yes">Yes - NCTE</option><option value="special">Special Ed</option><option value="no">No</option></select><div class="f-help">Mandatory for TGT/PGT</div></div>
+            <div class="f-grp"><label>CTET/STET</label><select id="eCTET"><option value="">N/A</option><option value="ctet1">CTET Paper-I</option><option value="ctet2">CTET Paper-II</option><option value="both">Both</option><option value="stet">State TET</option><option value="no">No</option></select><div class="f-help">Mandatory for PRT/TGT</div></div>
+            <div class="f-grp"><label>NET/SET/JRF</label><select id="eNET"><option value="">N/A</option><option>UGC NET</option><option>NET + JRF</option><option>State SET</option><option>None</option></select></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Computer</label><select id="eComputer"><option value="">Select</option><option>Basic</option><option>Intermediate</option><option>Advanced</option><option>Expert</option><option>None</option></select></div>
+            <div class="f-grp"><label>Experience (yrs)</label><input id="eExp" type="number" value="0"></div>
+            <div class="f-grp"><label>Previous School</label><input id="ePrevSchool"></div>
         </div>
     </div>
-
-    <!-- Step 4: Documents -->
     <div class="wiz-card wiz-step" id="step4" style="display:none;">
-        <h2>📎 Step 4: Document Upload</h2>
-        <p class="sub">Government-mandated documents for employment records. Red border = Mandatory.</p>
+        <h2>Step 4: Documents</h2><p class="sub">Red border = Mandatory</p>
         <div id="docSmartNote" style="display:none;padding:10px;border-radius:10px;background:#FEF3C7;border:1px solid #FCD34D;margin-bottom:12px;font-size:0.78rem;color:#92400E;"></div>
         <div class="doc-checklist" id="docChecklist"></div>
         <input type="file" id="hiddenFileInput" style="display:none;" accept=".pdf,.jpg,.jpeg,.png" onchange="handleDocUpload()">
     </div>
-
-    <!-- Step 5: Salary & Bank -->
     <div class="wiz-card wiz-step" id="step5" style="display:none;">
-        <h2>💰 Step 5: Salary Structure & Bank Details</h2>
-        <p class="sub">Configure compensation and bank details for salary credit.</p>
+        <h2>Step 5: Salary &amp; Bank</h2><p class="sub">Compensation and bank details</p>
         <div class="f-grid">
-            <div class="f-grp"><label>Basic Salary (₹/month) <span class="req">*</span></label><input id="eSalary" type="number" placeholder="25000"></div>
-            <div class="f-grp"><label>HRA (₹)</label><input id="eHRA" type="number" value="0"></div>
-            <div class="f-grp"><label>DA (₹)</label><input id="eDA" type="number" value="0"></div>
+            <div class="f-grp"><label>Basic Salary <span class="req">*</span></label><input id="eSalary" type="number" placeholder="25000" oninput="calcCTC()"></div>
+            <div class="f-grp"><label>HRA</label><input id="eHRA" type="number" value="0" oninput="calcCTC()"></div>
+            <div class="f-grp"><label>DA</label><input id="eDA" type="number" value="0" oninput="calcCTC()"></div>
         </div>
         <div class="f-grid">
-            <div class="f-grp"><label>Conveyance (₹)</label><input id="eConv" type="number" value="0"></div>
-            <div class="f-grp"><label>Special Allowance (₹)</label><input id="eSpecAllow" type="number" value="0"></div>
-            <div class="f-grp"><label>PF Applicable</label><select id="ePF"><option value="yes">Yes (12% of Basic)</option><option value="no">No</option></select></div>
+            <div class="f-grp"><label>Conveyance</label><input id="eConv" type="number" value="0" oninput="calcCTC()"></div>
+            <div class="f-grp"><label>Special Allow</label><input id="eSpecAllow" type="number" value="0" oninput="calcCTC()"></div>
+            <div class="f-grp"><label>PF</label><select id="ePF" onchange="calcCTC()"><option value="yes">Yes (12%)</option><option value="no">No</option></select></div>
         </div>
-        <hr style="margin:14px 0;border-color:var(--border-light);">
-        <p style="font-weight:700;font-size:0.78rem;margin-bottom:8px;">🏦 Bank Account Details (for NEFT Salary)</p>
+        <div style="padding:10px 14px;border-radius:10px;background:var(--bg);margin-bottom:14px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.82rem;"><span style="font-weight:700;">Gross Monthly</span><span style="font-weight:900;color:var(--primary);" id="ctcDisplay">Rs. 0</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-light);margin-top:4px;"><span>Annual CTC</span><span id="annualDisplay">Rs. 0</span></div>
+        </div>
+        <div class="section-title">Bank (NEFT Salary)</div>
         <div class="f-grid">
-            <div class="f-grp"><label>Bank Name</label><input id="eBank" placeholder="State Bank of India"></div>
-            <div class="f-grp"><label>Account Number</label><input id="eBankAcc"></div>
-            <div class="f-grp"><label>IFSC Code</label><input id="eIFSC" maxlength="11" style="text-transform:uppercase;"></div>
+            <div class="f-grp"><label>Bank</label><select id="eBank"><option value="">Select</option><option>SBI</option><option>PNB</option><option>BOB</option><option>Canara</option><option>Union</option><option>HDFC</option><option>ICICI</option><option>Axis</option><option>Kotak</option><option>Yes Bank</option><option>IDBI</option><option>Other</option></select></div>
+            <div class="f-grp"><label>Account No</label><input id="eBankAcc" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
+            <div class="f-grp"><label>IFSC</label><input id="eIFSC" maxlength="11" style="text-transform:uppercase;" oninput="validateIFSC(this)"><div class="f-validation" id="ifscHelp"></div></div>
         </div>
     </div>
-
-    <!-- Step 6: Review -->
     <div class="wiz-card wiz-step" id="step6" style="display:none;">
-        <h2>✅ Step 6: Review & Complete Onboarding</h2>
-        <p class="sub">Verify all details. The system will create employee record, login credentials, and ID card.</p>
+        <h2>Step 6: Review &amp; Complete</h2><p class="sub">Verify details. System creates employee record + login credentials.</p>
         <div class="summary-grid" id="summaryGrid"></div>
     </div>
-
     <div class="wiz-nav">
         <button class="btn-wiz btn-prev" id="btnPrev" onclick="prevStep()" style="display:none;"><i class="fas fa-arrow-left"></i> Previous</button>
         <div style="flex:1;"></div>
         <button class="btn-wiz btn-next" id="btnNext" onclick="nextStep()">Next Step <i class="fas fa-arrow-right"></i></button>
     </div>
 </div>
-{% endblock %}
-{% block extra_js %}
+{% endblock %}{% block extra_js %}
 <script>
-const STEPS=[
-    {id:'step1',title:'Personal Info',icon:'📝'},{id:'step2',title:'Role',icon:'💼'},
-    {id:'step3',title:'Qualifications',icon:'🎓'},{id:'step4',title:'Documents',icon:'📎'},
-    {id:'step5',title:'Salary & Bank',icon:'💰'},{id:'step6',title:'Review',icon:'✅'}
-];
-let currentStep=0, uploadedDocs={}, currentDocKey='';
-
-const DESIGNATIONS={
-    teaching:['PRT (Primary Teacher — Class 1-5)','TGT (Trained Graduate Teacher — Class 6-10)','PGT (Post Graduate Teacher — Class 11-12)',
-        'Headmistress/Headmaster','Vice Principal','Principal','PET (Physical Education Teacher)',
-        'Music Teacher','Art Teacher','Dance Teacher','Yoga Teacher','Computer Teacher','Librarian','Special Educator','Counsellor'],
-    non_teaching:['Lab Assistant','Lab Technician','Librarian Assistant','Store Keeper','Clerk','Data Entry Operator'],
-    admin:['Principal','Vice Principal','Academic Coordinator','Admission Incharge','Accountant','HR Manager','Office Superintendent','Receptionist'],
-    support:['Peon','Guard/Watchman','Driver','Gardener','Sweeper','Electrician','Plumber','Cook','Ayah/Helper']
-};
-
-const QUAL_GUIDANCE={
-    'PRT (Primary Teacher — Class 1-5)':`<strong>NCTE/CBSE Norms for PRT:</strong><br>
-        ✅ Senior Secondary (12th) with 50% marks + D.Ed / D.El.Ed (2 years) OR B.El.Ed (4-year integrated)<br>
-        ✅ CTET Paper-I qualified (mandatory per NCTE)<br>
-        ✅ Proficiency in Hindi & English medium<br>
-        ⚠️ B.Ed holders need 6-month Bridge Course in Elementary Education within 2 years`,
-    'TGT (Trained Graduate Teacher — Class 6-10)':`<strong>NCTE/CBSE Norms for TGT:</strong><br>
-        ✅ Graduation with 50% marks in concerned subject<br>
-        ✅ B.Ed from NCTE recognized institution with 50% marks (mandatory)<br>
-        ✅ CTET Paper-II qualified (mandatory per NCTE)<br>
-        ✅ Proficiency in Hindi & English medium<br>
-        💡 Desirable: Knowledge of Computer Applications`,
-    'PGT (Post Graduate Teacher — Class 11-12)':`<strong>NCTE/CBSE Norms for PGT:</strong><br>
-        ✅ Master's Degree with 50% marks in concerned subject<br>
-        ✅ B.Ed from NCTE recognized institution with 50% marks (mandatory)<br>
-        ✅ CTET now recommended for Class 9-12 under NEP 2020<br>
-        ⚠️ Candidates with only Special B.Ed are NOT eligible for PGT<br>
-        💡 Desirable: NET/SET qualification, Knowledge of Computer Applications`,
-    'PET (Physical Education Teacher)':`<strong>Norms for PET:</strong><br>
-        ✅ B.P.Ed (Bachelor of Physical Education) OR Diploma from NSNIS<br>
-        ✅ For PGT level: M.P.Ed (Master of Physical Education) required`,
-    'Computer Teacher':`<strong>Norms for Computer Teacher:</strong><br>
-        ✅ B.E/B.Tech (CS/IT) OR MCA OR M.Sc(CS) OR BCA + PG OR B.Sc(CS) + PG<br>
-        ✅ B.Ed recommended but not always mandatory for computer posts`,
-};
-
-const DOC_LIST=[
-    {key:'aadhaar',name:'Aadhaar Card',desc:'Mandatory per Govt of India for all employees',mandatory:true,icon:'🪪'},
-    {key:'pan_card',name:'PAN Card',desc:'Mandatory for salary/TDS under Income Tax Act',mandatory:true,icon:'💳'},
-    {key:'photo',name:'Passport Photos',desc:'Recent photographs (4 copies)',mandatory:true,icon:'📸'},
-    {key:'10th_marksheet',name:'10th Marksheet & Certificate',desc:'Secondary school — for age & qualification proof',mandatory:true,icon:'📊'},
-    {key:'12th_marksheet',name:'12th Marksheet & Certificate',desc:'Senior secondary — mandatory for PRT and above',mandatory:true,icon:'📊'},
-    {key:'graduation',name:'Graduation Degree & Marksheets',desc:'B.A/B.Sc/B.Com — mandatory for TGT and above',mandatory:false,icon:'🎓'},
-    {key:'post_graduation',name:'Post Graduation Degree & Marksheets',desc:'M.A/M.Sc/M.Com — mandatory for PGT',mandatory:false,icon:'🎓'},
-    {key:'bed_certificate',name:'B.Ed Certificate',desc:'NCTE recognized — mandatory for TGT/PGT per CBSE',mandatory:false,icon:'📜'},
-    {key:'ctet_certificate',name:'CTET / STET Certificate',desc:'Mandatory for PRT (Paper-I) and TGT (Paper-II)',mandatory:false,icon:'🏛️'},
-    {key:'experience_letter',name:'Experience Certificate / Relieving Letter',desc:'From previous employer',mandatory:false,icon:'📋'},
-    {key:'medical_fitness',name:'Medical Fitness Certificate',desc:'Physical fitness to work — some schools require',mandatory:false,icon:'🏥'},
-    {key:'address_proof',name:'Address Proof',desc:'Aadhaar/Voter ID/Utility bill',mandatory:true,icon:'📍'},
-    {key:'bank_passbook',name:'Bank Passbook / Cancelled Cheque',desc:'For salary credit via NEFT',mandatory:false,icon:'🏦'},
-    {key:'police_verification',name:'Police Verification Certificate',desc:'Character verification — recommended for all school staff',mandatory:false,icon:'🔒'},
+var STEPS=[{id:'step1',title:'Personal Info',icon:'1'},{id:'step2',title:'Role',icon:'2'},{id:'step3',title:'Qualifications',icon:'3'},{id:'step4',title:'Documents',icon:'4'},{id:'step5',title:'Salary',icon:'5'},{id:'step6',title:'Review',icon:'6'}];
+var currentStep=0,uploadedDocs={},currentDocKey='',photoFile=null;
+var DESIGNATIONS={teaching:['PRT (Primary Teacher - Class 1-5)','TGT (Trained Graduate Teacher - Class 6-10)','PGT (Post Graduate Teacher - Class 11-12)','Headmistress/Headmaster','Vice Principal','Principal','PET (Physical Education Teacher)','Music Teacher','Art Teacher','Dance Teacher','Yoga Teacher','Computer Teacher','Librarian','Special Educator','Counsellor'],non_teaching:['Lab Assistant','Lab Technician','Librarian Assistant','Store Keeper','Clerk','Data Entry Operator'],admin:['Principal','Vice Principal','Academic Coordinator','Admission Incharge','Accountant','HR Manager','Office Superintendent','Receptionist'],support:['Peon','Guard/Watchman','Driver','Gardener','Sweeper','Electrician','Plumber','Cook','Ayah/Helper']};
+var QUAL_G={'PRT':'<strong>PRT:</strong> 12th+50% + D.Ed, CTET-I mandatory','TGT':'<strong>TGT:</strong> Grad+50% + B.Ed(NCTE), CTET-II mandatory','PGT':'<strong>PGT:</strong> Masters+50% + B.Ed, NET desirable','PET':'<strong>PET:</strong> B.P.Ed or NSNIS','Computer':'<strong>Computer:</strong> BTech(CS)/MCA/MSc(CS)'};
+var SMART_DEPT={'PRT':'Science','TGT':'Science','PGT':'Science','Principal':'Administration','Vice':'Administration','Headmist':'Administration','PET':'Physical Education','Music':'Music','Art':'Art & Craft','Yoga':'Physical Education','Computer':'Computer Science','Librarian':'Library','Lab':'Science','Clerk':'Accounts','Accountant':'Accounts','HR':'Administration','Peon':'Maintenance','Guard':'Security','Driver':'Transport','Cook':'Maintenance'};
+var DOC_LIST=[
+{key:'photo',name:'Passport Photos (4)',desc:'Recent, white background',mandatory:true,icon:'fas fa-camera'},
+{key:'aadhaar',name:'Aadhaar Card',desc:'Govt of India mandatory',mandatory:true,icon:'fas fa-id-card'},
+{key:'pan',name:'PAN Card',desc:'For TDS',mandatory:true,icon:'fas fa-credit-card'},
+{key:'10th',name:'10th Marksheet & Certificate',desc:'Board cert - age proof',mandatory:true,icon:'fas fa-file-alt'},
+{key:'12th',name:'12th Marksheet & Certificate',desc:'Senior secondary',mandatory:true,icon:'fas fa-file-alt'},
+{key:'grad',name:'Graduation Degree',desc:'For TGT+',mandatory:false,icon:'fas fa-graduation-cap'},
+{key:'pg',name:'Post Graduation',desc:'For PGT',mandatory:false,icon:'fas fa-graduation-cap'},
+{key:'bed',name:'B.Ed Certificate',desc:'NCTE - TGT/PGT',mandatory:false,icon:'fas fa-certificate'},
+{key:'ctet',name:'CTET/STET Certificate',desc:'PRT/TGT',mandatory:false,icon:'fas fa-award'},
+{key:'exp',name:'Experience Letter',desc:'Previous employer',mandatory:false,icon:'fas fa-briefcase'},
+{key:'medical',name:'Medical Fitness',desc:'Physical fitness',mandatory:false,icon:'fas fa-heartbeat'},
+{key:'addr',name:'Address Proof',desc:'Voter ID/Utility bill',mandatory:true,icon:'fas fa-map-marker-alt'},
+{key:'bank',name:'Bank Passbook/Cheque',desc:'NEFT verification',mandatory:false,icon:'fas fa-university'},
+{key:'police',name:'Police Verification',desc:'Character check',mandatory:false,icon:'fas fa-shield-alt'},
+{key:'caste',name:'Caste Certificate',desc:'If applicable',mandatory:false,icon:'fas fa-file-contract'}
 ];
 
-function renderProgress(){
-    document.getElementById('wizProgress').innerHTML=STEPS.map((s,i)=>`<div class="wiz-step-ind ${i<currentStep?'done':''} ${i===currentStep?'active':''}" onclick="goToStep(${i})"><span class="step-num">${i<currentStep?'✓':s.icon}</span>${s.title}</div>`).join('');
-}
-function showStep(n){STEPS.forEach((s,i)=>{document.getElementById(s.id).style.display=i===n?'block':'none';});
-document.getElementById('btnPrev').style.display=n>0?'flex':'none';
-if(n===STEPS.length-1){document.getElementById('btnNext').innerHTML='<i class="fas fa-check"></i> Complete Onboarding';document.getElementById('btnNext').className='btn-wiz btn-next btn-success';buildSummary();}
-else{document.getElementById('btnNext').innerHTML='Next Step <i class="fas fa-arrow-right"></i>';document.getElementById('btnNext').className='btn-wiz btn-next';}
-renderProgress();}
-function nextStep(){
-    if(currentStep===0&&!v('eFname','First name')||currentStep===0&&!v('eDOB','Date of birth')||currentStep===0&&!v('ePhone','Phone'))return;
-    if(currentStep===1&&!v('eType','Employee type')||currentStep===1&&!v('eDesignation','Designation')||currentStep===1&&!v('eDOJ','Date of joining'))return;
-    if(currentStep===STEPS.length-1){submitOnboarding();return;}
-    currentStep++;showStep(currentStep);
-    if(currentStep===3)renderDocChecklist();
-}
+function renderProgress(){document.getElementById('wizProgress').innerHTML=STEPS.map(function(s,i){return '<div class="wiz-step-ind '+(i<currentStep?'done':'')+' '+(i===currentStep?'active':'')+'" onclick="goToStep('+i+')"><span class="step-num">'+(i<currentStep?'&#10003;':s.icon)+'</span>'+s.title+'</div>';}).join('');}
+function showStep(n){STEPS.forEach(function(s,i){document.getElementById(s.id).style.display=i===n?'block':'none';});if(n===2){var cat=g('eType');var hint=document.getElementById('qualHint');var stars=document.querySelectorAll('.qual-req');if(cat==='support'||cat==='non_teaching'){if(hint)hint.style.display='block';stars.forEach(function(s){s.style.display='none';});}else{if(hint)hint.style.display='none';stars.forEach(function(s){s.style.display='inline';});}}document.getElementById('btnPrev').style.display=n>0?'flex':'none';if(n===STEPS.length-1){document.getElementById('btnNext').innerHTML='<i class="fas fa-check"></i> Complete Onboarding';document.getElementById('btnNext').className='btn-wiz btn-next btn-success';buildSummary();}else{document.getElementById('btnNext').innerHTML='Next Step <i class="fas fa-arrow-right"></i>';document.getElementById('btnNext').className='btn-wiz btn-next';}renderProgress();window.scrollTo({top:0,behavior:'smooth'});}
+function nextStep(){if(currentStep===0){if(!v('eFname','First Name')||!v('eDOB','DOB')||!v('eGender','Gender'))return;if(!validatePhoneReq()||!validateAadhaarReq())return;if(!v('eAddress','Address'))return;}if(currentStep===1){if(!v('eType','Staff Category')||!v('eDesignation','Designation')||!v('eDOJ','DOJ'))return;}if(currentStep===2){var cat=g('eType');var needsQual=(cat==='teaching'||cat==='admin');if(needsQual){if(!v('e10Board','10th Board')||!v('e12Board','12th Board')||!v('eQual','Qualification'))return;}}if(currentStep===STEPS.length-1){submitOnboarding();return;}currentStep++;showStep(currentStep);if(currentStep===3)renderDocChecklist();}
 function prevStep(){if(currentStep>0){currentStep--;showStep(currentStep);}}
 function goToStep(n){if(n<=currentStep){currentStep=n;showStep(n);}}
-function v(id,name){if(!g(id)){showToast('error',name+' is required');return false;}return true;}
-
-// Smart mapping: designation → department auto-fill
-const SMART_DEPT={
-    'PRT':'Teaching','TGT':'Teaching','PGT':'Teaching','Headmistress':'Administration','Headmaster':'Administration',
-    'Vice Principal':'Administration','Principal':'Administration','PET':'Physical Education',
-    'Music Teacher':'Music','Art Teacher':'Art & Craft','Dance Teacher':'Art & Craft',
-    'Yoga Teacher':'Physical Education','Computer Teacher':'Computer Science','Librarian':'Library',
-    'Special Educator':'Teaching','Counsellor':'Administration',
-    'Lab Assistant':'Science','Lab Technician':'Science','Librarian Assistant':'Library',
-    'Store Keeper':'Administration','Clerk':'Accounts','Data Entry Operator':'Administration',
-    'Academic Coordinator':'Administration','Admission Incharge':'Administration',
-    'Accountant':'Accounts','HR Manager':'Administration','Office Superintendent':'Administration','Receptionist':'Administration',
-    'Peon':'Maintenance','Guard':'Security','Watchman':'Security','Driver':'Transport',
-    'Gardener':'Maintenance','Sweeper':'Maintenance','Electrician':'Maintenance',
-    'Plumber':'Maintenance','Cook':'Hostel','Ayah':'Hostel','Helper':'Hostel'
-};
-const NON_ACADEMIC_DEPTS=['Administration','Accounts','Maintenance','Security','Transport','Hostel'];
-
-function autoFillDepartment(){
-    const desig=g('eDesignation');if(!desig)return;
-    const dept=document.getElementById('eDept');
-    for(const [key,val] of Object.entries(SMART_DEPT)){
-        if(desig.toLowerCase().includes(key.toLowerCase())){
-            let found=false;
-            for(let i=0;i<dept.options.length;i++){
-                if(dept.options[i].text===val){dept.selectedIndex=i;found=true;break;}
-            }
-            if(!found){dept.innerHTML+=`<option value="${val}">${val}</option>`;dept.value=val;}
-            break;
-        }
-    }
-    // Filter: support staff sees only non-academic depts
-    const type=g('eType');
-    [...dept.options].forEach(opt=>{
-        if(!opt.value)return;
-        const isAcademic=!NON_ACADEMIC_DEPTS.includes(opt.text)&&opt.text!=='Library';
-        if(type==='support')opt.style.display=isAcademic?'none':'';
-        else opt.style.display='';
-    });
-}
-
-function adjustFieldsForRole(){
-    const type=g('eType');
-    const note=document.getElementById('docSmartNote');
-    if(!note)return;
-    if(type==='support'){
-        note.innerHTML='💡 <strong>Support Staff:</strong> Only Aadhaar & Photo mandatory. PAN, bank details, qualifications are optional.';
-        note.style.display='block';
-    }else if(type==='teaching'){
-        note.innerHTML='📋 <strong>Teaching Staff:</strong> Degree certificates, CTET/B.Ed and experience letters are required per NCTE norms.';
-        note.style.display='block';
-    }else note.style.display='none';
-}
-
-function updateDesignations(){
-    const type=g('eType');
-    const list=DESIGNATIONS[type]||[];
-    document.getElementById('eDesignation').innerHTML='<option value="">Select</option>'+list.map(d=>`<option value="${d}">${d}</option>`).join('');
-    document.getElementById('eDesignation').onchange=()=>{autoFillDepartment();showQualGuidance();adjustFieldsForRole();};
-    autoFillDepartment();adjustFieldsForRole();
-}
-function showQualGuidance(){
-    const desig=g('eDesignation');
-    const guidance=Object.entries(QUAL_GUIDANCE).find(([k])=>desig.includes(k));
-    const el=document.getElementById('qualGuidance');
-    if(guidance){el.innerHTML=guidance[1];el.style.display='block';}else{el.style.display='none';}
-}
-
-function renderDocChecklist(){
-    document.getElementById('docChecklist').innerHTML=DOC_LIST.map(d=>{
-        const uploaded=!!uploadedDocs[d.key];
-        return `<div class="doc-item ${d.mandatory?'mandatory':''} ${uploaded?'uploaded':''}">
-            <div class="doc-icon">${d.icon}</div>
-            <div><div class="doc-name">${d.name} ${d.mandatory?'<span style="color:var(--danger);font-size:0.60rem;">MANDATORY</span>':''}</div><div class="doc-desc">${d.desc}</div></div>
-            <div class="doc-status ${uploaded?'done':'pending'}">${uploaded?'✅ Uploaded':'⏳ Pending'}</div>
-            <button class="doc-upload-btn" onclick="triggerDoc('${d.key}')">${uploaded?'Replace':'Upload'}</button>
-        </div>`;}).join('');
-}
-function triggerDoc(key){currentDocKey=key;document.getElementById('hiddenFileInput').click();}
-function handleDocUpload(){
-    const file=document.getElementById('hiddenFileInput').files[0];if(!file)return;
-    uploadedDocs[currentDocKey]={file,name:file.name};renderDocChecklist();
-    showToast('success','Uploaded');document.getElementById('hiddenFileInput').value='';
-}
-
-function buildSummary(){
-    const mdocs=DOC_LIST.filter(d=>d.mandatory),muploaded=mdocs.filter(d=>uploadedDocs[d.key]).length;
-    document.getElementById('summaryGrid').innerHTML=`
-    <div class="sum-section"><h4>📝 Personal</h4>
-        <div class="sum-row"><span class="sl">Name</span><span class="sv">${g('eFname')} ${g('eLname')}</span></div>
-        <div class="sum-row"><span class="sl">DOB</span><span class="sv">${g('eDOB')}</span></div>
-        <div class="sum-row"><span class="sl">Phone</span><span class="sv">${g('ePhone')}</span></div>
-        <div class="sum-row"><span class="sl">Aadhaar</span><span class="sv">${g('eAadhaar')||'N/A'}</span></div>
-        <div class="sum-row"><span class="sl">PAN</span><span class="sv">${g('ePAN')||'N/A'}</span></div>
-    </div>
-    <div class="sum-section"><h4>💼 Role</h4>
-        <div class="sum-row"><span class="sl">Type</span><span class="sv">${g('eType')}</span></div>
-        <div class="sum-row"><span class="sl">Designation</span><span class="sv">${g('eDesignation')}</span></div>
-        <div class="sum-row"><span class="sl">Department</span><span class="sv">${g('eDept')||'-'}</span></div>
-        <div class="sum-row"><span class="sl">DOJ</span><span class="sv">${g('eDOJ')}</span></div>
-    </div>
-    <div class="sum-section"><h4>🎓 Qualifications</h4>
-        <div class="sum-row"><span class="sl">Highest</span><span class="sv">${g('eQual')||'-'}</span></div>
-        <div class="sum-row"><span class="sl">B.Ed</span><span class="sv">${g('eBEd')||'-'}</span></div>
-        <div class="sum-row"><span class="sl">CTET</span><span class="sv">${g('eCTET')||'-'}</span></div>
-        <div class="sum-row"><span class="sl">Experience</span><span class="sv">${g('eExp')||'0'} years</span></div>
-    </div>
-    <div class="sum-section"><h4>📎 Documents (${Object.keys(uploadedDocs).length} uploaded)</h4>
-        <div class="sum-row"><span class="sl">Mandatory</span><span class="sv" style="color:${muploaded===mdocs.length?'#059669':'#DC2626'};">${muploaded}/${mdocs.length}</span></div>
-        ${DOC_LIST.filter(d=>uploadedDocs[d.key]).map(d=>`<div class="sum-row"><span class="sl">${d.icon} ${d.name}</span><span class="sv" style="color:#059669;">✅</span></div>`).join('')}
-    </div>`;
-}
-
-async function submitOnboarding(){
-    const data={
-        first_name:g('eFname'),last_name:g('eLname'),date_of_birth:g('eDOB'),
-        gender:g('eGender'),blood_group:g('eBlood'),phone:g('ePhone'),email:g('eEmail'),
-        aadhaar_number:g('eAadhaar'),pan_number:g('ePAN'),address:g('eAddress'),
-        employee_type:g('eType'),designation:g('eDesignation'),department:g('eDept'),
-        date_of_joining:g('eDOJ'),employment_type:g('eEmpType'),
-        qualification:g('eQual'),specialization:g('eSpecial'),university:g('eUniv'),
-        basic_salary:parseInt(g('eSalary'))||0,hra:parseInt(g('eHRA'))||0,da:parseInt(g('eDA'))||0,
-        bank_name:g('eBank'),bank_account:g('eBankAcc'),bank_ifsc:g('eIFSC'),
-        emergency_contact_name:g('eEmergency'),
-    };
-    try{
-        const r=await fetch('/api/school/hr/employees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});
-        const d=await r.json();if(d.error){showToast('error',d.error);return;}
-        const empId=d.id||d.employee_id;
-        showToast('success','Employee created!');
-
-        // Upload docs (future: employee doc endpoint)
-        showToast('success','🎉 Onboarding complete!');
-        document.querySelector('.wiz-wrap').innerHTML=`<div class="wiz-card" style="text-align:center;padding:40px;">
-            <div style="font-size:4rem;margin-bottom:12px;">🧑‍🏫</div>
-            <h2 style="font-size:1.3rem;">Onboarding Successful!</h2>
-            <p style="color:var(--text-light);margin:8px 0 20px;">${g('eFname')} ${g('eLname')} — ${g('eDesignation')}</p>
-            <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
-                <a href="/school/hr/employees" class="btn-wiz btn-next" style="text-decoration:none;">View Employees</a>
-                <a href="/school/hr/id-cards" class="btn-wiz btn-prev" style="text-decoration:none;">Generate ID Card</a>
-                <a href="/school/onboarding" class="btn-wiz btn-prev" style="text-decoration:none;">Add Another</a>
-            </div>
-        </div>`;
-    }catch(e){showToast('error','Failed: '+e.message);}
-}
-
-function g(id){return document.getElementById(id)?.value?.trim()||'';}
-
-// ═══ SMART VALIDATIONS ═══
-function formatAadhaar(el){
-    let v=el.value.replace(/\D/g,'');
-    if(v.length>12)v=v.slice(0,12);
-    el.value=v.replace(/(\d{4})(\d{1,4})?(\d{1,4})?/,function(_,a,b,c){return a+(b?' '+b:'')+(c?' '+c:'');});
-    const help=document.getElementById('aadhaarHelp');
-    const digits=v.length;
-    if(digits===0){help.innerHTML='';return;}
-    if(digits<12){help.innerHTML=`<span style="color:#D97706;">⏳ ${12-digits} digits remaining</span>`;return;}
-    if(digits===12&&v[0]!=='0'&&v[0]!=='1'){help.innerHTML='<span style="color:#059669;">✅ Valid format</span>';}
-    else{help.innerHTML='<span style="color:#DC2626;">❌ Aadhaar cannot start with 0 or 1</span>';}
-}
-
-function validatePAN(el){
-    const v=el.value.toUpperCase();el.value=v;
-    const help=document.getElementById('panHelp');
-    if(!v){help.innerHTML='';return;}
-    // PAN format: ABCDE1234F — 5 letters, 4 digits, 1 letter
-    const pattern=/^[A-Z]{5}[0-9]{4}[A-Z]$/;
-    if(v.length<10){help.innerHTML=`<span style="color:#D97706;">Format: ABCDE1234F (${10-v.length} chars left)</span>`;return;}
-    if(pattern.test(v)){
-        const typeChar=v[3];
-        const types={P:'Individual',C:'Company',H:'HUF',F:'Firm',A:'AOP',T:'Trust',B:'BOI',L:'Local Auth',J:'Artificial Judicial',G:'Government'};
-        help.innerHTML=`<span style="color:#059669;">✅ Valid PAN (${types[typeChar]||''})</span>`;
-    }else{help.innerHTML='<span style="color:#DC2626;">❌ Invalid PAN format</span>';}
-}
-
-function validatePhone(el){
-    const v=el.value;
-    const help=document.getElementById('phoneHelp');
-    if(!v){help.innerHTML='';return;}
-    if(v.length<10){help.innerHTML=`<span style="color:#D97706;">${10-v.length} digits left</span>`;return;}
-    if(v.length===10&&/^[6-9]/.test(v)){help.innerHTML='<span style="color:#059669;">✅ Valid Indian mobile</span>';}
-    else{help.innerHTML='<span style="color:#DC2626;">❌ Must start with 6-9</span>';}
-}
-
+function v(id,nm){var el=document.getElementById(id);if(!el||!el.value||!el.value.trim()){showToast('error',nm+' is required');if(el){el.focus();el.classList.add('invalid');setTimeout(function(){el.classList.remove('invalid');},2000);}return false;}return true;}
+function handlePhotoUpload(input){var f=input.files[0];if(!f)return;if(f.size>2*1024*1024){showToast('error','Max 2MB');return;}photoFile=f;var r=new FileReader();r.onload=function(e){document.getElementById('photoPreview').innerHTML='<img src="'+e.target.result+'">';document.getElementById('photoHelp').innerHTML='<span style="color:#059669;">'+f.name+'</span>';};r.readAsDataURL(f);}
+function validatePhone(el){var val=el.value,h=document.getElementById('phoneHelp'),c=document.getElementById('ePhoneCode').value;if(!val){h.innerHTML='';el.classList.remove('valid','invalid');return;}if(c==='+91'){if(val.length<10){h.innerHTML='<span style="color:#D97706;">'+(10-val.length)+' left</span>';el.classList.add('invalid');el.classList.remove('valid');}else if(/^[6-9]/.test(val)){h.innerHTML='<span style="color:#059669;">Valid</span>';el.classList.add('valid');el.classList.remove('invalid');}else{h.innerHTML='<span style="color:#DC2626;">Start 6-9</span>';el.classList.add('invalid');}}else if(val.length>=7){h.innerHTML='<span style="color:#059669;">'+c+' '+val+'</span>';el.classList.add('valid');}}
+function validatePhoneReq(){var p=g('ePhone');if(!p||p.length<7){showToast('error','Phone required');return false;}if(g('ePhoneCode')==='+91'&&(p.length!==10||!/^[6-9]/.test(p))){showToast('error','Indian: 10 digits, start 6-9');return false;}return true;}
+function validateAadhaarReq(){var a=g('eAadhaar').replace(/\s/g,'');if(a.length<12){showToast('error','12-digit Aadhaar required');return false;}if(a[0]==='0'||a[0]==='1'){showToast('error','Aadhaar: no 0/1 start');return false;}return true;}
+function formatAadhaar(el){var v=el.value.replace(/\D/g,'');if(v.length>12)v=v.slice(0,12);el.value=v.replace(/(\d{4})(\d{1,4})?(\d{1,4})?/,function(_,a,b,c){return a+(b?' '+b:'')+(c?' '+c:'');});var h=document.getElementById('aadhaarHelp');if(!v){h.innerHTML='';return;}if(v.length<12){h.innerHTML='<span style="color:#D97706;">'+(12-v.length)+' left</span>';el.classList.add('invalid');el.classList.remove('valid');}else if(v[0]!=='0'&&v[0]!=='1'){h.innerHTML='<span style="color:#059669;">Valid</span>';el.classList.add('valid');el.classList.remove('invalid');}else{h.innerHTML='<span style="color:#DC2626;">Bad start</span>';el.classList.add('invalid');}}
+function validatePAN(el){var v=el.value.toUpperCase();el.value=v;var h=document.getElementById('panHelp');if(!v){h.innerHTML='';return;}if(v.length<10){h.innerHTML='<span style="color:#D97706;">'+(10-v.length)+' left</span>';return;}if(/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(v)){h.innerHTML='<span style="color:#059669;">Valid PAN</span>';el.classList.add('valid');}else{h.innerHTML='<span style="color:#DC2626;">Invalid</span>';el.classList.add('invalid');}}
+function validateEmail(el){var v=el.value,h=document.getElementById('emailHelp');if(!v){h.innerHTML='';return;}h.innerHTML=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)?'<span style="color:#059669;">Valid</span>':'<span style="color:#DC2626;">Invalid</span>';}
+function validateIFSC(el){var v=el.value.toUpperCase();el.value=v;var h=document.getElementById('ifscHelp');if(v.length<11){h.innerHTML='';return;}h.innerHTML=/^[A-Z]{4}0[A-Z0-9]{6}$/.test(v)?'<span style="color:#059669;">Valid</span>':'<span style="color:#DC2626;">Invalid</span>';}
+function calcAge(el){var h=document.getElementById('dobHelp');if(!el.value){h.innerHTML='';return;}var d=new Date(el.value),t=new Date(),a=t.getFullYear()-d.getFullYear();if(t.getMonth()<d.getMonth()||(t.getMonth()===d.getMonth()&&t.getDate()<d.getDate()))a--;h.innerHTML=a<18?'<span style="color:#DC2626;">Must be 18+ ('+a+')</span>':'<span style="color:#059669;">Age: '+a+'</span>';}
+function calcCTC(){var b=parseInt(g('eSalary'))||0,h=parseInt(g('eHRA'))||0,d=parseInt(g('eDA'))||0,c=parseInt(g('eConv'))||0,s=parseInt(g('eSpecAllow'))||0,pf=g('ePF')==='yes'?Math.round(b*0.12):0,gr=b+h+d+c+s;document.getElementById('ctcDisplay').textContent='Rs. '+gr.toLocaleString('en-IN');document.getElementById('annualDisplay').textContent='Rs. '+((gr+pf)*12).toLocaleString('en-IN')+'/yr';}
+function updateDesignations(){var t=g('eType'),l=DESIGNATIONS[t]||[];document.getElementById('eDesignation').innerHTML='<option value="">Select</option>'+l.map(function(d){return '<option value="'+d+'">'+d+'</option>';}).join('');adjustRole();}
+function autoFillDept(){var d=g('eDesignation'),el=document.getElementById('eDept');if(!d)return;for(var k in SMART_DEPT){if(d.toLowerCase().indexOf(k.toLowerCase())!==-1){for(var i=0;i<el.options.length;i++){if(el.options[i].text===SMART_DEPT[k]){el.selectedIndex=i;return;}}}}}
+function showQualGuidance(){var d=g('eDesignation'),el=document.getElementById('qualGuidance');for(var k in QUAL_G){if(d.indexOf(k)!==-1){el.innerHTML=QUAL_G[k];el.style.display='block';return;}}el.style.display='none';}
+function adjustRole(){var t=g('eType'),n=document.getElementById('docSmartNote');if(!n)return;if(t==='support'){n.innerHTML='<strong>Support Staff:</strong> Only Aadhaar, Photo, Address mandatory.';n.style.display='block';}else if(t==='teaching'){n.innerHTML='<strong>Teaching:</strong> Degree certs, CTET/B.Ed required per NCTE.';n.style.display='block';}else n.style.display='none';}
+function renderDocChecklist(){adjustRole();document.getElementById('docChecklist').innerHTML=DOC_LIST.map(function(d){var u=!!uploadedDocs[d.key];return '<div class="doc-item '+(d.mandatory?'mandatory':'')+' '+(u?'uploaded':'')+'"><div class="doc-icon"><i class="'+d.icon+'"></i></div><div><div class="doc-name">'+d.name+(d.mandatory?' <span style="color:var(--danger);font-size:0.55rem;">MANDATORY</span>':'')+'</div><div class="doc-desc">'+d.desc+'</div></div><div class="doc-status '+(u?'done':'pending')+'">'+(u?'Uploaded':'Pending')+'</div><button class="doc-upload-btn" onclick="triggerDoc(\''+d.key+'\')">'+(u?'Replace':'Upload')+'</button></div>';}).join('');}
+function triggerDoc(k){currentDocKey=k;document.getElementById('hiddenFileInput').click();}
+function handleDocUpload(){var f=document.getElementById('hiddenFileInput').files[0];if(!f)return;if(f.size>5*1024*1024){showToast('error','Max 5MB');return;}uploadedDocs[currentDocKey]={file:f,name:f.name};renderDocChecklist();showToast('success',f.name);document.getElementById('hiddenFileInput').value='';}
+function buildSummary(){var md=DOC_LIST.filter(function(d){return d.mandatory;}),mu=md.filter(function(d){return uploadedDocs[d.key];}).length;var ph=g('ePhoneCode')+' '+g('ePhone');document.getElementById('summaryGrid').innerHTML='<div class="sum-section"><h4>Personal</h4><div class="sum-row"><span class="sl">Name</span><span class="sv">'+g('eFname')+' '+g('eLname')+'</span></div><div class="sum-row"><span class="sl">DOB</span><span class="sv">'+g('eDOB')+'</span></div><div class="sum-row"><span class="sl">Phone</span><span class="sv">'+ph+'</span></div><div class="sum-row"><span class="sl">Aadhaar</span><span class="sv">'+(g('eAadhaar')||'-')+'</span></div><div class="sum-row"><span class="sl">PAN</span><span class="sv">'+(g('ePAN')||'-')+'</span></div></div><div class="sum-section"><h4>Role</h4><div class="sum-row"><span class="sl">Type</span><span class="sv">'+g('eType')+'</span></div><div class="sum-row"><span class="sl">Designation</span><span class="sv">'+g('eDesignation')+'</span></div><div class="sum-row"><span class="sl">Employment</span><span class="sv">'+g('eEmpType')+'</span></div><div class="sum-row"><span class="sl">DOJ</span><span class="sv">'+g('eDOJ')+'</span></div></div><div class="sum-section"><h4>Qualifications</h4><div class="sum-row"><span class="sl">10th</span><span class="sv">'+g('e10Board')+'</span></div><div class="sum-row"><span class="sl">12th</span><span class="sv">'+g('e12Board')+'</span></div><div class="sum-row"><span class="sl">Highest</span><span class="sv">'+(g('eQual')||'-')+'</span></div><div class="sum-row"><span class="sl">B.Ed</span><span class="sv">'+(g('eBEd')||'-')+'</span></div><div class="sum-row"><span class="sl">CTET</span><span class="sv">'+(g('eCTET')||'-')+'</span></div><div class="sum-row"><span class="sl">Exp</span><span class="sv">'+(g('eExp')||'0')+' yrs</span></div></div><div class="sum-section"><h4>Documents ('+Object.keys(uploadedDocs).length+')</h4><div class="sum-row"><span class="sl">Mandatory</span><span class="sv" style="color:'+(mu===md.length?'#059669':'#DC2626')+';">'+mu+'/'+md.length+'</span></div>'+DOC_LIST.filter(function(d){return uploadedDocs[d.key];}).map(function(d){return '<div class="sum-row"><span class="sl">'+d.name+'</span><span class="sv" style="color:#059669;">Done</span></div>';}).join('')+'</div>';}
+async function submitOnboarding(){var phone=g('ePhoneCode')+g('ePhone');var data={first_name:g('eFname'),last_name:g('eLname'),date_of_birth:g('eDOB'),gender:g('eGender'),blood_group:g('eBlood'),phone:phone,email:g('eEmail'),aadhaar_number:g('eAadhaar'),pan_number:g('ePAN'),address:g('eAddress'),employee_type:g('eType'),designation:g('eDesignation'),department:g('eDept'),date_of_joining:g('eDOJ'),employment_type:g('eEmpType'),qualification:g('eQual'),specialization:g('eSpecial'),university:g('eUniv'),bed:g('eBEd'),ctet:g('eCTET'),net:g('eNET'),previous_experience:parseInt(g('eExp'))||0,previous_school:g('ePrevSchool'),basic_salary:parseInt(g('eSalary'))||0,hra:parseInt(g('eHRA'))||0,da:parseInt(g('eDA'))||0,bank_name:g('eBank'),bank_account:g('eBankAcc'),bank_ifsc:g('eIFSC'),emergency_contact_name:g('eEmergency')};try{var r=await fetch('/api/school/hr/employees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});var d=await r.json();if(!r.ok||d.error||d.detail){showToast('error',d.detail||d.error||'Failed');return;}var empId=d.employee_id||'N/A',fname=g('eFname'),lname=g('eLname'),desig=g('eDesignation'),empType=g('eEmpType');showToast('success','Employee: '+empId);setTimeout(function(){document.querySelector('.wiz-wrap').innerHTML='<div class="wiz-card" style="text-align:center;padding:40px;"><div style="font-size:3.5rem;margin-bottom:16px;"><i class="fas fa-user-check" style="color:#059669;"></i></div><h2 style="font-size:1.3rem;">Onboarding Successful!</h2><div class="emp-id-card"><div class="label">Employee ID</div><div class="value">'+empId+'</div></div><p style="font-size:1rem;font-weight:600;margin:12px 0 4px;">'+fname+' '+lname+'</p><p style="color:var(--text-light);font-size:0.82rem;margin:0 0 6px;">'+desig+' &middot; '+empType+'</p><p style="color:var(--text-light);font-size:0.72rem;margin:0 0 20px;">Login: '+phone+'</p><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;"><a href="/school/teachers" class="btn-wiz btn-next" style="text-decoration:none;">View Teachers</a><a href="/school/id-card-designer" class="btn-wiz btn-prev" style="text-decoration:none;">Generate ID Card</a><a href="/school/onboarding" class="btn-wiz btn-prev" style="text-decoration:none;">Add Another</a></div></div>';},500);}catch(e){showToast('error','Failed: '+e.message);}}
+function g(id){var el=document.getElementById(id);return el?el.value.trim():'';}
 document.getElementById('eDOJ').value=new Date().toISOString().split('T')[0];
+var mx=new Date();mx.setFullYear(mx.getFullYear()-18);document.getElementById('eDOB').max=mx.toISOString().split('T')[0];
 showStep(0);
 </script>
 {% endblock %}

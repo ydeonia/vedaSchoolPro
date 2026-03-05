@@ -50,7 +50,7 @@
             <span><i class="fas fa-chalkboard"></i> {{ branch.board_type.value|upper }}</span>
             {% if branch.city %}<span><i class="fas fa-map-marker-alt"></i> {{ branch.city }}{{ ', ' + branch.state if branch.state else '' }}</span>{% endif %}
             {% if branch.email %}<span><i class="fas fa-envelope"></i> {{ branch.email }}</span>{% endif %}
-            {% if branch.phone %}<span><i class="fas fa-phone"></i> {{ branch.phone }}</span>{% endif %}
+            {% if branch.phone %}<span><i class="fas fa-phone"></i> +91 {{ branch.phone }}</span>{% endif %}
             <span><i class="fas fa-building"></i> {{ branch.organization.name if branch.organization else '—' }}</span>
         </div>
         <div style="margin-top:8px;">
@@ -97,7 +97,7 @@
         <div class="info-item"><div class="lbl">Code</div><div class="val">{{ branch.code or '—' }}</div></div>
         <div class="info-item"><div class="lbl">Board</div><div class="val">{{ branch.board_type.value|upper }}</div></div>
         <div class="info-item"><div class="lbl">Email</div><div class="val">{{ branch.email or '—' }}</div></div>
-        <div class="info-item"><div class="lbl">Phone</div><div class="val">{{ branch.phone or '—' }}</div></div>
+        <div class="info-item"><div class="lbl">Phone</div><div class="val">{% if branch.phone %}+91 {{ branch.phone }}{% else %}—{% endif %}</div></div>
         <div class="info-item"><div class="lbl">Address</div><div class="val">{{ branch.address or '—' }}</div></div>
         <div class="info-item"><div class="lbl">City</div><div class="val">{{ branch.city or '—' }}{{ ', ' + branch.state if branch.state else '' }} {{ branch.pincode or '' }}</div></div>
         <div class="info-item"><div class="lbl">Website</div><div class="val">{{ branch.website_url or '—' }}</div></div>
@@ -128,7 +128,7 @@
     </div>
     <div class="edit-row">
         <div class="edit-field"><label>Email</label><input id="eEmail" value="{{ branch.email or '' }}"></div>
-        <div class="edit-field"><label>Phone</label><input id="ePhone" value="{{ branch.phone or '' }}"></div>
+        <div class="edit-field"><label>Phone</label><div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1.5px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input id="ePhone" value="{{ branch.phone or '' }}" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div></div>
     </div>
     <div class="edit-row">
         <div class="edit-field"><label>Address</label><input id="eAddress" value="{{ branch.address or '' }}"></div>
@@ -201,7 +201,7 @@
         <div class="staff-avatar" style="background:#7C3AED;">{{ admin.first_name[0]|upper }}{{ (admin.last_name or ' ')[0]|upper }}</div>
         <div style="flex:1;min-width:0;">
             <div style="font-weight:800;">{{ admin.first_name }} {{ admin.last_name or '' }} <span style="font-size:0.58rem;background:#EDE9FE;color:#7C3AED;padding:2px 6px;border-radius:4px;font-weight:700;">👑 First Admin</span></div>
-            <div style="font-size:0.65rem;color:var(--text-light);">{{ admin.email }} {% if admin.phone %}· {{ admin.phone }}{% endif %}</div>
+            <div style="font-size:0.65rem;color:var(--text-light);">{{ admin.email }} {% if admin.phone %}· +91 {{ admin.phone }}{% endif %}</div>
         </div>
         <div class="staff-actions">
             <button onclick="resetPassword('{{ admin.id }}','{{ admin.first_name }}')" style="background:#DBEAFE;color:#1D4ED8;"><i class="fas fa-key"></i> Reset Pwd</button>

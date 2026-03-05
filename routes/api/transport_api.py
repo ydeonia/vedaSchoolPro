@@ -150,8 +150,25 @@ async def get_vehicle_students(request: Request, vid: str, db: AsyncSession = De
             select(StudentTransport).where(StudentTransport.route_id == r.id, StudentTransport.is_active == True)
         )).scalars().all()
         for a in assignments:
-            s = (await db.execute(select(Student).where(Student.id == a.student_id))).scalar_one_or_none()
-            if s: students.append({"id": str(s.id), "name": s.full_name, "route": r.route_name, "stop": a.stop_name or ""})
+            s = (await db.execute(
+                select(Student).where(Student.id == a.student_id)
+                .options(selectinload(Student.class_))
+            )).scalar_one_or_none()
+            if s:
+                # Get stop name if stop_id is set
+                stop_name = ""
+                if a.stop_id:
+                    from models.mega_modules import RouteStop
+                    stop = (await db.execute(select(RouteStop).where(RouteStop.id == a.stop_id))).scalar_one_or_none()
+                    stop_name = stop.stop_name if stop else ""
+                students.append({
+                    "id": str(s.id),
+                    "name": s.full_name,
+                    "class_name": s.class_.name if s.class_ else "—",
+                    "route": r.route_name,
+                    "stop": stop_name,
+                    "phone": s.father_phone or s.mother_phone or "",
+                })
     return {"students": students, "count": len(students)}
 
 
@@ -200,6 +217,21 @@ async def assign_student(request: Request, data: AssignData, db: AsyncSession = 
     db.add(st)
     await db.commit()
     return {"message": "Student assigned to route"}
+
+
+@router.delete("/unassign/{assignment_id}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def unassign_student(request: Request, assignment_id: str, db: AsyncSession = Depends(get_db)):
+    """Remove a student's transport assignment."""
+    from models.mega_modules import StudentTransport
+    a = (await db.execute(
+        select(StudentTransport).where(StudentTransport.id == uuid.UUID(assignment_id), StudentTransport.is_active == True)
+    )).scalar_one_or_none()
+    if not a:
+        raise HTTPException(404, "Assignment not found")
+    a.is_active = False
+    await db.commit()
+    return {"message": "Student unassigned from route"}
 
 
 @router.get("/summary")

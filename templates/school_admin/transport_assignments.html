@@ -2,35 +2,292 @@
 {% block title %}Transport — Assignments{% endblock %}
 {% block page_title %}👨‍🎓 Student-Route Assignment{% endblock %}
 {% block page_subtitle %}Assign students to transport routes and stops{% endblock %}
+
+{% block extra_css %}
+<style>
+.assign-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:20px;margin-bottom:16px;}
+.assign-card h3{font-size:0.92rem;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.assign-card h3 .count{background:var(--primary);color:white;padding:2px 10px;border-radius:99px;font-size:0.72rem;font-weight:700;}
+
+/* Search + Filter bar */
+.filter-bar{display:grid;grid-template-columns:1fr 180px 200px 130px;gap:10px;margin-bottom:6px;}
+.filter-bar input,.filter-bar select{padding:10px 12px;border-radius:10px;border:1px solid var(--border);font-size:0.82rem;background:var(--bg-card,white);}
+.filter-bar input:focus,.filter-bar select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(99,102,241,0.1);}
+.filter-bar .btn-assign{padding:10px 16px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.filter-bar .btn-assign:hover{opacity:0.9;}
+.filter-bar .btn-assign:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* Student picker dropdown */
+.student-picker-wrap{position:relative;}
+.student-results{position:absolute;top:100%;left:0;right:0;background:var(--bg-card,white);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.12);max-height:280px;overflow-y:auto;z-index:100;display:none;margin-top:4px;}
+.student-results.show{display:block;}
+.stu-item{padding:10px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-light);font-size:0.82rem;transition:background 0.15s;}
+.stu-item:last-child{border-bottom:none;}
+.stu-item:hover{background:var(--primary-50,#EEF2FF);}
+.stu-item.selected{background:var(--primary-50,#EEF2FF);font-weight:700;}
+.stu-item .stu-name{font-weight:600;}
+.stu-item .stu-class{font-size:0.72rem;color:var(--text-secondary);background:var(--bg);padding:2px 8px;border-radius:6px;font-weight:600;}
+.stu-item .stu-assigned{font-size:0.65rem;color:#F59E0B;font-weight:700;}
+.stu-empty{padding:20px;text-align:center;color:var(--text-light);font-size:0.82rem;}
+
+/* Selected student chip */
+.selected-chip{display:inline-flex;align-items:center;gap:6px;background:var(--primary-50,#EEF2FF);color:var(--primary);padding:6px 12px;border-radius:8px;font-size:0.82rem;font-weight:600;}
+.selected-chip .remove{cursor:pointer;font-size:0.9rem;opacity:0.6;}
+.selected-chip .remove:hover{opacity:1;}
+
+/* Assignment table */
+.assign-table{width:100%;border-collapse:separate;border-spacing:0;}
+.assign-table th{text-align:left;padding:8px 12px;font-size:0.68rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;border-bottom:2px solid var(--border);position:sticky;top:0;background:var(--bg-card,white);}
+.assign-table td{padding:10px 12px;font-size:0.82rem;border-bottom:1px solid var(--border-light);}
+.assign-table tr:hover td{background:var(--bg);}
+.assign-table .name-col{font-weight:700;}
+.assign-table .class-badge{background:var(--bg);padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;color:var(--text-secondary);}
+.assign-table .route-badge{background:#DBEAFE;padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;color:#2563EB;}
+.assign-table .vehicle-badge{background:#D1FAE5;padding:3px 10px;border-radius:6px;font-size:0.72rem;font-weight:700;color:#059669;}
+.btn-unassign{padding:4px 10px;border-radius:6px;font-size:0.70rem;font-weight:700;cursor:pointer;border:1px solid #FCA5A5;background:white;color:#DC2626;display:inline-flex;align-items:center;gap:4px;}
+.btn-unassign:hover{background:#FEE2E2;}
+
+/* Table filter */
+.table-filter{display:flex;gap:10px;margin-bottom:12px;align-items:center;}
+.table-filter input{flex:1;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.table-filter select{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;min-width:150px;}
+
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.stat-box{background:var(--bg-card,white);border-radius:12px;padding:16px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.stat-val{font-size:1.4rem;font-weight:900;color:var(--primary);}
+.stat-label{font-size:0.68rem;color:var(--text-secondary);text-transform:uppercase;font-weight:700;margin-top:2px;}
+
+.empty-state{text-align:center;padding:40px;color:var(--text-light);}
+.empty-state i{font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;}
+
+@media(max-width:768px){
+    .filter-bar{grid-template-columns:1fr;}.stats-row{grid-template-columns:1fr 1fr 1fr;}
+    .assign-table{font-size:0.75rem;}.assign-table th,.assign-table td{padding:8px 6px;}
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="card mb-3">
-    <div class="card-header"><h2>Assign Student to Route</h2></div>
-    <div class="card-body">
-        <div style="display:grid; grid-template-columns:1fr 1fr 120px; gap:10px;">
-            <select id="aStudent" class="form-select"><option value="">Select Student</option>{% for s in students %}<option value="{{ s.id }}">{{ s.full_name }} ({{ s.class_.name if s.class_ else '' }})</option>{% endfor %}</select>
-            <select id="aRoute" class="form-select"><option value="">Select Route</option>{% for r in routes %}<option value="{{ r.id }}">{{ r.route_name }} (₹{{ r.monthly_fee|int }}/mo)</option>{% endfor %}</select>
-            <button class="btn btn-primary" onclick="assignStudent()"><i class="fas fa-link"></i> Assign</button>
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat-box"><div class="stat-val">{{ students|length }}</div><div class="stat-label">Total Students</div></div>
+    <div class="stat-box"><div class="stat-val">{{ assignments|length }}</div><div class="stat-label">Assigned to Transport</div></div>
+    <div class="stat-box"><div class="stat-val">{{ routes|length }}</div><div class="stat-label">Active Routes</div></div>
+</div>
+
+<!-- Assign Student Card -->
+<div class="assign-card">
+    <h3><i class="fas fa-link" style="color:var(--primary);"></i> Assign Student to Route</h3>
+    <div class="filter-bar">
+        <div class="student-picker-wrap">
+            <input type="text" id="studentSearch" placeholder="🔍 Type student name or class to search..." autocomplete="off"
+                   onfocus="showStudentResults()" oninput="filterStudents()">
+            <div class="student-results" id="studentResults"></div>
         </div>
+        <select id="classFilter" onchange="filterStudents()">
+            <option value="">All Classes</option>
+            {% for c in class_names %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+        <select id="aRoute">
+            <option value="">Select Route</option>
+            {% for r in routes %}<option value="{{ r.id }}">{{ r.route_name }} (₹{{ r.monthly_fee|int }}/mo)</option>{% endfor %}
+        </select>
+        <button class="btn-assign" id="btnAssign" onclick="assignStudent()" disabled>
+            <i class="fas fa-link"></i> Assign
+        </button>
+    </div>
+    <div id="selectedStudentArea" style="margin-top:8px;display:none;">
+        <span class="selected-chip" id="selectedChip">
+            <span id="selectedName"></span>
+            <span class="remove" onclick="clearSelection()">&times;</span>
+        </span>
     </div>
 </div>
-<div class="card">
-    <div class="card-header"><h2>Current Assignments ({{ assignments|length }})</h2></div>
-    <div class="card-body">
-        {% if assignments %}
-        <p style="font-size:0.82rem; color:var(--text-secondary);">{{ assignments|length }} students assigned to transport routes.</p>
-        {% else %}
-        <div class="empty-state"><i class="fas fa-users"></i><h3>No Assignments</h3><p>Assign students to routes above.</p></div>
-        {% endif %}
+
+<!-- Current Assignments Table -->
+<div class="assign-card">
+    <h3><i class="fas fa-bus" style="color:#F59E0B;"></i> Current Assignments <span class="count">{{ assignments|length }}</span></h3>
+    {% if assignments %}
+    <div class="table-filter">
+        <input type="text" id="tableSearch" placeholder="🔍 Search by name, class, route..." oninput="filterTable()">
+        <select id="tableClassFilter" onchange="filterTable()">
+            <option value="">All Classes</option>
+            {% for c in class_names %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+        </select>
+        <select id="tableRouteFilter" onchange="filterTable()">
+            <option value="">All Routes</option>
+            {% for r in routes %}<option value="{{ r.id }}">{{ r.route_name }}</option>{% endfor %}
+        </select>
     </div>
+    <div style="max-height:500px;overflow-y:auto;border-radius:10px;border:1px solid var(--border);">
+    <table class="assign-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Student Name</th>
+                <th>Class</th>
+                <th>Route</th>
+                <th>Vehicle</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="assignmentTableBody">
+            {% for a in assignments %}
+            <tr data-name="{{ a.student_name|lower }}" data-class="{{ a.class_name }}" data-route="{{ a.route_id }}">
+                <td style="color:var(--text-light);font-size:0.75rem;">{{ loop.index }}</td>
+                <td class="name-col">{{ a.student_name }}</td>
+                <td><span class="class-badge">{{ a.class_name }}</span></td>
+                <td><span class="route-badge">{{ a.route_name }}</span></td>
+                <td>{% if a.vehicle_number != '—' %}<span class="vehicle-badge">🚌 {{ a.vehicle_number }}</span>{% else %}<span style="color:var(--text-light);font-size:0.75rem;">No vehicle</span>{% endif %}</td>
+                <td><button class="btn-unassign" onclick="confirmUnassign('{{ a.id }}','{{ a.student_name }}')"><i class="fas fa-unlink"></i> Remove</button></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div id="noFilterResults" style="display:none;text-align:center;padding:20px;color:var(--text-light);font-size:0.82rem;">
+        <i class="fas fa-search" style="opacity:0.3;"></i> No matching assignments found
+    </div>
+    {% else %}
+    <div class="empty-state"><i class="fas fa-users"></i><h3>No Assignments Yet</h3><p>Use the form above to assign students to transport routes.</p></div>
+    {% endif %}
 </div>
 {% endblock %}
+
 {% block extra_js %}
 <script>
+// ═══ Student Data ═══
+const ALL_STUDENTS = [
+{% for s in students %}
+    {id:"{{ s.id }}", name:"{{ s.full_name }}", cls:"{{ s.class_.name if s.class_ else '' }}", assigned:{{ 'true' if s.id|string in assigned_student_ids else 'false' }}},
+{% endfor %}
+];
+let selectedStudentId = null;
+
+// ═══ Student Search Picker ═══
+function showStudentResults(){
+    filterStudents();
+    document.getElementById('studentResults').classList.add('show');
+}
+
+function hideStudentResults(){
+    setTimeout(()=> document.getElementById('studentResults').classList.remove('show'), 200);
+}
+
+document.getElementById('studentSearch').addEventListener('blur', hideStudentResults);
+
+function filterStudents(){
+    const q = document.getElementById('studentSearch').value.toLowerCase().trim();
+    const cls = document.getElementById('classFilter').value;
+    const box = document.getElementById('studentResults');
+
+    let filtered = ALL_STUDENTS.filter(s => {
+        if(cls && s.cls !== cls) return false;
+        if(q && !s.name.toLowerCase().includes(q) && !s.cls.toLowerCase().includes(q)) return false;
+        return true;
+    });
+
+    // Sort: unassigned first, then alphabetical
+    filtered.sort((a,b) => {
+        if(a.assigned !== b.assigned) return a.assigned ? 1 : -1;
+        return a.name.localeCompare(b.name);
+    });
+
+    if(filtered.length === 0){
+        box.innerHTML = '<div class="stu-empty">No students found</div>';
+    } else {
+        // Show max 50 at a time for performance
+        const shown = filtered.slice(0, 50);
+        box.innerHTML = shown.map(s =>
+            `<div class="stu-item ${selectedStudentId === s.id ? 'selected' : ''}" onmousedown="selectStudent('${s.id}','${s.name.replace(/'/g,"\\'")}','${s.cls}')">
+                <span class="stu-name">${s.name}</span>
+                <span style="display:flex;align-items:center;gap:6px;">
+                    ${s.assigned ? '<span class="stu-assigned">🚌 Assigned</span>' : ''}
+                    <span class="stu-class">${s.cls || '—'}</span>
+                </span>
+            </div>`
+        ).join('');
+        if(filtered.length > 50) box.innerHTML += `<div class="stu-empty">${filtered.length - 50} more students — narrow your search</div>`;
+    }
+
+    if(!box.classList.contains('show')) box.classList.add('show');
+}
+
+function selectStudent(id, name, cls){
+    selectedStudentId = id;
+    document.getElementById('studentSearch').value = '';
+    document.getElementById('selectedName').textContent = name + (cls ? ' (' + cls + ')' : '');
+    document.getElementById('selectedStudentArea').style.display = 'block';
+    document.getElementById('studentResults').classList.remove('show');
+    updateAssignButton();
+}
+
+function clearSelection(){
+    selectedStudentId = null;
+    document.getElementById('selectedStudentArea').style.display = 'none';
+    document.getElementById('studentSearch').value = '';
+    updateAssignButton();
+}
+
+function updateAssignButton(){
+    const btn = document.getElementById('btnAssign');
+    const route = document.getElementById('aRoute').value;
+    btn.disabled = !(selectedStudentId && route);
+}
+
+document.getElementById('aRoute').addEventListener('change', updateAssignButton);
+
+// ═══ Assign ═══
 async function assignStudent(){
-    const sid=document.getElementById('aStudent').value, rid=document.getElementById('aRoute').value;
-    if(!sid||!rid){showToast('error','Select student and route');return;}
-    await apiCall('/api/school/transport/assign','POST',{student_id:sid,route_id:rid});
-    showToast('success','Assigned');setTimeout(()=>location.reload(),800);
+    if(!selectedStudentId){showToast('error','Select a student first');return;}
+    const rid = document.getElementById('aRoute').value;
+    if(!rid){showToast('error','Select a route');return;}
+    try {
+        await apiCall('/api/school/transport/assign','POST',{student_id:selectedStudentId, route_id:rid});
+        showToast('success','Student assigned to route!');
+        setTimeout(()=>location.reload(), 800);
+    } catch(e) {
+        showToast('error','Failed to assign');
+    }
+}
+
+// ═══ Unassign ═══
+function confirmUnassign(assignId, name){
+    showConfirm('Remove Assignment', 'Remove <b>' + name + '</b> from transport route?', async () => {
+        try {
+            await apiCall('/api/school/transport/unassign/' + assignId, 'DELETE');
+            showToast('success', name + ' removed from transport');
+            setTimeout(()=>location.reload(), 800);
+        } catch(e) {
+            showToast('error', 'Failed to remove');
+        }
+    }, {icon:'🚌', danger:true, yesText:'Remove'});
+}
+
+// ═══ Table Filter ═══
+function filterTable(){
+    const q = document.getElementById('tableSearch').value.toLowerCase().trim();
+    const cls = document.getElementById('tableClassFilter').value;
+    const route = document.getElementById('tableRouteFilter').value;
+    const rows = document.querySelectorAll('#assignmentTableBody tr');
+    let visible = 0;
+    rows.forEach((row, i) => {
+        const name = row.dataset.name || '';
+        const rowCls = row.dataset.class || '';
+        const rowRoute = row.dataset.route || '';
+        let show = true;
+        if(q && !name.includes(q) && !rowCls.toLowerCase().includes(q)) show = false;
+        if(cls && rowCls !== cls) show = false;
+        if(route && rowRoute !== route) show = false;
+        row.style.display = show ? '' : 'none';
+        if(show){
+            visible++;
+            row.querySelector('td').textContent = visible; // Update row number
+        }
+    });
+    const noResults = document.getElementById('noFilterResults');
+    if(noResults) noResults.style.display = (visible === 0 && rows.length > 0) ? 'block' : 'none';
 }
 </script>
 {% endblock %}

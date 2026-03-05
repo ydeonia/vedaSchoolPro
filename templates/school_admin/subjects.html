@@ -171,12 +171,13 @@ async function submitSubjectForm() {
 }
 
 async function quickAddSubjects() {
-    if (!confirm('This will create standard subjects: English, Hindi, Mathematics, Science, Social Science, Computer Science, Physical Education, Art. Continue?')) return;
+    showConfirm('Confirm', 'This will create standard subjects: English, Hindi, Mathematics, Science, Social Science, Computer Science, Physical Education, Art. Continue?', async () => {
     try {
         await apiCall('/api/school/subjects/quick-setup', 'POST');
         showToast('success', 'Subjects Created!', 'Standard subjects have been added');
         setTimeout(() => window.location.reload(), 1000);
     } catch (e) {}
+    }, {icon:'⚠️'});
 }
 
 async function assignSubjects() {

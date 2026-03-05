@@ -142,7 +142,7 @@ function addBulkQuestions() { for(let i=0;i<5;i++) addQuestion(); }
 
 async function saveQuiz(publish) {
     const title = document.getElementById('qTitle').value.trim();
-    if (!title) { alert('Enter quiz title'); return; }
+    if (!title) { showToast('warning','Enter quiz title'); return; }
     const qCards = document.querySelectorAll('.q-card');
     const qs = [];
     qCards.forEach((card, i) => {
@@ -160,21 +160,25 @@ async function saveQuiz(publish) {
             order_num: i + 1
         });
     });
-    if (!qs.length) { alert('Add at least one question'); return; }
+    if (!qs.length) { showToast('warning','Add at least one question'); return; }
     try {
         const res = await fetch('/api/school/quizzes', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({title, class_id: document.getElementById('qClass').value, subject_id: document.getElementById('qSubject').value || null,
                 time_limit_minutes: parseInt(document.getElementById('qTime').value) || 30, pass_marks: parseInt(document.getElementById('qPass').value) || 40,
                 shuffle_questions: document.getElementById('qShuffle').value === '1', is_published: publish, questions: qs})});
         if (!res.ok) throw new Error();
-        alert(publish ? '✅ Quiz published!' : '💾 Quiz saved as draft');
+        showToast('success', publish ? 'Quiz published!' : 'Quiz saved as draft');
         loadQuizzes(); switchTab('list', document.querySelectorAll('.quiz-tab')[0]);
-    } catch(e) { alert('Failed to save quiz'); }
+    } catch(e) { showToast('error','Failed to save quiz'); }
 }
 
 async function publishQuiz(id) { try { await fetch(`/api/school/quizzes/${id}/publish`, {method:'POST', credentials:'same-origin'}); loadQuizzes(); } catch(e){} }
-async function deleteQuiz(id) { if(!confirm('Delete this quiz?')) return; try { await fetch(`/api/school/quizzes/${id}`, {method:'DELETE', credentials:'same-origin'}); loadQuizzes(); } catch(e){} }
-function viewResults(id) { alert('Results view coming soon!'); }
+async function deleteQuiz(id) {
+showConfirm('Confirm','Delete this quiz?', async () => {
+try { await fetch(`/api/school/quizzes/${id}`, {method:'DELETE', credentials:'same-origin'}); loadQuizzes(); } catch(e){}
+}, {icon:'🗑️', danger:true, yesText:'Delete'});
+}
+function viewResults(id) { showToast('info','Results view coming soon!'); }
 
 init();
 </script>

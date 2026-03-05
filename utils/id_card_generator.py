@@ -1,632 +1,516 @@
-"""ID Card PDF Generator — Student & Employee ID Cards with Signed QR"""
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm, cm
-from reportlab.lib.colors import HexColor, black, white
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, Frame, PageTemplate
-from reportlab.pdfgen import canvas
-from io import BytesIO
-import os, hashlib, hmac
+"""
+ID Card Generator — Student Login ID generation + PDF card/slip generators.
+Consolidated: student-ID logic lives in student_id_generator.py.
+PDF generators use reportlab for ID cards and salary slips.
+"""
+from utils.student_id_generator import (
+    generate_student_registration_id,
+    _to_base36,
+    _random_alphanum,
+    _class_code,
+)
 
-BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+# QR code secret for tamper-proof verification
+QR_SECRET = "vedaflow_id_card_secret_2025"
 
-# Secret key for HMAC-signed QR (tamper-proof)
-QR_SECRET = os.environ.get("QR_SECRET_KEY", "EduFlow-QR-Secret-2025-X9k$mP")
+# Re-export for backward compatibility
+__all__ = [
+    "generate_student_registration_id",
+    "generate_student_id_card_pdf",
+    "generate_employee_id_card_pdf",
+    "generate_teacher_id_card_pdf",
+    "generate_visitor_card_pdf",
+    "generate_salary_slip_pdf",
+    "QR_SECRET",
+]
 
 
-def _generate_signed_qr(entity_type, entity_id, name=""):
+# ═══════════════════════════════════════════════════════════
+# STUDENT ID CARD PDF
+# ═══════════════════════════════════════════════════════════
+
+def generate_student_id_card_pdf(school_data: dict, student_data: dict) -> bytes:
     """
-    Generate a tamper-proof QR code image.
-    QR contains: EDUFLOW|type|uuid|hmac_hash
-    On scan, verify: hmac(secret, "type|uuid") == hash → valid card
+    Generate a student ID card as PDF bytes.
+    school_data: name, logo_url, motto, address, phone, landline, website
+    student_data: name, student_id, roll_number, admission_number, dob,
+                  blood_group, photo_url, father_name, mother_name,
+                  emergency_contact, address, class_name, valid_from, valid_to
     """
-    try:
-        import qrcode
-        payload = f"{entity_type}|{entity_id}"
-        sig = hmac.new(QR_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
-        qr_data = f"EDUFLOW|{payload}|{sig}"
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm, cm
+    from reportlab.lib.colors import HexColor, black, white
+    from reportlab.pdfgen import canvas
 
-        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_M, box_size=6, border=1)
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        img = qr.make_image(fill_color="black", back_color="white")
-        buf = BytesIO()
-        img.save(buf, format='PNG')
-        buf.seek(0)
-        return buf
-    except ImportError:
-        return None
+    buf = io.BytesIO()
+    card_w = 86 * mm   # standard ID card width
+    card_h = 54 * mm   # standard ID card height
+    page_w, page_h = A4
 
-# Card dimensions (credit card size: 85.6mm x 53.98mm)
-CARD_W = 86*mm
-CARD_H = 54*mm
+    c = canvas.Canvas(buf, pagesize=A4)
 
-# Colors
-PRIMARY = HexColor('#4F46E5')
-DARK = HexColor('#1E293B')
-LIGHT_BG = HexColor('#F8FAFC')
-ACCENT = HexColor('#EEF2FF')
-WHITE = white
-GRAY = HexColor('#64748B')
+    # Center card on page
+    x0 = (page_w - card_w) / 2
+    y0 = (page_h - card_h) / 2
 
-
-def _load_image(url, width=20*mm, height=20*mm):
-    if not url:
-        return None
-    filepath = os.path.join(BASE_DIR, url.lstrip('/'))
-    if os.path.exists(filepath):
-        try:
-            return Image(filepath, width=width, height=height)
-        except:
-            return None
-    return None
-
-
-def generate_student_id_card_pdf(school_data, student_data):
-    """
-    Generate student ID card PDF (2 cards per page — front + back).
-    school_data: {name, logo_url, motto, accreditation, address, phone, landline, website}
-    student_data: {name, class_name, roll_number, admission_number, dob, blood_group,
-                   photo_url, father_name, mother_name, emergency_contact, address,
-                   valid_from, valid_to, student_id}
-    """
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    # ─── FRONT CARD ────────────────────────────────────
-    x_start = (width - CARD_W) / 2
-    y_start = height - 40*mm - CARD_H
-
-    # Card border
-    c.setStrokeColor(PRIMARY)
+    # ── Card border ──
+    c.setStrokeColor(HexColor("#1a73e8"))
     c.setLineWidth(2)
-    c.roundRect(x_start, y_start, CARD_W, CARD_H, 4*mm)
+    c.roundRect(x0, y0, card_w, card_h, 3 * mm)
 
-    # Top strip (school header)
-    c.setFillColor(PRIMARY)
-    c.roundRect(x_start, y_start + CARD_H - 16*mm, CARD_W, 16*mm, 4*mm)
-    c.rect(x_start, y_start + CARD_H - 16*mm, CARD_W, 8*mm, fill=1)  # Square bottom to overlap rounded
+    # ── Header bar ──
+    header_h = 14 * mm
+    c.setFillColor(HexColor("#1a73e8"))
+    c.rect(x0 + 1, y0 + card_h - header_h - 1, card_w - 2, header_h, fill=True, stroke=False)
 
-    # School logo
-    logo = _load_image(school_data.get('logo_url', ''), width=10*mm, height=10*mm)
-    if logo:
-        logo.drawOn(c, x_start + 3*mm, y_start + CARD_H - 14*mm)
+    # School name
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 9)
+    school_name = school_data.get("name", "School Name")
+    c.drawCentredString(x0 + card_w / 2, y0 + card_h - 8 * mm, school_name[:40])
 
-    # School name on header
-    c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(x_start + 15*mm, y_start + CARD_H - 8*mm, school_data.get('name', 'School')[:35])
-    c.setFont('Helvetica', 5)
-    motto = school_data.get('motto', '')
+    # Motto (if fits)
+    motto = school_data.get("motto", "")
     if motto:
-        c.drawString(x_start + 15*mm, y_start + CARD_H - 12*mm, motto[:50])
-    accred = school_data.get('accreditation', '')
-    if accred:
-        c.drawString(x_start + 15*mm, y_start + CARD_H - 15*mm, f"Affn: {accred}")
+        c.setFont("Helvetica-Oblique", 6)
+        c.drawCentredString(x0 + card_w / 2, y0 + card_h - 12 * mm, motto[:50])
 
-    # STUDENT ID title
-    c.setFillColor(PRIMARY)
-    c.setFont('Helvetica-Bold', 6)
-    c.drawCentredString(x_start + CARD_W/2, y_start + CARD_H - 20*mm, "STUDENT IDENTITY CARD")
+    # ── Photo placeholder ──
+    photo_size = 20 * mm
+    photo_x = x0 + 4 * mm
+    photo_y = y0 + card_h - header_h - photo_size - 3 * mm
+    c.setStrokeColor(HexColor("#cccccc"))
+    c.setLineWidth(0.5)
+    c.rect(photo_x, photo_y, photo_size, photo_size)
+    c.setFillColor(HexColor("#f0f0f0"))
+    c.rect(photo_x, photo_y, photo_size, photo_size, fill=True, stroke=True)
+    c.setFillColor(HexColor("#999999"))
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(photo_x + photo_size / 2, photo_y + photo_size / 2, "PHOTO")
 
-    # Photo placeholder
-    photo = _load_image(student_data.get('photo_url', ''), width=16*mm, height=20*mm)
-    photo_x = x_start + 4*mm
-    photo_y = y_start + 6*mm
-    if photo:
-        photo.drawOn(c, photo_x, photo_y)
-    else:
-        c.setStrokeColor(GRAY)
-        c.setFillColor(LIGHT_BG)
-        c.rect(photo_x, photo_y, 16*mm, 20*mm, fill=1)
-        c.setFillColor(GRAY)
-        c.setFont('Helvetica', 5)
-        c.drawCentredString(photo_x + 8*mm, photo_y + 9*mm, "Photo")
+    # ── Student details ──
+    details_x = photo_x + photo_size + 4 * mm
+    details_y = y0 + card_h - header_h - 5 * mm
+    line_h = 3.5 * mm
 
-    # Student details (right of photo)
-    detail_x = x_start + 23*mm
-    detail_y = y_start + CARD_H - 24*mm
-    line_h = 4.2*mm
+    c.setFillColor(black)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(details_x, details_y, student_data.get("name", "")[:25])
+    details_y -= line_h + 1 * mm
 
-    c.setFillColor(DARK)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(detail_x, detail_y, student_data.get('name', '')[:25])
-    detail_y -= line_h
-
-    details = [
-        ('Class', student_data.get('class_name', '')),
-        ('Roll No', str(student_data.get('roll_number', ''))),
-        ('Adm No', str(student_data.get('admission_number', ''))),
-        ('DOB', str(student_data.get('dob', ''))),
-        ('Blood', student_data.get('blood_group', '')),
-        ("Father", student_data.get('father_name', '')[:20]),
+    fields = [
+        ("Class", student_data.get("class_name", "")),
+        ("Roll No", student_data.get("roll_number", "")),
+        ("DOB", student_data.get("dob", "")),
+        ("Blood Grp", student_data.get("blood_group", "")),
     ]
+    c.setFont("Helvetica", 6)
+    for label, val in fields:
+        if val:
+            c.setFont("Helvetica-Bold", 6)
+            c.drawString(details_x, details_y, f"{label}: ")
+            c.setFont("Helvetica", 6)
+            c.drawString(details_x + 18 * mm, details_y, str(val)[:20])
+            details_y -= line_h
 
-    c.setFont('Helvetica', 5.5)
-    for label, value in details:
-        if value:
-            c.setFillColor(GRAY)
-            c.drawString(detail_x, detail_y, f"{label}:")
-            c.setFillColor(DARK)
-            c.drawString(detail_x + 14*mm, detail_y, str(value))
-            detail_y -= line_h * 0.85
+    # ── Footer bar ──
+    footer_h = 8 * mm
+    c.setFillColor(HexColor("#e8f0fe"))
+    c.rect(x0 + 1, y0 + 1, card_w - 2, footer_h, fill=True, stroke=False)
+    c.setFillColor(HexColor("#333333"))
+    c.setFont("Helvetica", 5)
+    contact = student_data.get("emergency_contact", "")
+    father = student_data.get("father_name", "")
+    if father:
+        c.drawString(x0 + 4 * mm, y0 + 4.5 * mm, f"Father: {father[:25]}")
+    if contact:
+        c.drawString(x0 + 4 * mm, y0 + 1.5 * mm, f"Emergency: {contact}")
 
-    # Valid period at bottom
-    c.setFont('Helvetica', 4.5)
-    c.setFillColor(GRAY)
-    valid = f"Valid: {student_data.get('valid_from', '')} to {student_data.get('valid_to', '')}"
-    c.drawCentredString(x_start + CARD_W/2, y_start + 2*mm, valid)
+    # Validity
+    valid_from = student_data.get("valid_from", "")
+    valid_to = student_data.get("valid_to", "")
+    if valid_from and valid_to:
+        c.setFont("Helvetica", 5)
+        c.drawRightString(x0 + card_w - 4 * mm, y0 + 1.5 * mm, f"Valid: {valid_from} - {valid_to}")
 
-    # QR Code (signed, tamper-proof) — top-right of front card
-    student_id = student_data.get('student_id', student_data.get('admission_number', 'unknown'))
-    qr_buf = _generate_signed_qr("STUDENT", str(student_id), student_data.get('name', ''))
-    if qr_buf:
-        from reportlab.lib.utils import ImageReader
-        qr_img = ImageReader(qr_buf)
-        qr_size = 14*mm
-        c.drawImage(qr_img, x_start + CARD_W - qr_size - 3*mm, y_start + 8*mm, qr_size, qr_size)
-        c.setFont('Helvetica', 3.5)
-        c.setFillColor(GRAY)
-        c.drawCentredString(x_start + CARD_W - qr_size/2 - 3*mm, y_start + 5.5*mm, "🔒 Verified")
-
-    # ─── BACK CARD ─────────────────────────────────────
-    y_back = y_start - 15*mm - CARD_H
-
-    c.setStrokeColor(PRIMARY)
-    c.setLineWidth(2)
-    c.roundRect(x_start, y_back, CARD_W, CARD_H, 4*mm)
-
-    # Header
-    c.setFillColor(PRIMARY)
-    c.roundRect(x_start, y_back + CARD_H - 10*mm, CARD_W, 10*mm, 4*mm)
-    c.rect(x_start, y_back + CARD_H - 10*mm, CARD_W, 5*mm, fill=1)
-    c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 7)
-    c.drawCentredString(x_start + CARD_W/2, y_back + CARD_H - 7*mm, school_data.get('name', '')[:40])
-
-    # Details on back
-    back_y = y_back + CARD_H - 16*mm
-    c.setFont('Helvetica', 5.5)
-
-    back_details = [
-        ("Student's Address", student_data.get('address', 'N/A')[:60]),
-        ("Emergency Contact", student_data.get('emergency_contact', 'N/A')),
-        ("Mother's Name", student_data.get('mother_name', 'N/A')[:30]),
-    ]
-
-    for label, value in back_details:
-        c.setFillColor(GRAY)
-        c.drawString(x_start + 5*mm, back_y, f"{label}:")
-        c.setFillColor(DARK)
-        c.drawString(x_start + 5*mm, back_y - 3.5*mm, str(value))
-        back_y -= 8*mm
-
-    # School contact
-    c.setFont('Helvetica', 5)
-    c.setFillColor(GRAY)
-    school_contact = []
-    if school_data.get('phone'):
-        school_contact.append(f"Ph: {school_data['phone']}")
-    if school_data.get('landline'):
-        school_contact.append(f"Landline: {school_data['landline']}")
-    if school_data.get('website'):
-        school_contact.append(school_data['website'])
-    contact_str = " | ".join(school_contact)
-    c.drawCentredString(x_start + CARD_W/2, y_back + 10*mm, contact_str[:70])
-
-    # School address
-    if school_data.get('address'):
-        c.drawCentredString(x_start + CARD_W/2, y_back + 6*mm, school_data['address'][:70])
-
-    # Signature line
-    c.setStrokeColor(GRAY)
-    c.line(x_start + CARD_W - 35*mm, y_back + 3*mm, x_start + CARD_W - 5*mm, y_back + 3*mm)
-    c.setFont('Helvetica', 4)
-    c.drawCentredString(x_start + CARD_W - 20*mm, y_back + 0.5*mm, "Principal's Signature")
-
-    # "If found" note
-    c.setFont('Helvetica-Oblique', 4)
-    c.setFillColor(GRAY)
-    c.drawString(x_start + 5*mm, y_back + 2*mm, "If found, please return to the school address above.")
-
+    c.showPage()
     c.save()
-    return buffer.getvalue()
+    return buf.getvalue()
 
 
-def generate_employee_id_card_pdf(school_data, employee_data):
+# ═══════════════════════════════════════════════════════════
+# SALARY SLIP PDF
+# ═══════════════════════════════════════════════════════════
+
+def generate_salary_slip_pdf(school_data: dict, salary_data: dict) -> bytes:
     """
-    Generate employee ID card PDF.
-    school_data: {name, logo_url, motto, accreditation, address, phone, landline}
-    employee_data: {name, employee_code, designation, department, dob, blood_group,
-                    photo_url, emergency_contact_name, emergency_contact_phone,
-                    address, valid_from, valid_to}
+    Generate a salary slip as PDF bytes.
+    school_data: name, address, logo_url
+    salary_data: employee_name, employee_code, designation, department,
+                 month, year, basic, hra, da, conveyance, medical, special,
+                 pf, esi, tds, other_ded, gross, deductions, net,
+                 days_present, days_absent, working_days
     """
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm, cm
+    from reportlab.lib.colors import HexColor, black, white
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 
-    x_start = (width - CARD_W) / 2
-    y_start = height - 40*mm - CARD_H
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=20 * mm, rightMargin=20 * mm,
+                            topMargin=15 * mm, bottomMargin=15 * mm)
 
-    # Card border
-    c.setStrokeColor(HexColor('#059669'))  # Green for employees
-    c.setLineWidth(2)
-    c.roundRect(x_start, y_start, CARD_W, CARD_H, 4*mm)
-
-    # Top strip
-    c.setFillColor(HexColor('#059669'))
-    c.roundRect(x_start, y_start + CARD_H - 16*mm, CARD_W, 16*mm, 4*mm)
-    c.rect(x_start, y_start + CARD_H - 16*mm, CARD_W, 8*mm, fill=1)
-
-    # Logo
-    logo = _load_image(school_data.get('logo_url', ''), width=10*mm, height=10*mm)
-    if logo:
-        logo.drawOn(c, x_start + 3*mm, y_start + CARD_H - 14*mm)
-
-    c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(x_start + 15*mm, y_start + CARD_H - 8*mm, school_data.get('name', '')[:35])
-    c.setFont('Helvetica', 5)
-    if school_data.get('motto'):
-        c.drawString(x_start + 15*mm, y_start + CARD_H - 12*mm, school_data['motto'][:50])
-
-    # Title
-    c.setFillColor(HexColor('#059669'))
-    c.setFont('Helvetica-Bold', 6)
-    c.drawCentredString(x_start + CARD_W/2, y_start + CARD_H - 20*mm, "EMPLOYEE IDENTITY CARD")
-
-    # Photo
-    photo = _load_image(employee_data.get('photo_url', ''), width=16*mm, height=20*mm)
-    photo_x = x_start + 4*mm
-    photo_y = y_start + 6*mm
-    if photo:
-        photo.drawOn(c, photo_x, photo_y)
-    else:
-        c.setStrokeColor(GRAY)
-        c.setFillColor(LIGHT_BG)
-        c.rect(photo_x, photo_y, 16*mm, 20*mm, fill=1)
-        c.setFillColor(GRAY)
-        c.setFont('Helvetica', 5)
-        c.drawCentredString(photo_x + 8*mm, photo_y + 9*mm, "Photo")
-
-    # Details
-    detail_x = x_start + 23*mm
-    detail_y = y_start + CARD_H - 24*mm
-    line_h = 4.2*mm
-
-    c.setFillColor(DARK)
-    c.setFont('Helvetica-Bold', 8)
-    c.drawString(detail_x, detail_y, employee_data.get('name', '')[:25])
-    detail_y -= line_h
-
-    details = [
-        ('Emp ID', employee_data.get('employee_code', '')),
-        ('Desig', employee_data.get('designation', '')),
-        ('Dept', employee_data.get('department', '')),
-        ('Blood', employee_data.get('blood_group', '')),
-        ('DOB', str(employee_data.get('dob', ''))),
-    ]
-
-    c.setFont('Helvetica', 5.5)
-    for label, value in details:
-        if value:
-            c.setFillColor(GRAY)
-            c.drawString(detail_x, detail_y, f"{label}:")
-            c.setFillColor(DARK)
-            c.drawString(detail_x + 13*mm, detail_y, str(value)[:25])
-            detail_y -= line_h * 0.85
-
-    # Valid
-    c.setFont('Helvetica', 4.5)
-    c.setFillColor(GRAY)
-    valid = f"Valid: {employee_data.get('valid_from', '')} to {employee_data.get('valid_to', '')}"
-    c.drawCentredString(x_start + CARD_W/2, y_start + 2*mm, valid)
-
-    # QR Code (signed, tamper-proof)
-    emp_id = employee_data.get('employee_id', employee_data.get('employee_code', 'unknown'))
-    qr_buf = _generate_signed_qr("EMPLOYEE", str(emp_id), employee_data.get('name', ''))
-    if qr_buf:
-        from reportlab.lib.utils import ImageReader
-        qr_img = ImageReader(qr_buf)
-        qr_size = 14*mm
-        c.drawImage(qr_img, x_start + CARD_W - qr_size - 3*mm, y_start + 8*mm, qr_size, qr_size)
-        c.setFont('Helvetica', 3.5)
-        c.setFillColor(GRAY)
-        c.drawCentredString(x_start + CARD_W - qr_size/2 - 3*mm, y_start + 5.5*mm, "🔒 Verified")
-
-    # ─── BACK CARD ─────────────────────────────────────
-    y_back = y_start - 15*mm - CARD_H
-    c.setStrokeColor(HexColor('#059669'))
-    c.setLineWidth(2)
-    c.roundRect(x_start, y_back, CARD_W, CARD_H, 4*mm)
-
-    c.setFillColor(HexColor('#059669'))
-    c.roundRect(x_start, y_back + CARD_H - 10*mm, CARD_W, 10*mm, 4*mm)
-    c.rect(x_start, y_back + CARD_H - 10*mm, CARD_W, 5*mm, fill=1)
-    c.setFillColor(WHITE)
-    c.setFont('Helvetica-Bold', 7)
-    c.drawCentredString(x_start + CARD_W/2, y_back + CARD_H - 7*mm, school_data.get('name', '')[:40])
-
-    back_y = y_back + CARD_H - 16*mm
-    c.setFont('Helvetica', 5.5)
-    back_details = [
-        ("Address", employee_data.get('address', 'N/A')[:60]),
-        ("Emergency Contact", employee_data.get('emergency_contact_name', 'N/A')),
-        ("Emergency Phone", employee_data.get('emergency_contact_phone', 'N/A')),
-    ]
-    for label, value in back_details:
-        c.setFillColor(GRAY)
-        c.drawString(x_start + 5*mm, back_y, f"{label}:")
-        c.setFillColor(DARK)
-        c.drawString(x_start + 5*mm, back_y - 3.5*mm, str(value))
-        back_y -= 8*mm
-
-    # School contact
-    c.setFont('Helvetica', 5)
-    c.setFillColor(GRAY)
-    parts = []
-    if school_data.get('phone'): parts.append(f"Ph: {school_data['phone']}")
-    if school_data.get('landline'): parts.append(f"Landline: {school_data['landline']}")
-    c.drawCentredString(x_start + CARD_W/2, y_back + 10*mm, " | ".join(parts)[:70])
-    if school_data.get('address'):
-        c.drawCentredString(x_start + CARD_W/2, y_back + 6*mm, school_data['address'][:70])
-
-    c.setStrokeColor(GRAY)
-    c.line(x_start + CARD_W - 35*mm, y_back + 3*mm, x_start + CARD_W - 5*mm, y_back + 3*mm)
-    c.setFont('Helvetica', 4)
-    c.drawCentredString(x_start + CARD_W - 20*mm, y_back + 0.5*mm, "Principal's Signature")
-
-    c.save()
-    return buffer.getvalue()
-
-
-def generate_certificate_pdf(school_data, cert_data):
-    """
-    Generate certificate PDF — TC, Bonafide, Character, Study.
-    school_data: {name, logo_url, motto, accreditation, address}
-    cert_data: {cert_type, certificate_number, student_name, father_name,
-                class_name, dob, admission_number, admission_date, leaving_date,
-                reason, conduct, destination_school, issue_date}
-    """
-    from reportlab.lib.styles import getSampleStyleSheet
-
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    w, h = A4
-
-    # Border
-    c.setStrokeColor(PRIMARY)
-    c.setLineWidth(3)
-    c.rect(20*mm, 20*mm, w - 40*mm, h - 40*mm)
-    c.setLineWidth(1)
-    c.rect(22*mm, 22*mm, w - 44*mm, h - 44*mm)
-
-    # Header
-    cy = h - 40*mm
-    logo = _load_image(school_data.get('logo_url', ''), width=18*mm, height=18*mm)
-    if logo:
-        logo.drawOn(c, 30*mm, cy - 5*mm)
-
-    c.setFont('Helvetica-Bold', 16)
-    c.setFillColor(PRIMARY)
-    c.drawCentredString(w/2, cy, school_data.get('name', ''))
-
-    if school_data.get('motto'):
-        c.setFont('Helvetica-Oblique', 9)
-        c.setFillColor(GRAY)
-        c.drawCentredString(w/2, cy - 8*mm, school_data['motto'])
-
-    if school_data.get('accreditation'):
-        c.setFont('Helvetica', 8)
-        c.drawCentredString(w/2, cy - 14*mm, f"Affiliation No: {school_data['accreditation']}")
-
-    if school_data.get('address'):
-        c.setFont('Helvetica', 7)
-        c.drawCentredString(w/2, cy - 19*mm, school_data['address'][:80])
-
-    # Divider
-    cy -= 25*mm
-    c.setStrokeColor(PRIMARY)
-    c.setLineWidth(2)
-    c.line(30*mm, cy, w - 30*mm, cy)
-
-    # Certificate title
-    cy -= 12*mm
-    cert_type = cert_data.get('cert_type', 'Certificate')
-    titles = {
-        'transfer_certificate': 'TRANSFER CERTIFICATE',
-        'bonafide_certificate': 'BONAFIDE CERTIFICATE',
-        'character_certificate': 'CHARACTER CERTIFICATE',
-        'study_certificate': 'STUDY CERTIFICATE',
-        'conduct_certificate': 'CONDUCT CERTIFICATE',
-    }
-    title = titles.get(cert_type, cert_type.replace('_', ' ').upper())
-
-    c.setFont('Helvetica-Bold', 18)
-    c.setFillColor(DARK)
-    c.drawCentredString(w/2, cy, title)
-
-    # Certificate number
-    cy -= 8*mm
-    c.setFont('Helvetica', 9)
-    c.setFillColor(GRAY)
-    c.drawCentredString(w/2, cy, f"Certificate No: {cert_data.get('certificate_number', 'N/A')}")
-
-    # Content
-    cy -= 15*mm
-    c.setFont('Helvetica', 11)
-    c.setFillColor(DARK)
-
-    student = cert_data.get('student_name', '')
-    father = cert_data.get('father_name', '')
-    class_name = cert_data.get('class_name', '')
-
-    if cert_type == 'transfer_certificate':
-        lines = [
-            f"This is to certify that {student},",
-            f"son/daughter of {father},",
-            f"was a bonafide student of this school in Class {class_name}.",
-            f"",
-            f"Admission Number: {cert_data.get('admission_number', 'N/A')}",
-            f"Date of Birth: {cert_data.get('dob', 'N/A')}",
-            f"Date of Admission: {cert_data.get('admission_date', 'N/A')}",
-            f"Date of Leaving: {cert_data.get('leaving_date', 'N/A')}",
-            f"Reason for Leaving: {cert_data.get('reason', 'N/A')}",
-            f"Conduct & Character: {cert_data.get('conduct', 'Good')}",
-            f"",
-            f"He/She is transferred to: {cert_data.get('destination_school', 'N/A')}",
-        ]
-    elif cert_type == 'bonafide_certificate':
-        lines = [
-            f"This is to certify that {student},",
-            f"son/daughter of {father},",
-            f"is a bonafide student of this school.",
-            f"",
-            f"He/She is currently studying in Class {class_name}.",
-            f"Admission Number: {cert_data.get('admission_number', 'N/A')}",
-            f"Date of Birth: {cert_data.get('dob', 'N/A')}",
-            f"",
-            f"This certificate is issued upon request for the purpose",
-            f"of {cert_data.get('reason', 'official records')}.",
-        ]
-    else:
-        lines = [
-            f"This is to certify that {student},",
-            f"son/daughter of {father},",
-            f"is/was a student of this school in Class {class_name}.",
-            f"",
-            f"His/Her conduct and character during the period of study",
-            f"has been: {cert_data.get('conduct', 'Good')}.",
-        ]
-
-    for line in lines:
-        c.drawString(35*mm, cy, line)
-        cy -= 7*mm
-
-    # Issue date
-    cy -= 10*mm
-    c.setFont('Helvetica', 10)
-    c.drawString(35*mm, cy, f"Date: {cert_data.get('issue_date', '')}")
-    c.drawString(35*mm, cy - 7*mm, f"Place: {school_data.get('address', '').split(',')[0] if school_data.get('address') else ''}")
-
-    # Signatures
-    sig_y = 45*mm
-    c.setStrokeColor(GRAY)
-    c.line(30*mm, sig_y, 70*mm, sig_y)
-    c.line(w - 70*mm, sig_y, w - 30*mm, sig_y)
-    c.setFont('Helvetica', 8)
-    c.setFillColor(GRAY)
-    c.drawCentredString(50*mm, sig_y - 4*mm, "Class Teacher")
-    c.drawCentredString(w - 50*mm, sig_y - 4*mm, "Principal")
-
-    c.save()
-    return buffer.getvalue()
-
-
-def generate_salary_slip_pdf(school_data, salary_data):
-    """
-    Generate salary slip PDF.
-    school_data: {name, logo_url, address}
-    salary_data: {employee_name, employee_code, designation, department, month, year,
-                  basic, hra, da, conveyance, medical, special,
-                  pf, esi, tds, other_ded, gross, deductions, net,
-                  days_present, days_absent, working_days, payment_mode, bank}
-    """
-    from reportlab.lib.styles import getSampleStyleSheet
-
-    buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm,
-                            leftMargin=20*mm, rightMargin=20*mm)
     styles = getSampleStyleSheet()
-    story = []
+    title_style = ParagraphStyle("SlipTitle", parent=styles["Heading1"],
+                                  fontSize=14, alignment=TA_CENTER,
+                                  spaceAfter=2 * mm, textColor=HexColor("#1a73e8"))
+    subtitle_style = ParagraphStyle("SlipSubtitle", parent=styles["Normal"],
+                                     fontSize=8, alignment=TA_CENTER,
+                                     spaceAfter=4 * mm, textColor=HexColor("#666666"))
+    label_style = ParagraphStyle("Label", parent=styles["Normal"],
+                                  fontSize=9, textColor=HexColor("#333333"))
+    value_style = ParagraphStyle("Value", parent=styles["Normal"],
+                                  fontSize=9, fontName="Helvetica-Bold")
+    month_names = {1: "January", 2: "February", 3: "March", 4: "April",
+                   5: "May", 6: "June", 7: "July", 8: "August",
+                   9: "September", 10: "October", 11: "November", 12: "December"}
+
+    elements = []
 
     # Header
-    story.append(Paragraph(f"<b>{school_data.get('name', '')}</b>", ParagraphStyle('H', fontSize=14, alignment=TA_CENTER, textColor=PRIMARY)))
-    if school_data.get('address'):
-        story.append(Paragraph(f"<font size='8' color='#6B7280'>{school_data['address']}</font>", ParagraphStyle('A', fontSize=8, alignment=TA_CENTER)))
-    story.append(Spacer(1, 3*mm))
+    school_name = school_data.get("name", "School")
+    school_addr = school_data.get("address", "")
+    month = salary_data.get("month", 1)
+    year = salary_data.get("year", 2025)
+    month_name = month_names.get(month, str(month))
 
-    month_names = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December']
-    m = salary_data.get('month', 1)
-    story.append(Paragraph(f"<b>SALARY SLIP — {month_names[m]} {salary_data.get('year', '')}</b>",
-                           ParagraphStyle('T', fontSize=12, alignment=TA_CENTER)))
-    story.append(Spacer(1, 5*mm))
+    elements.append(Paragraph(school_name, title_style))
+    if school_addr:
+        elements.append(Paragraph(school_addr, subtitle_style))
+    elements.append(Paragraph(f"Salary Slip for {month_name} {year}", ParagraphStyle(
+        "MonthTitle", parent=styles["Heading2"], fontSize=11, alignment=TA_CENTER,
+        spaceAfter=6 * mm, textColor=HexColor("#333333"))))
+    elements.append(Spacer(1, 3 * mm))
 
-    # Employee info
+    # Employee info table
     emp_data = [
-        ['Employee Name', salary_data.get('employee_name', ''), 'Employee Code', salary_data.get('employee_code', '')],
-        ['Designation', salary_data.get('designation', ''), 'Department', salary_data.get('department', '')],
-        ['Working Days', str(salary_data.get('working_days', 26)), 'Days Present', str(salary_data.get('days_present', 0))],
+        [Paragraph("<b>Employee Name</b>", label_style),
+         Paragraph(salary_data.get("employee_name", ""), value_style),
+         Paragraph("<b>Employee Code</b>", label_style),
+         Paragraph(salary_data.get("employee_code", ""), value_style)],
+        [Paragraph("<b>Designation</b>", label_style),
+         Paragraph(salary_data.get("designation", ""), value_style),
+         Paragraph("<b>Department</b>", label_style),
+         Paragraph(salary_data.get("department", ""), value_style)],
+        [Paragraph("<b>Working Days</b>", label_style),
+         Paragraph(str(salary_data.get("working_days", "")), value_style),
+         Paragraph("<b>Days Present</b>", label_style),
+         Paragraph(str(salary_data.get("days_present", "")), value_style)],
     ]
-    emp_table = Table(emp_data, colWidths=[80, 140, 80, 110])
+    emp_table = Table(emp_data, colWidths=[35 * mm, 45 * mm, 35 * mm, 45 * mm])
     emp_table.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 9), ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#E5E7EB')),
-        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#F8FAFC')),
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica'), ('FONTNAME', (2, 0), (2, -1), 'Helvetica'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica-Bold'), ('FONTNAME', (3, 0), (3, -1), 'Helvetica-Bold'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5), ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#dddddd")),
+        ("BACKGROUND", (0, 0), (0, -1), HexColor("#f5f7fa")),
+        ("BACKGROUND", (2, 0), (2, -1), HexColor("#f5f7fa")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
     ]))
-    story.append(emp_table)
-    story.append(Spacer(1, 5*mm))
+    elements.append(emp_table)
+    elements.append(Spacer(1, 5 * mm))
 
-    # Earnings vs Deductions (side by side)
+    # Earnings & Deductions side by side
+    fmt = lambda v: f"{float(v):,.2f}" if v else "0.00"
+
     earnings = [
-        ['EARNINGS', 'Amount (₹)'],
-        ['Basic Salary', f"₹ {salary_data.get('basic', 0):,.0f}"],
-        ['HRA', f"₹ {salary_data.get('hra', 0):,.0f}"],
-        ['DA', f"₹ {salary_data.get('da', 0):,.0f}"],
-        ['Conveyance', f"₹ {salary_data.get('conveyance', 0):,.0f}"],
-        ['Medical', f"₹ {salary_data.get('medical', 0):,.0f}"],
-        ['Special Allowance', f"₹ {salary_data.get('special', 0):,.0f}"],
-        ['Gross Salary', f"₹ {salary_data.get('gross', 0):,.0f}"],
+        ["Earnings", "Amount"],
+        ["Basic Salary", fmt(salary_data.get("basic", 0))],
+        ["HRA", fmt(salary_data.get("hra", 0))],
+        ["DA", fmt(salary_data.get("da", 0))],
+        ["Conveyance", fmt(salary_data.get("conveyance", 0))],
+        ["Medical", fmt(salary_data.get("medical", 0))],
+        ["Special Allowance", fmt(salary_data.get("special", 0))],
+        ["", ""],
+        ["Gross Salary", fmt(salary_data.get("gross", 0))],
     ]
+
     deductions = [
-        ['DEDUCTIONS', 'Amount (₹)'],
-        ['PF', f"₹ {salary_data.get('pf', 0):,.0f}"],
-        ['ESI', f"₹ {salary_data.get('esi', 0):,.0f}"],
-        ['TDS', f"₹ {salary_data.get('tds', 0):,.0f}"],
-        ['Other', f"₹ {salary_data.get('other_ded', 0):,.0f}"],
-        ['', ''], ['', ''],
-        ['Total Deductions', f"₹ {salary_data.get('deductions', 0):,.0f}"],
+        ["Deductions", "Amount"],
+        ["PF", fmt(salary_data.get("pf", 0))],
+        ["ESI", fmt(salary_data.get("esi", 0))],
+        ["TDS", fmt(salary_data.get("tds", 0))],
+        ["Other Deductions", fmt(salary_data.get("other_ded", 0))],
+        ["", ""],
+        ["", ""],
+        ["", ""],
+        ["Total Deductions", fmt(salary_data.get("deductions", 0))],
     ]
 
-    e_table = Table(earnings, colWidths=[120, 80])
-    d_table = Table(deductions, colWidths=[120, 80])
-    for t in [e_table, d_table]:
-        t.setStyle(TableStyle([
-            ('FONTSIZE', (0, 0), (-1, -1), 9), ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#E5E7EB')),
-            ('BACKGROUND', (0, 0), (-1, 0), PRIMARY), ('TEXTCOLOR', (0, 0), (-1, 0), white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            ('BACKGROUND', (0, -1), (-1, -1), HexColor('#EEF2FF')),
-            ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
-            ('TOPPADDING', (0, 0), (-1, -1), 4), ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ]))
-
-    combo = Table([[e_table, d_table]], colWidths=[210, 210])
-    combo.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP')]))
-    story.append(combo)
-    story.append(Spacer(1, 5*mm))
-
-    # Net salary
-    net_data = [['NET SALARY', f"₹ {salary_data.get('net', 0):,.0f}"]]
-    net_table = Table(net_data, colWidths=[300, 110])
-    net_table.setStyle(TableStyle([
-        ('FONTSIZE', (0, 0), (-1, -1), 12), ('FONTNAME', (0, 0), (-1, -1), 'Helvetica-Bold'),
-        ('BACKGROUND', (0, 0), (-1, -1), HexColor('#D1FAE5')), ('TEXTCOLOR', (0, 0), (-1, -1), HexColor('#059669')),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+    earn_table = Table(earnings, colWidths=[50 * mm, 28 * mm])
+    earn_table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#dddddd")),
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#1a73e8")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), HexColor("#e8f0fe")),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
     ]))
-    story.append(net_table)
-    story.append(Spacer(1, 8*mm))
+
+    ded_table = Table(deductions, colWidths=[50 * mm, 28 * mm])
+    ded_table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#dddddd")),
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#e53935")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), HexColor("#fce4ec")),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+    ]))
+
+    combined = Table([[earn_table, ded_table]], colWidths=[80 * mm, 80 * mm])
+    combined.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elements.append(combined)
+    elements.append(Spacer(1, 6 * mm))
+
+    # Net Salary
+    net_data = [["Net Salary Payable", fmt(salary_data.get("net", 0))]]
+    net_table = Table(net_data, colWidths=[120 * mm, 40 * mm])
+    net_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#1a73e8")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), white),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 11),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(net_table)
+    elements.append(Spacer(1, 10 * mm))
 
     # Footer
-    story.append(Paragraph("<font size='7' color='#6B7280'>This is a computer-generated salary slip and does not require a signature. | Generated by EduFlow</font>",
-                           ParagraphStyle('F', fontSize=7, alignment=TA_CENTER)))
+    elements.append(Paragraph(
+        "This is a computer-generated document and does not require a signature.",
+        ParagraphStyle("Footer", parent=styles["Normal"], fontSize=7,
+                       alignment=TA_CENTER, textColor=HexColor("#999999"))))
 
-    doc.build(story)
-    return buffer.getvalue()
+    doc.build(elements)
+    return buf.getvalue()
+
+
+# ═══════════════════════════════════════════════════════════
+# EMPLOYEE ID CARD PDF
+# ═══════════════════════════════════════════════════════════
+
+def generate_employee_id_card_pdf(school_data: dict, employee_data: dict) -> bytes:
+    """Generate an employee/non-teaching staff ID card as PDF bytes."""
+    return _generate_staff_card_pdf(school_data, employee_data, card_color="#7C3AED", role_label="STAFF")
+
+
+# ═══════════════════════════════════════════════════════════
+# TEACHER ID CARD PDF
+# ═══════════════════════════════════════════════════════════
+
+def generate_teacher_id_card_pdf(school_data: dict, teacher_data: dict) -> bytes:
+    """Generate a teacher ID card as PDF bytes."""
+    return _generate_staff_card_pdf(school_data, teacher_data, card_color="#059669", role_label="TEACHER")
+
+
+# ═══════════════════════════════════════════════════════════
+# VISITOR / GUEST CARD PDF
+# ═══════════════════════════════════════════════════════════
+
+def generate_visitor_card_pdf(school_data: dict, visitor_data: dict) -> bytes:
+    """
+    Generate a visitor/guest pass as PDF bytes.
+    visitor_data: name, purpose, visiting_whom, phone, date, valid_until
+    """
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor, black, white
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    card_w = 86 * mm
+    card_h = 54 * mm
+    page_w, page_h = A4
+    c = canvas.Canvas(buf, pagesize=A4)
+    x0 = (page_w - card_w) / 2
+    y0 = (page_h - card_h) / 2
+
+    # Card border — orange for visitor
+    c.setStrokeColor(HexColor("#EA580C"))
+    c.setLineWidth(2)
+    c.roundRect(x0, y0, card_w, card_h, 3 * mm)
+
+    # Header bar
+    header_h = 16 * mm
+    c.setFillColor(HexColor("#EA580C"))
+    c.rect(x0 + 1, y0 + card_h - header_h - 1, card_w - 2, header_h, fill=True, stroke=False)
+
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(x0 + card_w / 2, y0 + card_h - 8 * mm, school_data.get("name", "School")[:35])
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(x0 + card_w / 2, y0 + card_h - 13 * mm, "VISITOR PASS")
+
+    # Visitor details
+    details_x = x0 + 6 * mm
+    details_y = y0 + card_h - header_h - 5 * mm
+    line_h = 4 * mm
+
+    c.setFillColor(black)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(details_x, details_y, visitor_data.get("name", "Guest")[:30])
+    details_y -= line_h + 1 * mm
+
+    fields = [
+        ("Purpose", visitor_data.get("purpose", "")),
+        ("Visiting", visitor_data.get("visiting_whom", "")),
+        ("Phone", visitor_data.get("phone", "")),
+        ("Date", visitor_data.get("date", "")),
+    ]
+    c.setFont("Helvetica", 6.5)
+    for label, val in fields:
+        if val:
+            c.setFont("Helvetica-Bold", 6.5)
+            c.drawString(details_x, details_y, f"{label}: ")
+            c.setFont("Helvetica", 6.5)
+            c.drawString(details_x + 16 * mm, details_y, str(val)[:30])
+            details_y -= line_h
+
+    # Footer
+    footer_h = 6 * mm
+    c.setFillColor(HexColor("#FFF7ED"))
+    c.rect(x0 + 1, y0 + 1, card_w - 2, footer_h, fill=True, stroke=False)
+    c.setFillColor(HexColor("#9A3412"))
+    c.setFont("Helvetica-Bold", 5)
+    valid = visitor_data.get("valid_until", "Today Only")
+    c.drawCentredString(x0 + card_w / 2, y0 + 2 * mm, f"Valid: {valid} | Must be returned at exit")
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()
+
+
+# ═══════════════════════════════════════════════════════════
+# SHARED STAFF CARD GENERATOR (Teacher / Employee)
+# ═══════════════════════════════════════════════════════════
+
+def _generate_staff_card_pdf(school_data: dict, person_data: dict,
+                              card_color: str = "#1a73e8", role_label: str = "STAFF") -> bytes:
+    """Internal: generates teacher or employee ID card PDF."""
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib.colors import HexColor, black, white
+    from reportlab.pdfgen import canvas
+
+    buf = io.BytesIO()
+    card_w = 86 * mm
+    card_h = 54 * mm
+    page_w, page_h = A4
+    c = canvas.Canvas(buf, pagesize=A4)
+    x0 = (page_w - card_w) / 2
+    y0 = (page_h - card_h) / 2
+
+    # Card border
+    c.setStrokeColor(HexColor(card_color))
+    c.setLineWidth(2)
+    c.roundRect(x0, y0, card_w, card_h, 3 * mm)
+
+    # Header bar
+    header_h = 14 * mm
+    c.setFillColor(HexColor(card_color))
+    c.rect(x0 + 1, y0 + card_h - header_h - 1, card_w - 2, header_h, fill=True, stroke=False)
+
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(x0 + card_w / 2, y0 + card_h - 8 * mm, school_data.get("name", "School")[:40])
+    motto = school_data.get("motto", "")
+    if motto:
+        c.setFont("Helvetica-Oblique", 6)
+        c.drawCentredString(x0 + card_w / 2, y0 + card_h - 12 * mm, motto[:50])
+
+    # Photo placeholder
+    photo_size = 20 * mm
+    photo_x = x0 + 4 * mm
+    photo_y = y0 + card_h - header_h - photo_size - 3 * mm
+    c.setFillColor(HexColor("#f0f0f0"))
+    c.setStrokeColor(HexColor("#cccccc"))
+    c.setLineWidth(0.5)
+    c.rect(photo_x, photo_y, photo_size, photo_size, fill=True, stroke=True)
+    c.setFillColor(HexColor("#999999"))
+    c.setFont("Helvetica", 6)
+    c.drawCentredString(photo_x + photo_size / 2, photo_y + photo_size / 2, "PHOTO")
+
+    # Role badge
+    badge_w = 18 * mm
+    badge_h = 4.5 * mm
+    c.setFillColor(HexColor(card_color))
+    c.roundRect(photo_x, photo_y - badge_h - 1 * mm, badge_w, badge_h, 2 * mm, fill=True, stroke=False)
+    c.setFillColor(white)
+    c.setFont("Helvetica-Bold", 5.5)
+    c.drawCentredString(photo_x + badge_w / 2, photo_y - badge_h + 0.5 * mm, role_label)
+
+    # Details
+    details_x = photo_x + photo_size + 4 * mm
+    details_y = y0 + card_h - header_h - 5 * mm
+    line_h = 3.5 * mm
+
+    c.setFillColor(black)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(details_x, details_y, person_data.get("name", "")[:25])
+    details_y -= line_h + 1 * mm
+
+    fields = [
+        ("Designation", person_data.get("designation", "")),
+        ("Department", person_data.get("department", "")),
+        ("Code", person_data.get("employee_code", "")),
+        ("DOB", person_data.get("dob", "")),
+        ("Blood Grp", person_data.get("blood_group", "")),
+    ]
+    c.setFont("Helvetica", 6)
+    for label, val in fields:
+        if val:
+            c.setFont("Helvetica-Bold", 6)
+            c.drawString(details_x, details_y, f"{label}: ")
+            c.setFont("Helvetica", 6)
+            c.drawString(details_x + 20 * mm, details_y, str(val)[:20])
+            details_y -= line_h
+
+    # Footer
+    footer_h = 8 * mm
+    c.setFillColor(HexColor("#f0f4ff"))
+    c.rect(x0 + 1, y0 + 1, card_w - 2, footer_h, fill=True, stroke=False)
+    c.setFillColor(HexColor("#333333"))
+    c.setFont("Helvetica", 5)
+    contact_name = person_data.get("emergency_contact_name", "")
+    contact_phone = person_data.get("emergency_contact_phone", person_data.get("emergency_contact", ""))
+    if contact_name:
+        c.drawString(x0 + 4 * mm, y0 + 4.5 * mm, f"Emergency: {contact_name[:20]}")
+    if contact_phone:
+        c.drawString(x0 + 4 * mm, y0 + 1.5 * mm, f"Phone: {contact_phone}")
+    valid_from = person_data.get("valid_from", "")
+    valid_to = person_data.get("valid_to", "")
+    if valid_from and valid_to:
+        c.drawRightString(x0 + card_w - 4 * mm, y0 + 1.5 * mm, f"Valid: {valid_from} - {valid_to}")
+
+    c.showPage()
+    c.save()
+    return buf.getvalue()

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, or_
 from sqlalchemy.orm import selectinload
 from database import get_db
 from models.user import User, UserRole
@@ -8,7 +8,7 @@ from models.academic import AcademicYear, Class, Section, Subject, ClassSubject
 from models.teacher import Teacher
 from utils.auth import hash_password
 from utils.permissions import get_current_user
-from routes.api.student_login_id_api import generate_student_login_id
+from utils.student_id_generator import generate_student_registration_id
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import date, timedelta
@@ -337,6 +337,25 @@ async def create_teacher(data: TeacherCreate, request: Request, db: AsyncSession
         address=data.address,
     )
     db.add(teacher)
+    await db.flush()
+
+    # Auto-create Employee record so teacher appears in payroll
+    from models.employee import Employee, EmployeeType
+    emp = Employee(
+        branch_id=branch_id,
+        user_id=teacher_user.id,
+        teacher_id=teacher.id,
+        employee_code=data.employee_id or f"T-{str(teacher.id)[:6].upper()}",
+        first_name=data.first_name,
+        last_name=data.last_name,
+        email=data.email,
+        phone=data.phone,
+        employee_type=EmployeeType.TEACHING,
+        designation=data.designation or "Teacher",
+        department="Teaching",
+        date_of_joining=data.joining_date,
+    )
+    db.add(emp)
 
     return {"success": True, "message": f"Teacher {data.first_name} added with login access"}
 
@@ -356,6 +375,367 @@ async def delete_teacher(teacher_id: str, request: Request, db: AsyncSession = D
             user.is_active = False
     return {"success": True, "message": "Teacher deactivated"}
 
+# ─── TEACHER UPDATE ──────────────────────────────────────
+
+class TeacherUpdate(BaseModel):
+    first_name: str
+    last_name: Optional[str] = None
+    employee_id: Optional[str] = None
+    designation: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    qualification: Optional[str] = None
+    specialization: Optional[str] = None
+    experience_years: Optional[int] = 0
+    joining_date: Optional[date] = None
+    address: Optional[str] = None
+
+
+@router.put("/teachers/{teacher_id}")
+async def update_teacher(teacher_id: str, data: TeacherUpdate, request: Request, db: AsyncSession = Depends(get_db)):
+    await verify_school_admin(request)
+    result = await db.execute(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    teacher = result.scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    teacher.first_name = data.first_name
+    teacher.last_name = data.last_name
+    teacher.employee_id = data.employee_id
+    teacher.designation = data.designation
+    teacher.email = data.email
+    teacher.phone = data.phone
+    teacher.qualification = data.qualification
+    teacher.specialization = data.specialization
+    teacher.experience_years = data.experience_years or 0
+    teacher.joining_date = data.joining_date
+    teacher.address = data.address
+
+    # Also update the linked User record
+    if teacher.user_id:
+        user_result = await db.execute(select(User).where(User.id == teacher.user_id))
+        user_obj = user_result.scalar_one_or_none()
+        if user_obj:
+            user_obj.first_name = data.first_name
+            user_obj.last_name = data.last_name
+            if data.email:
+                user_obj.email = data.email
+            if data.phone:
+                user_obj.phone = data.phone
+
+    return {"success": True, "message": f"Teacher {data.first_name} updated"}
+
+
+# ─── CLASS TEACHER ASSIGNMENT ────────────────────────────
+
+class ClassTeacherAssign(BaseModel):
+    section_id: Optional[str] = None
+
+
+# ─── ASSIGN CLASS TEACHER (with constraint) ───────────────
+@router.post("/teachers/{teacher_id}/class-teacher")
+async def assign_class_teacher(teacher_id: str, data: ClassTeacherAssign, request: Request, db: AsyncSession = Depends(get_db)):
+    """Assign teacher as class teacher of a section.
+    Enforces: one class teacher per section. If another teacher was assigned, they lose it."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+
+    result = await db.execute(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    teacher = result.scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    warning = None
+
+    if data.section_id:
+        sid = data.section_id
+
+        # Check if another teacher currently has this section
+        existing = await db.execute(sql_text(
+            "SELECT s.class_teacher_id, t.first_name || ' ' || COALESCE(t.last_name, '') as teacher_name "
+            "FROM sections s LEFT JOIN teachers t ON t.id = s.class_teacher_id "
+            "WHERE s.id = :sid AND s.class_teacher_id IS NOT NULL AND s.class_teacher_id != :tid"
+        ), {"sid": sid, "tid": str(teacher.id)})
+        old_row = existing.first()
+        if old_row:
+            warning = f"Reassigned from {old_row.teacher_name.strip()}"
+
+        # Clear this section (enforce one teacher per section)
+        await db.execute(sql_text(
+            "UPDATE sections SET class_teacher_id = NULL WHERE id = :sid"
+        ), {"sid": sid})
+
+        # Assign this teacher to this section
+        await db.execute(sql_text(
+            "UPDATE sections SET class_teacher_id = :tid WHERE id = :sid"
+        ), {"tid": str(teacher.id), "sid": sid})
+
+    await db.commit()
+    resp = {"success": True, "message": "Class teacher assigned"}
+    if warning:
+        resp["warning"] = warning
+    return resp
+
+
+
+# ─── REMOVE CLASS TEACHER FROM SECTION ─────────────────────
+@router.post("/teachers/{teacher_id}/class-teacher-remove")
+async def remove_class_teacher(teacher_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Remove a class teacher from a specific section or all sections."""
+    user = await verify_school_admin(request)
+    from sqlalchemy import text as sql_text
+
+    body = await request.json()
+    section_id = body.get("section_id")
+
+    if section_id:
+        await db.execute(sql_text(
+            "UPDATE sections SET class_teacher_id = NULL "
+            "WHERE id = :sid AND class_teacher_id = :tid"
+        ), {"sid": section_id, "tid": teacher_id})
+    else:
+        await db.execute(sql_text(
+            "UPDATE sections SET class_teacher_id = NULL "
+            "WHERE class_teacher_id = :tid"
+        ), {"tid": teacher_id})
+
+    await db.commit()
+    return {"success": True, "message": "Class teacher removed"}
+# ─── 3. CHANGE WORK STATUS ───────────────────────────────────
+# NEW endpoint
+
+@router.post("/teachers/{teacher_id}/work-status")
+async def change_teacher_work_status(teacher_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Change teacher work status: available, suspended, or resigned."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+    from datetime import datetime
+
+    body = await request.json()
+    new_status = body.get("work_status", "available")
+
+    result = await db.execute(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    teacher = result.scalar_one_or_none()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+
+    if new_status == "resigned":
+        teacher.is_active = False
+        teacher.work_status = "resigned"
+        # Disable linked User account login
+        if teacher.user_id:
+            linked_user = await db.scalar(select(User).where(User.id == teacher.user_id))
+            if linked_user:
+                linked_user.is_active = False
+        # Remove class teacher assignments
+        await db.execute(sql_text(
+            "UPDATE sections SET class_teacher_id = NULL WHERE class_teacher_id = :tid"
+        ), {"tid": teacher_id})
+        # Deactivate teaching assignments
+        try:
+            await db.execute(sql_text(
+                "UPDATE teacher_class_assignments SET is_active = false "
+                "WHERE teacher_id = :tid AND branch_id = :bid"
+            ), {"tid": teacher_id, "bid": str(branch_id)})
+        except Exception:
+            pass
+    elif new_status == "available":
+        teacher.is_active = True
+        teacher.work_status = "available"
+    elif new_status == "suspended":
+        teacher.is_active = True
+        teacher.work_status = "suspended"
+
+    # Audit log
+    print(f"[AUDIT] Teacher {teacher.first_name} {teacher.last_name or ''} "
+          f"({teacher_id}) → {new_status} "
+          f"by {user.get('name', 'admin')} at {datetime.now().isoformat()}")
+
+    await db.commit()
+    return {"success": True, "message": f"Status changed to {new_status}"}
+
+# ─── SAVE TEACHING ASSIGNMENTS ─────────────────────────────
+@router.post("/teachers/{teacher_id}/assignments")
+async def save_teacher_assignments(teacher_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Save teaching class-section-subject assignments. Replaces all existing."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+
+    body = await request.json()
+    assignments = body.get("assignments", [])
+
+    # Deactivate all existing
+    try:
+        await db.execute(sql_text(
+            "UPDATE teacher_class_assignments SET is_active = false "
+            "WHERE teacher_id = :tid AND branch_id = :bid"
+        ), {"tid": teacher_id, "bid": str(branch_id)})
+    except Exception:
+        pass
+
+    # Insert/reactivate new
+    for a in assignments:
+        class_id = a.get("class_id")
+        section_id = a.get("section_id")
+        subject_id = a.get("subject_id")
+        if not class_id or not subject_id:
+            continue
+        try:
+            existing = await db.execute(sql_text(
+                "SELECT id FROM teacher_class_assignments "
+                "WHERE teacher_id = :tid AND class_id = :cid AND subject_id = :subid "
+                "AND (section_id = :sid OR (section_id IS NULL AND :sid IS NULL)) "
+                "AND branch_id = :bid"
+            ), {"tid": teacher_id, "cid": class_id, "sid": section_id, "subid": subject_id, "bid": str(branch_id)})
+            row = existing.first()
+            if row:
+                await db.execute(sql_text(
+                    "UPDATE teacher_class_assignments SET is_active = true WHERE id = :id"
+                ), {"id": str(row.id)})
+            else:
+                import uuid as uuid_mod
+                await db.execute(sql_text(
+                    "INSERT INTO teacher_class_assignments (id, teacher_id, class_id, section_id, subject_id, branch_id, is_active) "
+                    "VALUES (:id, :tid, :cid, :sid, :subid, :bid, true)"
+                ), {
+                    "id": str(uuid_mod.uuid4()), "tid": teacher_id,
+                    "cid": class_id, "sid": section_id,
+                    "subid": subject_id, "bid": str(branch_id),
+                })
+        except Exception as e:
+            print(f"TC assignment error: {e}")
+
+    await db.commit()
+    return {"success": True, "message": f"{len(assignments)} assignments saved"}
+
+@router.get("/teachers/{teacher_id}/assignments")
+async def get_teacher_assignments(teacher_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+
+    # Get class teacher section(s) — now from sections table
+    ct_section_id = None
+    try:
+        ct_row = await db.execute(sql_text(
+            "SELECT id FROM sections WHERE class_teacher_id = :tid LIMIT 1"
+        ), {"tid": teacher_id})
+        ct_sec = ct_row.scalar_one_or_none()
+        ct_section_id = str(ct_sec) if ct_sec else None
+    except Exception:
+        pass
+
+    # Get teaching assignments
+    assignments = []
+    try:
+        rows = await db.execute(sql_text("""
+            SELECT tca.class_id, tca.section_id, tca.subject_id
+            FROM teacher_class_assignments tca
+            WHERE tca.teacher_id = :tid AND tca.branch_id = :bid AND tca.is_active = true
+        """), {"tid": teacher_id, "bid": str(branch_id)})
+        for row in rows:
+            assignments.append({
+                "class_id": str(row.class_id),
+                "section_id": str(row.section_id) if row.section_id else None,
+                "subject_id": str(row.subject_id),
+            })
+    except Exception:
+        pass
+
+    return {
+        "class_teacher_of": ct_section_id,
+        "assignments": assignments,
+    }
+# ─── TEACHING ASSIGNMENTS (GET + POST) ──────────────────
+
+class TeachingAssignment(BaseModel):
+    class_id: str
+    section_id: Optional[str] = None
+    subject_id: str
+
+
+class TeachingAssignmentBulk(BaseModel):
+    assignments: List[TeachingAssignment]
+
+
+@router.get("/teachers/{teacher_id}/assignments")
+async def get_teacher_assignments(teacher_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+
+    # Get class teacher info
+    result = await db.execute(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    teacher = result.scalar_one_or_none()
+    # Get section(s) where this teacher is class teacher
+    ct_section_id = None
+    try:
+        ct_row = await db.execute(sql_text(
+            "SELECT id FROM sections WHERE class_teacher_id = :tid LIMIT 1"
+        ), {"tid": teacher_id})
+        ct_sec = ct_row.scalar_one_or_none()
+        ct_section_id = str(ct_sec) if ct_sec else None
+    except Exception:
+        pass
+
+    # Get teaching assignments
+    assignments = []
+    try:
+        rows = await db.execute(sql_text("""
+            SELECT tca.class_id, tca.section_id, tca.subject_id
+            FROM teacher_class_assignments tca
+            WHERE tca.teacher_id = :tid AND tca.branch_id = :bid AND tca.is_active = true
+        """), {"tid": teacher_id, "bid": str(branch_id)})
+        for row in rows:
+            assignments.append({
+                "class_id": str(row.class_id),
+                "section_id": str(row.section_id) if row.section_id else None,
+                "subject_id": str(row.subject_id),
+            })
+    except Exception:
+        pass
+
+    return {
+        "class_teacher_of": ct_section_id,
+        "assignments": assignments,
+    }
+
+
+@router.post("/teachers/{teacher_id}/assignments")
+async def save_teacher_assignments(teacher_id: str, data: TeachingAssignmentBulk, request: Request, db: AsyncSession = Depends(get_db)):
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from sqlalchemy import text as sql_text
+
+    # Delete existing assignments for this teacher
+    try:
+        await db.execute(sql_text(
+            "DELETE FROM teacher_class_assignments WHERE teacher_id = :tid AND branch_id = :bid"
+        ), {"tid": teacher_id, "bid": str(branch_id)})
+    except Exception:
+        pass
+
+    # Insert new assignments
+    for a in data.assignments:
+        try:
+            await db.execute(sql_text("""
+                INSERT INTO teacher_class_assignments (teacher_id, class_id, section_id, subject_id, branch_id)
+                VALUES (:tid, :cid, :sid, :subid, :bid)
+                ON CONFLICT (teacher_id, class_id, section_id, subject_id) DO NOTHING
+            """), {
+                "tid": teacher_id,
+                "cid": a.class_id,
+                "sid": a.section_id if a.section_id else None,
+                "subid": a.subject_id,
+                "bid": str(branch_id),
+            })
+        except Exception:
+            pass
+    await db.commit()
+    return {"success": True, "message": f"{len(data.assignments)} assignments saved"}
 
 # ─── STUDENTS ─────────────────────────────────────────────
 
@@ -379,6 +759,9 @@ class StudentCreate(BaseModel):
     father_occupation: Optional[str] = None
     mother_name: Optional[str] = None
     mother_phone: Optional[str] = None
+    mother_occupation: Optional[str] = None
+    father_qualification: Optional[str] = None     
+    mother_qualification: Optional[str] = None     
     address: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -386,7 +769,15 @@ class StudentCreate(BaseModel):
     medical_conditions: Optional[str] = None
     emergency_contact: Optional[str] = None
     uses_transport: bool = False
-
+    religion: Optional[str] = None
+    category: Optional[str] = None
+    nationality: Optional[str] = "Indian"
+    admission_type: Optional[str] = "new"
+    previous_school: Optional[str] = None
+    previous_board: Optional[str] = None
+    previous_class: Optional[str] = None
+    father_aadhaar: Optional[str] = None
+    mother_aadhaar: Optional[str] = None
 
 @router.get("/students")
 async def list_students(request: Request, class_id: str = "", section_id: str = "", class_level: str = "", db: AsyncSession = Depends(get_db)):
@@ -442,7 +833,25 @@ async def create_student(request: Request, data: StudentCreate, db: AsyncSession
     # ─── Auto-generate Student Login ID (PO-approved v3.0) ───
     from datetime import date as dt_date
     adm_year = data.admission_date.year if data.admission_date else dt_date.today().year
-    student_login_id = await generate_student_login_id(db, str(branch_id), adm_year)
+
+    cls_name = await db.scalar(select(Class.name).where(Class.id == uuid.UUID(data.class_id))) or ""
+
+    student_login_id = await generate_student_registration_id(
+        db=db, branch_id=str(branch_id),
+        admission_year=adm_year, class_name=cls_name, gender=data.gender or "",
+    )
+
+    if not data.admission_number:
+        data.admission_number = student_login_id
+
+    # Auto roll number
+    if not data.roll_number or data.roll_number.lower() == "auto":
+        existing_count = await db.scalar(
+            select(func.count(Student.id)).where(
+                Student.branch_id == branch_id,
+                Student.class_id == uuid.UUID(data.class_id),
+                Student.is_active == True)) or 0
+        data.roll_number = str(existing_count + 1)
 
     # Get current academic year
     ay_result = await db.execute(
@@ -486,6 +895,17 @@ async def create_student(request: Request, data: StudentCreate, db: AsyncSession
         medical_conditions=data.medical_conditions,
         emergency_contact=data.emergency_contact,
         uses_transport=data.uses_transport,
+        religion=data.religion,
+        category=data.category,
+        nationality=data.nationality or "Indian",
+        admission_type=data.admission_type or "new",
+        previous_school=data.previous_school,
+        previous_board=data.previous_board,
+        previous_class=data.previous_class,
+        father_aadhaar=data.father_aadhaar,
+        mother_aadhaar=data.mother_aadhaar,
+        father_qualification=data.father_qualification,
+        mother_qualification=data.mother_qualification,
     )
     db.add(student)
     await db.flush()
@@ -582,12 +1002,19 @@ async def delete_student(student_id: str, request: Request, db: AsyncSession = D
     if not student:
         raise HTTPException(status_code=404, detail="Not found")
     student.is_active = False
+    # Disable linked User account (student + parent logins)
+    if student.user_id:
+        linked_user = await db.scalar(select(User).where(User.id == student.user_id))
+        if linked_user:
+            linked_user.is_active = False
+    await db.commit()
     return {"success": True, "message": "Student deactivated"}
 
 
 # ─── ATTENDANCE ─────────────────────────────────────────
 
 from models.attendance import Attendance, AttendanceStatus
+from models.event import SchoolEvent
 
 @router.get("/attendance/load")
 async def load_attendance(request: Request, class_id: str, section_id: str, date: str, db: AsyncSession = Depends(get_db)):
@@ -849,20 +1276,43 @@ class PeriodSetupData(BaseModel):
 
 @router.post("/timetable/periods/setup")
 async def setup_periods(data: PeriodSetupData, request: Request, db: AsyncSession = Depends(get_db)):
-    """Create/replace all period definitions for a branch"""
+    """Create/replace all period definitions for a branch (backward compat — auto-creates Default template)"""
     user = await verify_school_admin(request)
     branch_id = get_branch_id(user)
     from datetime import time as time_type, datetime as dt
+    from models.timetable import BellScheduleTemplate
 
-    # Delete existing periods
+    # Find or create "Default Schedule" template for backward compat
+    tmpl_result = await db.execute(
+        select(BellScheduleTemplate).where(
+            BellScheduleTemplate.branch_id == branch_id,
+            BellScheduleTemplate.is_default == True,
+            BellScheduleTemplate.is_active == True,
+        )
+    )
+    default_template = tmpl_result.scalar_one_or_none()
+    if not default_template:
+        default_template = BellScheduleTemplate(
+            branch_id=branch_id,
+            name="Default Schedule",
+            description="Auto-created default bell schedule",
+            is_default=True,
+        )
+        db.add(default_template)
+        await db.flush()
+
+    # Delete existing periods for this template
     existing = await db.execute(
-        select(PeriodDefinition).where(PeriodDefinition.branch_id == branch_id)
+        select(PeriodDefinition).where(
+            PeriodDefinition.branch_id == branch_id,
+            PeriodDefinition.template_id == default_template.id,
+        )
     )
     for p in existing.scalars().all():
         await db.delete(p)
     await db.flush()
 
-    # Create new ones
+    # Create new ones linked to default template
     for pd in data.periods:
         try:
             st = dt.strptime(pd.start_time, "%H:%M").time()
@@ -872,6 +1322,7 @@ async def setup_periods(data: PeriodSetupData, request: Request, db: AsyncSessio
 
         period = PeriodDefinition(
             branch_id=branch_id,
+            template_id=default_template.id,
             period_number=pd.period_number,
             label=pd.label,
             start_time=st,
@@ -881,7 +1332,7 @@ async def setup_periods(data: PeriodSetupData, request: Request, db: AsyncSessio
         db.add(period)
 
     await db.commit()
-    return {"success": True, "message": f"{len(data.periods)} periods configured"}
+    return {"success": True, "message": f"{len(data.periods)} periods configured", "template_id": str(default_template.id)}
 
 
 @router.get("/timetable/periods")
@@ -947,6 +1398,28 @@ async def save_timetable_slot(data: TimetableSlotData, request: Request, db: Asy
             cls = cls_result.scalar_one_or_none()
             cls_name = cls.name if cls else "another class"
             raise HTTPException(400, f"Teacher conflict: already assigned to {cls_name} at this time")
+
+    # Check for room conflict (same room, same period, same day, different class)
+    if data.room and data.room.strip():
+        from models.academic import Class as ClassModel
+        room_conflict_q = select(TimetableSlot).where(
+            TimetableSlot.branch_id == branch_id,
+            TimetableSlot.room == data.room.strip(),
+            TimetableSlot.period_id == uuid.UUID(data.period_id),
+            TimetableSlot.day_of_week == day_enum,
+            TimetableSlot.is_active == True,
+        )
+        room_conflict_q = room_conflict_q.where(
+            ~((TimetableSlot.class_id == uuid.UUID(data.class_id)) &
+              (TimetableSlot.section_id == (uuid.UUID(data.section_id) if data.section_id else None)))
+        )
+        room_result = await db.execute(room_conflict_q)
+        room_conflict = room_result.scalar_one_or_none()
+        if room_conflict:
+            rc_result = await db.execute(select(ClassModel).where(ClassModel.id == room_conflict.class_id))
+            rc_cls = rc_result.scalar_one_or_none()
+            rc_name = rc_cls.name if rc_cls else "another class"
+            raise HTTPException(400, f"Room conflict: {data.room} already assigned to {rc_name} at this time")
 
     # Find existing slot or create new
     existing_q = select(TimetableSlot).where(
@@ -1329,6 +1802,7 @@ async def get_pending_leaves(request: Request, db: AsyncSession = Depends(get_db
              "type": l.leave_type.value, "start": l.start_date.isoformat(),
              "end": l.end_date.isoformat(), "days": (l.end_date - l.start_date).days + 1,
              "reason": l.reason, "status": l.status.value,
+             "on_behalf": l.on_behalf_name or "" if hasattr(l, 'on_behalf_name') else "",
              "applied": l.created_at.strftime("%d %b %Y") if l.created_at else ""}
             for l in leaves
         ]
@@ -1362,6 +1836,7 @@ async def get_all_leaves(request: Request, db: AsyncSession = Depends(get_db)):
              "end": l.end_date.isoformat(), "days": (l.end_date - l.start_date).days + 1,
              "reason": l.reason, "status": l.status.value,
              "admin_remarks": l.admin_remarks or "",
+             "on_behalf": l.on_behalf_name or "" if hasattr(l, 'on_behalf_name') else "",
              "applied": l.created_at.strftime("%d %b %Y") if l.created_at else ""}
             for l in leaves
         ]
@@ -1439,6 +1914,46 @@ async def leave_action(leave_id: str, data: LeaveActionData, request: Request, d
     return {"success": True, "message": msg}
 
 
+class LeaveOnBehalfData(BaseModel):
+    teacher_id: str
+    leave_type: str
+    start_date: str
+    end_date: str
+    reason: str
+
+
+@router.post("/leaves/on-behalf")
+async def apply_leave_on_behalf(data: LeaveOnBehalfData, request: Request, db: AsyncSession = Depends(get_db)):
+    """Admin applies leave on behalf of a teacher."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from datetime import datetime as dt, date as dt_date
+
+    start = dt_date.fromisoformat(data.start_date)
+    end = dt_date.fromisoformat(data.end_date)
+    if end < start:
+        raise HTTPException(400, "End date must be after start date")
+
+    admin_id = uuid.UUID(user["user_id"])
+    admin_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip() or "Admin"
+
+    leave = LeaveRequest(
+        branch_id=branch_id,
+        teacher_id=uuid.UUID(data.teacher_id),
+        leave_type=LeaveType(data.leave_type),
+        start_date=start,
+        end_date=end,
+        reason=data.reason,
+        status=LeaveStatus.PENDING,
+        applied_on_behalf_by=admin_id,
+        on_behalf_name=admin_name,
+    )
+    db.add(leave)
+    await db.commit()
+    days = (end - start).days + 1
+    return {"success": True, "message": f"Leave applied on behalf for {days} day(s)", "id": str(leave.id)}
+
+
 # ─── EXAM & RESULTS APIs ─────────────────────────────────
 from models.exam import Exam, ExamSubject, Marks
 from models.student import Student
@@ -1456,6 +1971,7 @@ class CreateExamData(BaseModel):
     description: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
+    applicable_classes: Optional[list] = None
     subjects: List[ExamSubjectData] = []
 
 
@@ -1479,6 +1995,7 @@ async def create_exam(data: CreateExamData, request: Request, db: AsyncSession =
         description=data.description,
         start_date=dt.strptime(data.start_date, "%Y-%m-%d").date() if data.start_date else None,
         end_date=dt.strptime(data.end_date, "%Y-%m-%d").date() if data.end_date else None,
+        applicable_classes=data.applicable_classes,
     )
     db.add(exam)
     await db.flush()
@@ -1516,15 +2033,34 @@ async def get_exam_subjects(exam_id: str, request: Request, class_id: str = "", 
         r = await db.execute(select(SubjectModel).where(SubjectModel.id.in_(sub_ids)))
         sub_map = {s.id: s.name for s in r.scalars().all()}
 
+    # Get class names
+    cls_ids = {s.class_id for s in subjects if s.class_id}
+    cls_map = {}
+    if cls_ids:
+        cr = await db.execute(select(Class).where(Class.id.in_(cls_ids)))
+        cls_map = {c.id: c.name for c in cr.scalars().all()}
+
     return {
         "subjects": [
             {"id": str(s.id), "subject_id": str(s.subject_id),
              "subject_name": sub_map.get(s.subject_id, ""),
              "class_id": str(s.class_id),
+             "class_name": cls_map.get(s.class_id, ""),
              "max_marks": s.max_marks, "passing_marks": s.passing_marks}
             for s in subjects
         ]
     }
+
+
+@router.delete("/exams/subject/{es_id}")
+async def delete_exam_subject(es_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    user = await verify_school_admin(request)
+    es = await db.get(ExamSubject, uuid.UUID(es_id))
+    if not es:
+        raise HTTPException(status_code=404, detail="Exam subject not found")
+    await db.delete(es)
+    await db.commit()
+    return {"success": True, "message": "Subject removed from exam"}
 
 
 class AddExamSubjectData(BaseModel):
@@ -1606,7 +2142,7 @@ async def load_marks(
         m = marks_map.get(str(s.id))
         student_list.append({
             "id": str(s.id), "name": s.full_name,
-            "roll": s.roll_number or "", "gender": s.gender or "",
+            "roll": s.roll_number or "", "gender": s.gender.value if s.gender else "",
             "marks": m.marks_obtained if m and not m.is_absent else None,
             "is_absent": m.is_absent if m else False,
             "grade": m.grade if m else "",
@@ -2214,6 +2750,7 @@ class AnnouncementData(BaseModel):
     priority: str = "normal"
     target_role: str = "all"  # all, teacher, student, parent
     target_class_id: Optional[str] = None
+    target_section_id: Optional[str] = None
     is_pinned: bool = False
     is_emergency: bool = False
 
@@ -2246,21 +2783,46 @@ async def create_announcement(data: AnnouncementData, request: Request, db: Asyn
 
     if target_roles:
         users_q = select(User).where(User.branch_id == branch_id, User.role.in_(target_roles), User.is_active == True)
+
+        # If targeting specific class/section, filter student/parent users
+        if data.target_class_id and data.target_role in ("student", "parent"):
+            from models.student import Student as StudentModel
+            stu_q = select(StudentModel.user_id).where(
+                StudentModel.branch_id == branch_id, StudentModel.is_active == True,
+                StudentModel.class_id == uuid.UUID(data.target_class_id)
+            )
+            if data.target_section_id:
+                stu_q = stu_q.where(StudentModel.section_id == uuid.UUID(data.target_section_id))
+            student_user_ids = [r[0] for r in (await db.execute(stu_q)).all()]
+            if student_user_ids:
+                users_q = users_q.where(User.id.in_(student_user_ids))
+            else:
+                users_q = users_q.where(User.id == None)  # No students match
+
         target_users = (await db.execute(users_q)).scalars().all()
+        notif_action = "/student/announcements"
         for u in target_users:
+            if u.role == UR.SCHOOL_ADMIN:
+                notif_action = "/school/announcements"
+            elif u.role == UR.TEACHER:
+                notif_action = "/teacher/dashboard"
             notif = Notification(
                 branch_id=branch_id, user_id=u.id,
                 type=NotificationType.ANNOUNCEMENT,
                 title=data.title, message=data.content[:200],
                 priority=data.priority,
-                action_url="/school/announcements" if u.role == UR.SCHOOL_ADMIN else None,
+                action_url=notif_action,
                 action_label="View",
             )
             db.add(notif)
 
     await db.commit()
+    count = len(target_users) if target_roles else 0
     icon = "🚨" if data.is_emergency else ("📌" if data.is_pinned else "📢")
-    return {"success": True, "message": f"{icon} Announcement published to {data.target_role}!"}
+    target_label = data.target_role
+    if data.target_class_id:
+        target_label += " (filtered by class/section)"
+    return {"success": True, "message": f"{icon} Announcement sent to {count} {target_label}!"}
 
 
 @router.get("/announcements/list")
@@ -2354,11 +2916,11 @@ async def mark_notifications_read(request: Request, notification_id: str = "",
         n = result.scalar_one_or_none()
         if n:
             n.is_read = True
-            from datetime import datetime, timezone
-            n.read_at = datetime.now(timezone.utc)
+            from datetime import datetime
+            n.read_at = datetime.utcnow()
     else:
         # Mark all read
-        from datetime import datetime, timezone
+        from datetime import datetime
         branch_id = get_branch_id(user)
         result = await db.execute(
             select(Notification).where(
@@ -2368,7 +2930,7 @@ async def mark_notifications_read(request: Request, notification_id: str = "",
             ))
         for n in result.scalars().all():
             n.is_read = True
-            n.read_at = datetime.now(timezone.utc)
+            n.read_at = datetime.utcnow()
     await db.commit()
     return {"success": True}
 
@@ -2384,6 +2946,7 @@ async def unread_count(request: Request, db: AsyncSession = Depends(get_db)):
         count = await db.scalar(
             select(func.count(Notification.id)).where(
                 Notification.branch_id == branch_id,
+                (Notification.user_id == user_id) | (Notification.user_id == None),
                 Notification.is_read == False
             ))
         return {"count": count or 0}
@@ -2403,6 +2966,7 @@ class CommSettingsData(BaseModel):
     sms_provider: Optional[str] = None
     sms_api_key: Optional[str] = None
     sms_sender_id: Optional[str] = None
+    sms_route_id: Optional[str] = None
     whatsapp_enabled: bool = False
     whatsapp_api_token: Optional[str] = None
     whatsapp_phone_id: Optional[str] = None
@@ -2447,7 +3011,9 @@ async def load_comm_settings(request: Request, db: AsyncSession = Depends(get_db
         "smtp_port": config.smtp_port or 587, "smtp_username": config.smtp_username or "",
         "from_email": config.from_email or "",
         "sms_enabled": config.sms_enabled, "sms_provider": config.sms_provider or "",
+        "sms_api_key": config.sms_api_key or "",
         "sms_sender_id": config.sms_sender_id or "",
+        "sms_route_id": getattr(config, 'sms_route_id', '') or "8",
         "whatsapp_enabled": config.whatsapp_enabled,
         "whatsapp_phone_id": config.whatsapp_phone_id or "",
         "quiet_hours_enabled": config.quiet_hours_enabled,
@@ -2588,10 +3154,15 @@ async def download_report_card(request: Request, student_id: str, exam_id: str =
     from models.teacher import Teacher
     class_teacher_sig = None
     if student.section_id:
-        ct = (await db.execute(select(Teacher).where(
-            Teacher.class_teacher_of == student.section_id, Teacher.is_active == True))).scalar_one_or_none()
-        if ct:
-            class_teacher_sig = ct.signature_url
+        from sqlalchemy import text as sql_text
+        ct_id = await db.scalar(sql_text(
+            "SELECT class_teacher_id FROM sections WHERE id = :sid"
+        ), {"sid": str(student.section_id)})
+        if ct_id:
+            ct = (await db.execute(select(Teacher).where(
+                Teacher.id == ct_id, Teacher.is_active == True))).scalar_one_or_none()
+            if ct:
+                class_teacher_sig = ct.signature_url
 
     student_data = {
         "name": student.full_name,
@@ -2930,6 +3501,167 @@ async def set_timezone(request: Request, db: AsyncSession = Depends(get_db)):
     return {"status": "saved", "timezone": tz}
 
 
+# ─── SCHOOL TIMING SETTINGS ────────────────────────────────
+
+@router.get("/settings/school-timing")
+async def get_school_timing(request: Request, db: AsyncSession = Depends(get_db)):
+    """Load current school timing from BranchSettings.custom_data"""
+    user = await get_current_user(request)
+    if not user:
+        return {"error": "unauthorized"}
+    branch_id = uuid.UUID(user["branch_id"])
+    from models.branch import BranchSettings
+    from utils.timezone import TIMEZONE_LABELS
+    settings = await db.scalar(select(BranchSettings).where(BranchSettings.branch_id == branch_id))
+
+    timing = {}
+    timezone_name = "Asia/Kolkata"
+    if settings:
+        timing = (settings.custom_data or {}).get("school_timing", {})
+        timezone_name = settings.timezone or "Asia/Kolkata"
+
+    # Defaults
+    defaults = {
+        "school_start_time": "07:30",
+        "school_end_time": "14:30",
+        "gate_open_time": "07:00",
+        "late_grace_minutes": 15,
+        "half_day_end_time": "12:00",
+        "lunch_start_time": "12:30",
+        "lunch_end_time": "13:00",
+        "saturday_enabled": True,
+        "saturday_start_time": "07:30",
+        "saturday_end_time": "12:00",
+        "effective_from": None,
+        "last_changed_at": None,
+        "last_changed_by": None,
+    }
+    for k, v in defaults.items():
+        if k not in timing:
+            timing[k] = v
+
+    return {
+        "timing": timing,
+        "timezone": timezone_name,
+        "timezone_label": TIMEZONE_LABELS.get(timezone_name, timezone_name),
+    }
+
+
+@router.post("/settings/school-timing")
+async def save_school_timing(request: Request, db: AsyncSession = Depends(get_db)):
+    """Save school timing. If timing changed + effective_from set, notify all users."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    data = await request.json()
+
+    from models.branch import BranchSettings
+    from sqlalchemy.orm.attributes import flag_modified
+    from datetime import datetime as dt
+
+    settings = await db.scalar(select(BranchSettings).where(BranchSettings.branch_id == branch_id))
+    if not settings:
+        settings = BranchSettings(branch_id=branch_id)
+        db.add(settings)
+        await db.flush()
+
+    old_timing = (settings.custom_data or {}).get("school_timing", {})
+
+    new_timing = {
+        "school_start_time": data.get("school_start_time", "07:30"),
+        "school_end_time": data.get("school_end_time", "14:30"),
+        "gate_open_time": data.get("gate_open_time", "07:00"),
+        "late_grace_minutes": int(data.get("late_grace_minutes", 15)),
+        "half_day_end_time": data.get("half_day_end_time", "12:00"),
+        "lunch_start_time": data.get("lunch_start_time", "12:30"),
+        "lunch_end_time": data.get("lunch_end_time", "13:00"),
+        "saturday_enabled": bool(data.get("saturday_enabled", True)),
+        "saturday_start_time": data.get("saturday_start_time", "07:30"),
+        "saturday_end_time": data.get("saturday_end_time", "12:00"),
+        "effective_from": data.get("effective_from"),
+        "last_changed_at": dt.utcnow().isoformat(),
+        "last_changed_by": user.get("user_id"),
+    }
+
+    # Detect if timing actually changed (ignore meta fields)
+    timing_fields = ["school_start_time", "school_end_time", "gate_open_time",
+                     "late_grace_minutes", "half_day_end_time",
+                     "lunch_start_time", "lunch_end_time",
+                     "saturday_enabled", "saturday_start_time", "saturday_end_time"]
+    timing_changed = any(
+        str(old_timing.get(f, "")) != str(new_timing.get(f, ""))
+        for f in timing_fields
+    )
+
+    # Save to custom_data
+    cd = settings.custom_data or {}
+    cd["school_timing"] = new_timing
+    settings.custom_data = cd
+    flag_modified(settings, "custom_data")
+
+    notification_count = 0
+
+    # If timing changed AND effective_from is set, create announcement + notifications
+    if timing_changed and new_timing.get("effective_from"):
+        effective = new_timing["effective_from"]
+        content = (
+            f"School timings will change effective {effective}.\n\n"
+            f"New Schedule:\n"
+            f"Gate Opens: {new_timing['gate_open_time']}\n"
+            f"School Starts: {new_timing['school_start_time']}\n"
+            f"School Ends: {new_timing['school_end_time']}\n"
+            f"Lunch: {new_timing['lunch_start_time']} - {new_timing['lunch_end_time']}\n"
+            f"Late Grace: {new_timing['late_grace_minutes']} minutes\n"
+        )
+        if new_timing.get("saturday_enabled"):
+            content += f"Saturday: {new_timing['saturday_start_time']} - {new_timing['saturday_end_time']}\n"
+        else:
+            content += "Saturday: Off\n"
+
+        # Create announcement
+        from models.notification import Announcement, AnnouncementPriority, Notification, NotificationType
+        ann = Announcement(
+            branch_id=branch_id,
+            title="School Timing Change",
+            content=content,
+            priority=AnnouncementPriority.IMPORTANT,
+            target_role="all",
+            is_pinned=True,
+            published_by=uuid.UUID(user["user_id"]),
+        )
+        db.add(ann)
+        await db.flush()
+
+        # Bulk create notifications for all users
+        from models.user import User, UserRole as UR
+        target_users = (await db.execute(
+            select(User).where(
+                User.branch_id == branch_id,
+                User.role.in_([UR.SCHOOL_ADMIN, UR.TEACHER, UR.STUDENT, UR.PARENT]),
+                User.is_active == True,
+            )
+        )).scalars().all()
+
+        for u in target_users:
+            notif = Notification(
+                branch_id=branch_id, user_id=u.id,
+                type=NotificationType.ANNOUNCEMENT,
+                title="School Timing Change",
+                message=content[:200],
+                priority="important",
+                action_url="/school/school-timing" if u.role == UR.SCHOOL_ADMIN else None,
+                action_label="View Details",
+            )
+            db.add(notif)
+        notification_count = len(target_users)
+
+    await db.commit()
+
+    msg = "School timing saved"
+    if notification_count > 0:
+        msg += f" and {notification_count} notifications sent"
+    return {"success": True, "message": msg, "notifications_sent": notification_count, "timing_changed": timing_changed}
+
+
 # ═══════════════════════════════════════════════════════════
 # MORNING BRIEF — Rule-based insights (ZERO AI, pure SQL)
 # ═══════════════════════════════════════════════════════════
@@ -3266,9 +3998,11 @@ async def get_activities(request: Request, db: AsyncSession = Depends(get_db)):
     items = []
     for a in acts:
         count = await db.scalar(select(func.count(ActivityParticipant.id)).where(ActivityParticipant.activity_id == a.id)) or 0
-        items.append({"id": str(a.id), "title": a.title, "activity_type": a.activity_type, "category": a.category or "",
+        items.append({"id": str(a.id), "title": a.title or a.name, "activity_type": a.activity_type, "category": a.category or "",
                        "event_date": a.event_date.isoformat() if a.event_date else "", "venue": a.venue or "",
-                       "status": a.status, "participant_count": count, "max_participants": a.max_participants})
+                       "status": a.status, "participant_count": count, "max_participants": a.max_participants,
+                       "target_audience": a.target_audience or [],
+                       "published_at": a.published_at.strftime("%d %b %Y") if hasattr(a, 'published_at') and a.published_at else ""})
     return {"activities": items}
 
 
@@ -3278,15 +4012,24 @@ async def create_activity(request: Request, db: AsyncSession = Depends(get_db)):
     if not user: return {"error": "unauthorized"}
     branch_id = uuid.UUID(user["branch_id"])
     data = await request.json()
+    save_as = data.get("save_as", "draft")  # "draft" or "publish"
     act = Activity(branch_id=branch_id, name=data["title"], title=data["title"], activity_type=data["activity_type"],
                    category=data.get("category"), description=data.get("description"),
                    event_date=date.fromisoformat(data["event_date"]) if data.get("event_date") else None,
                    registration_deadline=date.fromisoformat(data["registration_deadline"]) if data.get("registration_deadline") else None,
                    venue=data.get("venue"), max_participants=data.get("max_participants"),
-                   eligible_classes=data.get("eligible_classes"), status="open",
+                   eligible_classes=data.get("eligible_classes"),
+                   target_audience=data.get("target_audience"),
+                   status="draft" if save_as == "draft" else "open",
                    created_by=uuid.UUID(user["user_id"]))
+    if save_as != "draft":
+        from datetime import datetime as dt
+        act.published_at = dt.utcnow()
     db.add(act)
     await db.commit()
+    # If publishing immediately, send notifications
+    if save_as != "draft" and data.get("target_audience"):
+        await _send_activity_notifications(db, act, branch_id, user)
     return {"status": "created", "id": str(act.id)}
 
 
@@ -3313,6 +4056,101 @@ async def update_participant(request: Request, activity_id: str, participant_id:
         if "status" in data: part.status = data["status"]
         await db.commit()
     return {"status": "updated"}
+
+
+@router.post("/activities/{activity_id}/publish")
+async def publish_activity(request: Request, activity_id: str, db: AsyncSession = Depends(get_db)):
+    """Publish a draft activity — sends notifications to target audience."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from datetime import datetime as dt
+
+    act = await db.scalar(select(Activity).where(Activity.id == uuid.UUID(activity_id)))
+    if not act:
+        raise HTTPException(404, "Activity not found")
+
+    data = await request.json()
+    target = data.get("target_audience", [])
+    act.target_audience = target
+    act.status = "open"
+    act.published_at = dt.utcnow()
+    await db.commit()
+
+    # Send notifications
+    if target:
+        await _send_activity_notifications(db, act, branch_id, user)
+
+    return {"status": "published", "message": f"'{act.title or act.name}' published and notifications sent"}
+
+
+async def _send_activity_notifications(db, act, branch_id, user):
+    """Send in-app notifications to selected target audience."""
+    from models.notification import Notification, NotificationType
+    from datetime import datetime as dt
+
+    target = act.target_audience or []
+    title = f"New Event: {act.title or act.name}"
+    msg = f"{act.title or act.name}"
+    if act.event_date:
+        msg += f" on {act.event_date.strftime('%d %b %Y')}"
+    if act.venue:
+        msg += f" at {act.venue}"
+
+    user_ids = set()
+
+    if "all_students" in target:
+        # Notify all students' user_ids
+        from models.student import Student as St
+        rows = (await db.execute(
+            select(St.user_id).where(St.branch_id == branch_id, St.is_active == True, St.user_id.isnot(None))
+        )).scalars().all()
+        user_ids.update(rows)
+
+    if "teachers" in target:
+        from models.teacher import Teacher as Tc
+        rows = (await db.execute(
+            select(Tc.user_id).where(Tc.branch_id == branch_id, Tc.is_active == True, Tc.user_id.isnot(None))
+        )).scalars().all()
+        user_ids.update(rows)
+
+    if "non_teaching_staff" in target:
+        from models.mega_modules import Employee as Emp
+        rows = (await db.execute(
+            select(Emp.user_id).where(Emp.branch_id == branch_id, Emp.is_active == True, Emp.user_id.isnot(None))
+        )).scalars().all()
+        user_ids.update(rows)
+
+    # Handle specific classes like "class_<id>"
+    for t in target:
+        if t.startswith("class_"):
+            cls_id = t.replace("class_", "")
+            try:
+                from models.student import Student as St2
+                rows = (await db.execute(
+                    select(St2.user_id).where(
+                        St2.branch_id == branch_id, St2.class_id == uuid.UUID(cls_id),
+                        St2.is_active == True, St2.user_id.isnot(None)
+                    )
+                )).scalars().all()
+                user_ids.update(rows)
+            except Exception:
+                pass
+
+    # Create notifications
+    for uid in user_ids:
+        if uid:
+            notif = Notification(
+                user_id=uid, branch_id=branch_id,
+                title=title, message=msg,
+                notification_type=NotificationType.ALERT,
+                action_url="/student/online-classes" if "student" in str(target) else None,
+            )
+            db.add(notif)
+
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -3512,10 +4350,20 @@ async def promote_students(request: Request, db: AsyncSession = Depends(get_db))
         elif action == "tc_issued":
             student.is_active = False
             student.admission_status = AdmissionStatus.TC_ISSUED
+            # Disable linked User account (student + parent logins)
+            if student.user_id:
+                linked_user = await db.scalar(select(User).where(User.id == student.user_id))
+                if linked_user:
+                    linked_user.is_active = False
             tc += 1
         elif action == "left":
             student.is_active = False
             student.admission_status = AdmissionStatus.LEFT
+            # Disable linked User account (student + parent logins)
+            if student.user_id:
+                linked_user = await db.scalar(select(User).where(User.id == student.user_id))
+                if linked_user:
+                    linked_user.is_active = False
             left += 1
     await db.commit()
     return {"promoted": promoted, "detained": detained, "tc": tc, "left": left}
@@ -3685,15 +4533,24 @@ async def qr_mark_attendance(request: Request, db: AsyncSession = Depends(get_db
     if existing:
         return {"success": True, "student_name": student.full_name, "roll": student.roll_number or "", "message": "Already marked"}
 
-    # Mark present
+    # Mark present with check-in time
+    from utils.timezone import get_school_time
+    try:
+        now_time, _ = await get_school_time(db, branch_id)
+    except Exception:
+        from datetime import datetime as _dt
+        now_time = _dt.utcnow().time()
+
     att = Attendance(
         student_id=student.id, branch_id=branch_id,
         class_id=student.class_id, section_id=student.section_id,
-        date=today, status=AttendanceStatus.PRESENT
+        date=today, status=AttendanceStatus.PRESENT,
+        check_in_time=now_time,
     )
     db.add(att)
     await db.commit()
-    return {"success": True, "student_name": student.full_name, "roll": student.roll_number or "", "message": "Marked present"}
+    time_str = now_time.strftime("%I:%M %p") if now_time else ""
+    return {"success": True, "student_name": student.full_name, "roll": student.roll_number or "", "message": f"Marked present at {time_str}"}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -4141,22 +4998,68 @@ async def student_profile(request: Request, student_id: str, db: AsyncSession = 
     doc_list = [{"id": str(d.id), "doc_type": d.doc_type, "doc_name": d.doc_name,
                  "file_url": d.file_url, "uploaded_at": d.uploaded_at.strftime('%d %b %Y') if d.uploaded_at else ""} for d in docs]
 
+    # Transport info
+    transport_info = {"route_name": "", "vehicle_number": "", "stop_name": ""}
+    if s.uses_transport:
+        try:
+            from models.transport import StudentTransport, TransportRoute, RouteStop, Vehicle
+            st = await db.scalar(select(StudentTransport).where(
+                StudentTransport.student_id == s.id, StudentTransport.is_active == True))
+            if st:
+                route = await db.scalar(select(TransportRoute).where(TransportRoute.id == st.route_id))
+                if route:
+                    transport_info["route_name"] = route.route_name or ""
+                    if route.vehicle_id:
+                        veh = await db.scalar(select(Vehicle).where(Vehicle.id == route.vehicle_id))
+                        if veh: transport_info["vehicle_number"] = veh.vehicle_number or ""
+                stop = await db.scalar(select(RouteStop).where(RouteStop.id == st.stop_id)) if st.stop_id else None
+                if stop: transport_info["stop_name"] = stop.stop_name or ""
+        except Exception:
+            pass
+    elif s.transport_route:
+        transport_info["route_name"] = s.transport_route
+
     return {"student": {
         "id": str(s.id), "first_name": s.first_name, "last_name": s.last_name or "",
         "full_name": s.full_name, "roll_number": s.roll_number or "",
         "admission_number": s.admission_number or "",
-            "student_login_id": s.student_login_id or "",
+        "student_login_id": s.student_login_id or "",
         "class_name": cls_name or "", "section_name": sec_name,
         "class_id": str(s.class_id) if s.class_id else "",
         "section_id": str(s.section_id) if s.section_id else "",
         "date_of_birth": s.date_of_birth.isoformat() if s.date_of_birth else "",
-        "gender": s.gender or "", "blood_group": s.blood_group or "",
-        "father_name": s.father_name or "", "mother_name": s.mother_name or "",
-        "father_phone": s.father_phone or "", "mother_phone": s.mother_phone or "",
-        "address": s.address or "", "photo_url": s.photo_url or "",
+        "gender": s.gender.value if s.gender else "", "blood_group": s.blood_group or "",
+        "aadhaar_number": s.aadhaar_number or "",
+        "admission_date": s.admission_date.isoformat() if s.admission_date else "",
+        "admission_type": s.admission_type or "",
         "admission_status": s.admission_status.value if s.admission_status else "admitted",
+        # Parent / Guardian
+        "father_name": s.father_name or "", "father_phone": s.father_phone or "",
+        "father_email": s.father_email or "", "father_occupation": s.father_occupation or "",
+        "father_qualification": s.father_qualification or "",
+        "mother_name": s.mother_name or "", "mother_phone": s.mother_phone or "",
+        "mother_email": s.mother_email or "", "mother_occupation": s.mother_occupation or "",
+        "mother_qualification": s.mother_qualification or "",
+        "guardian_name": s.guardian_name or "", "guardian_phone": s.guardian_phone or "",
+        # Address
+        "address": s.address or "", "city": s.city or "", "state": s.state or "", "pincode": s.pincode or "",
+        # Medical
+        "medical_conditions": s.medical_conditions or "", "emergency_contact": s.emergency_contact or "",
+        # Background
+        "religion": s.religion or "", "category": s.category or "", "nationality": s.nationality or "",
+        "previous_school": s.previous_school or "", "previous_board": s.previous_board or "",
+        "previous_class": s.previous_class or "",
+        # Transport
+        "uses_transport": s.uses_transport or False,
+        "transport_route": transport_info["route_name"],
+        "transport_vehicle": transport_info["vehicle_number"],
+        "transport_stop": transport_info["stop_name"],
+        # House & Photo
+        "photo_url": s.photo_url or "",
         "house_name": house_name, "house_color": house_color,
         "roles": role_list, "documents": doc_list,
+        "updated_at": s.updated_at.strftime("%d %b %Y %I:%M %p") if s.updated_at else "",
+        "created_at": s.created_at.strftime("%d %b %Y") if s.created_at else "",
     }}
 
 
@@ -4255,14 +5158,18 @@ async def admission_notify(request: Request, db: AsyncSession = Depends(get_db))
     # 1. Notify class teacher of this specific section
     class_teacher = None
     if section_id:
-        class_teacher = await db.scalar(
-            select(Teacher).where(
-                Teacher.branch_id == branch_id,
-                Teacher.is_class_teacher == True,
-                Teacher.class_teacher_of == uuid.UUID(section_id),
-                Teacher.is_active == True
+        from sqlalchemy import text as sql_text
+        ct_teacher_id = await db.scalar(sql_text(
+            "SELECT class_teacher_id FROM sections WHERE id = :sid"
+        ), {"sid": section_id})
+        class_teacher = None
+        if ct_teacher_id:
+            class_teacher = await db.scalar(
+                select(Teacher).where(
+                    Teacher.id == ct_teacher_id,
+                    Teacher.is_active == True
+                )
             )
-        )
     if class_teacher and class_teacher.user_id:
         n = Notification(
             branch_id=branch_id, user_id=class_teacher.user_id,
@@ -4545,3 +5452,1885 @@ async def update_notification_settings(request: Request, db: AsyncSession = Depe
 
     await db.commit()
     return {"success": True, "message": "Notification settings saved!"}
+
+# ═══════════════════════════════════════════════════════════
+# REGISTRATION ID CONFIG — Admin-configurable student ID format
+# ═══════════════════════════════════════════════════════════
+from models.registration_config import RegistrationNumberConfig
+
+
+@router.get("/registration-config")
+async def get_registration_config(request: Request, db: AsyncSession = Depends(get_db)):
+    """Get current registration ID format config + presets."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    config = await db.scalar(
+        select(RegistrationNumberConfig).where(RegistrationNumberConfig.branch_id == branch_id))
+    presets = [
+        {"label": "School + Year + Sequence", "format": "{SCHOOL4}{YY}{SEQ4}", "example": "GNK261"},
+        {"label": "Code + Year + Class + Seq", "format": "{CODE}{YY}{CLASS}{SEQ3}", "example": "GNK2604123"},
+        {"label": "Code + Year + Gender + Seq", "format": "{CODE}{YY}{GENDER}{SEQ4}", "example": "GNK26M1"},
+        {"label": "Year + Code + Base36 Seq", "format": "{YY}{CODE}{SEQ4}", "example": "26GNK001"},
+        {"label": "Code + Random 6", "format": "{CODE}{RAND6}", "example": "GNK7X9K2M"},
+        {"label": "Full Year + School + Class + Seq", "format": "{YYYY}{SCHOOL3}{CLASS}{SEQ4}", "example": "2026GNK041"},
+    ]
+    if config:
+        return {"config": {
+            "format_template": config.format_template,
+            "school_code": config.school_code or "",
+            "use_base36": config.use_base36,
+            "current_sequence": config.current_sequence or 0,
+            "current_year": config.current_year,
+        }, "presets": presets}
+    return {"config": None, "presets": presets}
+
+
+@router.post("/registration-config")
+async def save_registration_config(request: Request, db: AsyncSession = Depends(get_db)):
+    """Save registration ID format and generate a preview."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    data = await request.json()
+
+    config = await db.scalar(
+        select(RegistrationNumberConfig).where(RegistrationNumberConfig.branch_id == branch_id))
+    if not config:
+        config = RegistrationNumberConfig(branch_id=branch_id)
+        db.add(config)
+
+    config.format_template = data.get("format_template", "{SCHOOL4}{YY}{SEQ4}")
+    if data.get("school_code"):
+        config.school_code = data["school_code"].upper().strip()
+    config.use_base36 = data.get("use_base36", False)
+    await db.flush()
+
+    # Generate preview (creates a temp ID then rolls back sequence)
+    preview = await generate_student_registration_id(
+        db=db, branch_id=str(branch_id),
+        admission_year=date.today().year, class_name="Class 4", gender="male")
+    # Roll back the sequence bump from preview
+    config.current_sequence = max((config.current_sequence or 1) - 1, 0)
+    await db.commit()
+    return {"success": True, "preview": preview, "message": f"Format saved. Preview: {preview}"}
+
+
+# ─── 3. Add this endpoint for student photo upload ───
+
+@router.post("/students/{student_id}/photo")
+async def upload_student_photo(request: Request, student_id: str, db: AsyncSession = Depends(get_db)):
+    """Upload student profile photo — stored as photo_url on student record."""
+    user = await get_current_user(request)
+    if not user: return {"error": "unauthorized"}
+    import aiofiles
+    form = await request.form()
+    file = form.get("file")
+    if not file: return {"error": "No file"}
+    
+    contents = await file.read()
+    if len(contents) > 512000:
+        raise HTTPException(400, "Photo must be under 500KB")
+    
+    upload_dir = os.path.join("static", "uploads", "student_photos")
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = "jpg" if "jpeg" in (file.content_type or "") else "png"
+    filename = f"{student_id}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+    
+    # Update student record
+    student = await db.scalar(select(Student).where(Student.id == uuid.UUID(student_id)))
+    if student:
+        student.photo_url = f"/{filepath}"
+        await db.commit()
+    
+    return {"photo_url": f"/{filepath}", "message": "Photo uploaded"}
+
+class EmployeeOnboardData(BaseModel):
+    first_name: str
+    last_name: Optional[str] = ""
+    date_of_birth: Optional[str] = None
+    gender: Optional[str] = None
+    blood_group: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    pan_number: Optional[str] = None
+    address: Optional[str] = None
+    employee_type: Optional[str] = "teaching"
+    designation: Optional[str] = None
+    department: Optional[str] = None
+    date_of_joining: Optional[str] = None
+    employment_type: Optional[str] = "Permanent"
+    qualification: Optional[str] = None
+    specialization: Optional[str] = None
+    university: Optional[str] = None
+    bed: Optional[str] = None
+    ctet: Optional[str] = None
+    net: Optional[str] = None
+    previous_experience: Optional[int] = 0
+    previous_school: Optional[str] = None
+    basic_salary: Optional[int] = 0
+    hra: Optional[int] = 0
+    da: Optional[int] = 0
+    bank_name: Optional[str] = None
+    bank_account: Optional[str] = None
+    bank_ifsc: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+
+@router.post("/hr/employees")
+async def create_employee_from_onboarding(data: EmployeeOnboardData, request: Request, db: AsyncSession = Depends(get_db)):
+    try:
+        await db.rollback()
+    except Exception:
+        pass
+
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+
+    from sqlalchemy import text as sql_text
+    from datetime import date, datetime
+    import uuid as uuid_mod
+
+    # 1. Generate Employee ID
+    branch_prefix = "EMP"
+    try:
+        br_row = await db.execute(sql_text("SELECT name, short_code FROM branches WHERE id = :bid"), {"bid": str(branch_id)})
+        br = br_row.first()
+        if br:
+            if hasattr(br, 'short_code') and br.short_code:
+                branch_prefix = br.short_code.upper()
+            elif br.name:
+                words = br.name.strip().split()
+                branch_prefix = ''.join(w[0].upper() for w in words[:3])
+    except Exception:
+        pass
+
+    type_prefix = {"teaching":"T","non_teaching":"N","admin":"A","support":"S"}.get(data.employee_type, "T")
+    seq = await db.execute(sql_text("SELECT COUNT(*) FROM teachers WHERE branch_id = :bid"), {"bid": str(branch_id)})
+    next_num = (seq.scalar() or 0) + 1
+    employee_id = f"{branch_prefix}-{type_prefix}-{next_num:03d}"
+    while True:
+        chk = await db.execute(sql_text("SELECT id FROM teachers WHERE employee_id = :eid AND branch_id = :bid"), {"eid": employee_id, "bid": str(branch_id)})
+        if not chk.first(): break
+        next_num += 1
+        employee_id = f"{branch_prefix}-{type_prefix}-{next_num:03d}"
+
+    # 2. Short designation
+    short_desig = data.designation or "Teacher"
+    if data.designation and "(" in data.designation:
+        short_desig = data.designation.split("(")[0].strip()
+
+    # 3. Employment type mapping
+    emp_map = {"Permanent":"permanent","Contractual":"contractual","Probation":"contractual","Part-Time":"contractual","Guest Faculty":"guest"}
+    mapped_emp = emp_map.get(data.employment_type, "permanent")
+
+    # 4. Parse joining date
+    joining_date = None
+    if data.date_of_joining:
+        try: joining_date = datetime.strptime(data.date_of_joining, "%Y-%m-%d").date()
+        except: joining_date = date.today()
+
+    # 5. Qualification string
+    qp = []
+    if data.qualification: qp.append(data.qualification)
+    if data.bed and data.bed not in ("","no"): qp.append("B.Ed")
+    if data.ctet and data.ctet not in ("","no"):
+        cm = {"ctet1":"CTET-I","ctet2":"CTET-II","both":"CTET (I+II)","stet":"STET"}
+        qp.append(cm.get(data.ctet, data.ctet))
+    if data.net and data.net not in ("","None"): qp.append(data.net)
+    qual_str = ", ".join(qp) if qp else data.qualification
+
+    # 6. Phone — frontend now sends ISD code prefix (+91XXXXXXXXXX)
+    phone = data.phone or ""
+    if phone and not phone.startswith("+"):
+        phone = "+91" + phone
+
+    # 7. Create Teacher
+    teacher_id = str(uuid_mod.uuid4())
+    try:
+        await db.execute(sql_text("""
+            INSERT INTO teachers (id, branch_id, first_name, last_name, employee_id,
+                designation, email, phone, qualification, specialization,
+                experience_years, joining_date, address, is_active,
+                work_status, employment_type, created_at, updated_at)
+            VALUES (:id, :bid, :fname, :lname, :eid, :desig, :email, :phone,
+                :qual, :spec, :exp, :doj, :address, true, 'available', :emp_type, NOW(), NOW())
+        """), {"id": teacher_id, "bid": str(branch_id), "fname": data.first_name, "lname": data.last_name or "",
+               "eid": employee_id, "desig": short_desig, "email": data.email or None, "phone": phone,
+               "qual": qual_str, "spec": data.specialization or data.department,
+               "exp": data.previous_experience or 0, "doj": joining_date,
+               "address": data.address or "", "emp_type": mapped_emp})
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed: {str(e)}")
+
+    # 8. Create User for login
+    try:
+        user_id = str(uuid_mod.uuid4())
+        role = "school_admin" if data.employee_type == "admin" else "teacher"
+        await db.execute(sql_text("""
+            INSERT INTO users (id, name, email, phone, role, branch_id, is_active, created_at, updated_at)
+            VALUES (:id, :name, :email, :phone, :role, :bid, true, NOW(), NOW())
+        """), {"id": user_id, "name": f"{data.first_name} {data.last_name or ''}".strip(),
+               "email": data.email or None, "phone": phone, "role": role, "bid": str(branch_id)})
+        await db.execute(sql_text("UPDATE teachers SET user_id = :uid WHERE id = :tid"), {"uid": user_id, "tid": teacher_id})
+    except Exception as e:
+        print(f"[WARN] User creation failed for {data.first_name}: {e}")
+
+    await db.commit()
+    return {"success": True, "id": teacher_id, "employee_id": employee_id,
+            "message": f"Employee {data.first_name} onboarded as {employee_id}"}
+
+
+# ═══════════════════════════════════════════════════════════
+# FEE AUTOMATION SETTINGS
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/settings/fee-automation")
+async def get_fee_automation_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    """Get fee automation configuration for the branch."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from models.branch import BranchSettings
+
+    bs = (await db.execute(
+        select(BranchSettings).where(BranchSettings.branch_id == branch_id)
+    )).scalar_one_or_none()
+
+    if not bs:
+        return {
+            "fee_reminder_days": [7, 3, 1],
+            "late_fee_percentage": 0,
+            "late_fee_after_days": 15,
+            "auto_generate_enabled": False,
+            "notify_fee_reminder": True,
+            "fee_alert_day": 1,
+        }
+
+    custom = bs.custom_data or {}
+    return {
+        "fee_reminder_days": bs.fee_reminder_days or [7, 3, 1],
+        "late_fee_percentage": bs.late_fee_percentage or 0,
+        "late_fee_after_days": bs.late_fee_after_days or 15,
+        "auto_generate_enabled": custom.get("auto_generate_fees", False),
+        "notify_fee_reminder": bs.notify_fee_reminder if bs.notify_fee_reminder is not None else True,
+        "fee_alert_day": custom.get("fee_alert_day", 1),
+    }
+
+
+@router.post("/settings/fee-automation")
+async def save_fee_automation_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    """Save fee automation configuration."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    body = await request.json()
+    from models.branch import BranchSettings
+    from sqlalchemy.orm.attributes import flag_modified
+
+    bs = (await db.execute(
+        select(BranchSettings).where(BranchSettings.branch_id == branch_id)
+    )).scalar_one_or_none()
+
+    if not bs:
+        bs = BranchSettings(branch_id=branch_id)
+        db.add(bs)
+
+    # Update standard columns
+    reminder_days = body.get("fee_reminder_days", [7, 3, 1])
+    if isinstance(reminder_days, list) and all(isinstance(d, int) for d in reminder_days):
+        bs.fee_reminder_days = sorted(reminder_days, reverse=True)
+    bs.late_fee_percentage = max(0, min(100, body.get("late_fee_percentage", 0)))
+    bs.late_fee_after_days = max(1, body.get("late_fee_after_days", 15))
+    bs.notify_fee_reminder = body.get("notify_fee_reminder", True)
+
+    # Store auto-generate flag + fee alert day in custom_data (no migration)
+    custom = bs.custom_data or {}
+    custom["auto_generate_fees"] = body.get("auto_generate_enabled", False)
+    custom["fee_alert_day"] = body.get("fee_alert_day", 1)
+    bs.custom_data = custom
+    flag_modified(bs, "custom_data")
+
+    await db.commit()
+    return {"success": True, "message": "Fee automation settings saved"}
+
+
+# ═══════════════════════════════════════════════════════════
+# STUDENT ATTENDANCE CALENDAR (for profile page)
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/students/{student_id}/attendance-calendar")
+async def student_attendance_calendar(
+    request: Request, student_id: str,
+    month: int = 0, year: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """Day-by-day attendance for a student in a given month. Used by profile calendar widget."""
+    user = await get_current_user(request)
+    if not user:
+        return {"error": "unauthorized"}
+    branch_id = uuid.UUID(user["branch_id"])
+
+    from calendar import monthrange
+    today = date.today()
+    m = month or today.month
+    y = year or today.year
+    _, days_in_month = monthrange(y, m)
+    start_date = date(y, m, 1)
+    end_date = date(y, m, days_in_month)
+
+    # Student info
+    student = await db.scalar(select(Student).where(Student.id == uuid.UUID(student_id)))
+    if not student:
+        return {"error": "Student not found"}
+
+    # All attendance records for this student in the month
+    records = (await db.execute(
+        select(Attendance).where(
+            Attendance.student_id == student.id,
+            Attendance.date >= start_date,
+            Attendance.date <= end_date,
+        )
+    )).scalars().all()
+    att_map = {r.date: r for r in records}
+
+    # Holidays in this month
+    holidays_q = (await db.execute(
+        select(SchoolEvent).where(
+            SchoolEvent.branch_id == branch_id,
+            SchoolEvent.is_holiday == True,
+            SchoolEvent.start_date <= end_date,
+            or_(SchoolEvent.end_date >= start_date, SchoolEvent.end_date == None),
+        )
+    )).scalars().all()
+    holiday_dates = set()
+    for h in holidays_q:
+        d = max(h.start_date, start_date)
+        end_h = min(h.end_date or h.start_date, end_date)
+        while d <= end_h:
+            holiday_dates.add(d)
+            d += timedelta(days=1)
+
+    WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days = []
+    summary = {"present": 0, "absent": 0, "late": 0, "half_day": 0, "excused": 0, "holidays": 0, "total_working": 0}
+
+    for day_num in range(1, days_in_month + 1):
+        d = date(y, m, day_num)
+        weekday = WEEKDAYS[d.weekday()]
+        is_sunday = d.weekday() == 6
+
+        if is_sunday:
+            days.append({"day": day_num, "weekday": weekday, "status": None, "is_weekend": True})
+            continue
+
+        if d in holiday_dates:
+            days.append({"day": day_num, "weekday": weekday, "status": "holiday", "is_holiday": True})
+            summary["holidays"] += 1
+            continue
+
+        # Future dates
+        if d > today:
+            days.append({"day": day_num, "weekday": weekday, "status": None, "is_future": True})
+            continue
+
+        summary["total_working"] += 1
+        rec = att_map.get(d)
+        if rec:
+            status = rec.status.value
+            summary[status] = summary.get(status, 0) + 1
+            check_in = rec.check_in_time.strftime("%I:%M %p") if rec.check_in_time else None
+            check_out = rec.check_out_time.strftime("%I:%M %p") if rec.check_out_time else None
+            days.append({
+                "day": day_num, "weekday": weekday, "status": status,
+                "check_in": check_in, "check_out": check_out,
+                "remarks": rec.remarks,
+            })
+        else:
+            # No record = absent (if school day in the past)
+            summary["absent"] += 1
+            days.append({"day": day_num, "weekday": weekday, "status": "absent"})
+
+    pct = round(summary["present"] / summary["total_working"] * 100, 1) if summary["total_working"] > 0 else 0
+    summary["percentage"] = pct
+
+    return {
+        "student_name": student.full_name,
+        "month": m, "year": y,
+        "summary": summary,
+        "days": days,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# TEACHER FULL PROFILE API (for profile page)
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/teachers/{teacher_id}/profile-full")
+async def teacher_profile_full(
+    request: Request, teacher_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Comprehensive teacher profile: details + assignments + awards + attendance summary."""
+    user = await get_current_user(request)
+    if not user:
+        return {"error": "unauthorized"}
+    branch_id = uuid.UUID(user["branch_id"])
+
+    try:
+        teacher = await db.scalar(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    except Exception:
+        return {"error": "Invalid teacher ID"}
+    if not teacher:
+        return {"error": "Teacher not found"}
+
+    # Class teacher of
+    ct_label = ""
+    if teacher.class_teacher_of:
+        from models.academic import Section as Sec2
+        sec = await db.scalar(select(Sec2).where(Sec2.id == teacher.class_teacher_of))
+        if sec:
+            cls = await db.scalar(select(Class.name).where(Class.id == sec.class_id))
+            ct_label = f"{cls or ''}-{sec.name}"
+
+    # Teaching assignments (use raw SQL — same pattern as existing get_teacher_assignments)
+    from sqlalchemy import text as sql_text
+    assignments = []
+    try:
+        rows = await db.execute(sql_text("""
+            SELECT c.name as class_name, sec.name as section_name, sub.name as subject_name
+            FROM teacher_class_assignments tca
+            JOIN classes c ON c.id = tca.class_id
+            LEFT JOIN sections sec ON sec.id = tca.section_id
+            LEFT JOIN subjects sub ON sub.id = tca.subject_id
+            WHERE tca.teacher_id = :tid AND tca.branch_id = :bid AND tca.is_active = true
+            ORDER BY c.name, sec.name
+        """), {"tid": str(teacher.id), "bid": str(branch_id)})
+        for r in rows.mappings():
+            assignments.append({
+                "class_name": r["class_name"] or "",
+                "section_name": r["section_name"] or "",
+                "subject_name": r["subject_name"] or "",
+            })
+    except Exception as e:
+        print(f"[WARN] Teacher assignments query failed: {e}")
+        # Fallback: try class_subjects table
+        try:
+            from models.academic import ClassSubject, Subject as Subj2
+            cs_rows = (await db.execute(
+                select(ClassSubject).where(ClassSubject.teacher_id == teacher.id)
+            )).scalars().all()
+            for cs in cs_rows:
+                cls_name = await db.scalar(select(Class.name).where(Class.id == cs.class_id)) or ""
+                sub_name = await db.scalar(select(Subj2.name).where(Subj2.id == cs.subject_id)) or ""
+                assignments.append({"class_name": cls_name, "section_name": "", "subject_name": sub_name})
+        except Exception:
+            pass
+
+    # House (if teacher is a house master)
+    house_name, house_color = "", ""
+    try:
+        from models.mega_modules import House
+        house = await db.scalar(select(House).where(
+            House.house_master_id == teacher.id, House.is_active == True))
+        if house:
+            house_name, house_color = house.name or "", house.color or ""
+    except Exception:
+        pass
+
+    # Awards
+    from models.teacher_award import TeacherAward
+    MONTHS = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+              'July', 'August', 'September', 'October', 'November', 'December']
+    awards_raw = (await db.execute(
+        select(TeacherAward).where(
+            TeacherAward.teacher_id == teacher.id,
+            TeacherAward.status == "awarded",
+        ).order_by(TeacherAward.awarded_at.desc()).limit(10)
+    )).scalars().all()
+    awards = [{
+        "title": a.title, "award_type": a.award_type,
+        "month": MONTHS[a.month] if a.month else "", "year": a.year,
+        "prize": a.prize_details or "", "description": a.description or "",
+    } for a in awards_raw]
+
+    # Attendance summary — this month
+    today = date.today()
+    month_start = today.replace(day=1)
+    from models.teacher_attendance import TeacherAttendance, TeacherAttendanceStatus
+    month_att = (await db.execute(
+        select(TeacherAttendance).where(
+            TeacherAttendance.teacher_id == teacher.id,
+            TeacherAttendance.date >= month_start,
+            TeacherAttendance.date <= today,
+        )
+    )).scalars().all()
+
+    this_month = {"present": 0, "absent": 0, "late": 0, "on_leave": 0, "half_day": 0}
+    for a in month_att:
+        this_month[a.status.value] = this_month.get(a.status.value, 0) + 1
+    total_m = sum(this_month.values())
+    this_month["percentage"] = round(this_month["present"] / total_m * 100, 1) if total_m > 0 else 0
+
+    # Overall attendance (all time)
+    overall_total = await db.scalar(
+        select(func.count(TeacherAttendance.id)).where(TeacherAttendance.teacher_id == teacher.id)
+    ) or 0
+    overall_present = await db.scalar(
+        select(func.count(TeacherAttendance.id)).where(
+            TeacherAttendance.teacher_id == teacher.id,
+            TeacherAttendance.status == TeacherAttendanceStatus.PRESENT,
+        )
+    ) or 0
+
+    return {
+        "teacher": {
+            "id": str(teacher.id), "full_name": teacher.full_name,
+            "employee_id": teacher.employee_id or "",
+            "designation": teacher.designation or "",
+            "qualification": teacher.qualification or "",
+            "specialization": teacher.specialization or "",
+            "experience_years": teacher.experience_years or 0,
+            "joining_date": teacher.joining_date.isoformat() if teacher.joining_date else "",
+            "phone": teacher.phone or "", "email": teacher.email or "",
+            "photo_url": teacher.photo_url or "",
+            "address": teacher.address or "",
+            "city": getattr(teacher, 'city', '') or "",
+            "state": getattr(teacher, 'state', '') or "",
+            "pincode": getattr(teacher, 'pincode', '') or "",
+            "emergency_contact": getattr(teacher, 'emergency_contact', '') or "",
+            "emergency_contact_name": getattr(teacher, 'emergency_contact_name', '') or "",
+            "uses_transport": getattr(teacher, 'uses_transport', False) or False,
+            "transport_route": getattr(teacher, 'transport_route', '') or "",
+            "is_class_teacher": teacher.is_class_teacher,
+            "class_teacher_of": ct_label,
+            "work_status": teacher.work_status or "available",
+            "is_active": teacher.is_active,
+            "house_name": house_name, "house_color": house_color,
+            "updated_at": teacher.updated_at.strftime("%d %b %Y %I:%M %p") if teacher.updated_at else "",
+            "created_at": teacher.created_at.strftime("%d %b %Y") if teacher.created_at else "",
+        },
+        "assignments": assignments,
+        "awards": awards,
+        "attendance_summary": {
+            "this_month": this_month,
+            "overall": {
+                "total_days": overall_total, "present": overall_present,
+                "percentage": round(overall_present / overall_total * 100, 1) if overall_total > 0 else 0,
+            },
+        },
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# TEACHER ATTENDANCE CALENDAR (for profile page)
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/teachers/{teacher_id}/attendance-calendar")
+async def teacher_attendance_calendar(
+    request: Request, teacher_id: str,
+    month: int = 0, year: int = 0,
+    db: AsyncSession = Depends(get_db),
+):
+    """Day-by-day teacher attendance for calendar widget. Includes check-in/check-out times."""
+    user = await get_current_user(request)
+    if not user:
+        return {"error": "unauthorized"}
+    branch_id = uuid.UUID(user["branch_id"])
+
+    from calendar import monthrange
+    from models.teacher_attendance import TeacherAttendance
+    today = date.today()
+    m = month or today.month
+    y = year or today.year
+    _, days_in_month = monthrange(y, m)
+    start_date = date(y, m, 1)
+    end_date = date(y, m, days_in_month)
+
+    teacher = await db.scalar(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    if not teacher:
+        return {"error": "Teacher not found"}
+
+    records = (await db.execute(
+        select(TeacherAttendance).where(
+            TeacherAttendance.teacher_id == teacher.id,
+            TeacherAttendance.date >= start_date,
+            TeacherAttendance.date <= end_date,
+        )
+    )).scalars().all()
+    att_map = {r.date: r for r in records}
+
+    # Holidays
+    holidays_q = (await db.execute(
+        select(SchoolEvent).where(
+            SchoolEvent.branch_id == branch_id,
+            SchoolEvent.is_holiday == True,
+            SchoolEvent.start_date <= end_date,
+            or_(SchoolEvent.end_date >= start_date, SchoolEvent.end_date == None),
+        )
+    )).scalars().all()
+    holiday_dates = set()
+    for h in holidays_q:
+        d = max(h.start_date, start_date)
+        end_h = min(h.end_date or h.start_date, end_date)
+        while d <= end_h:
+            holiday_dates.add(d)
+            d += timedelta(days=1)
+
+    WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    days = []
+    summary = {"present": 0, "absent": 0, "late": 0, "half_day": 0, "on_leave": 0, "holidays": 0, "total_working": 0}
+
+    for day_num in range(1, days_in_month + 1):
+        d = date(y, m, day_num)
+        weekday = WEEKDAYS[d.weekday()]
+        is_sunday = d.weekday() == 6
+
+        if is_sunday:
+            days.append({"day": day_num, "weekday": weekday, "status": None, "is_weekend": True})
+            continue
+        if d in holiday_dates:
+            days.append({"day": day_num, "weekday": weekday, "status": "holiday", "is_holiday": True})
+            summary["holidays"] += 1
+            continue
+        if d > today:
+            days.append({"day": day_num, "weekday": weekday, "status": None, "is_future": True})
+            continue
+
+        summary["total_working"] += 1
+        rec = att_map.get(d)
+        if rec:
+            status = rec.status.value
+            summary[status] = summary.get(status, 0) + 1
+            check_in = rec.check_in_time.strftime("%I:%M %p") if rec.check_in_time else None
+            check_out = rec.check_out_time.strftime("%I:%M %p") if rec.check_out_time else None
+            days.append({
+                "day": day_num, "weekday": weekday, "status": status,
+                "check_in": check_in, "check_out": check_out,
+                "remarks": rec.remarks, "source": rec.source.value if rec.source else None,
+            })
+        else:
+            summary["absent"] += 1
+            days.append({"day": day_num, "weekday": weekday, "status": "absent"})
+
+    pct = round(summary["present"] / summary["total_working"] * 100, 1) if summary["total_working"] > 0 else 0
+    summary["percentage"] = pct
+
+    return {
+        "teacher_name": teacher.full_name,
+        "month": m, "year": y,
+        "summary": summary,
+        "days": days,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# PHOTO UPLOAD WITH APPROVAL WORKFLOW
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/teachers/{teacher_id}/photo")
+async def upload_teacher_photo(request: Request, teacher_id: str, db: AsyncSession = Depends(get_db)):
+    """Upload teacher profile photo — stored as photo_url on teacher record."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    import aiofiles
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        raise HTTPException(400, "No file")
+
+    contents = await file.read()
+    if len(contents) > 512000:
+        raise HTTPException(400, "Photo must be under 500KB")
+
+    upload_dir = os.path.join("static", "uploads", "teacher_photos")
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = "jpg" if "jpeg" in (file.content_type or "") else "png"
+    filename = f"{teacher_id}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+
+    teacher = await db.scalar(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))
+    if teacher:
+        teacher.photo_url = f"/{filepath}"
+        await db.commit()
+
+    return {"photo_url": f"/{filepath}", "message": "Photo uploaded"}
+
+
+@router.post("/employees/{employee_id}/photo")
+async def upload_employee_photo(request: Request, employee_id: str, db: AsyncSession = Depends(get_db)):
+    """Upload employee (non-teaching staff) profile photo."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    from models.employee import Employee
+    import aiofiles
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        raise HTTPException(400, "No file")
+
+    contents = await file.read()
+    if len(contents) > 512000:
+        raise HTTPException(400, "Photo must be under 500KB")
+
+    upload_dir = os.path.join("static", "uploads", "employee_photos")
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = "jpg" if "jpeg" in (file.content_type or "") else "png"
+    filename = f"{employee_id}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+
+    emp = await db.scalar(select(Employee).where(Employee.id == uuid.UUID(employee_id)))
+    if emp:
+        emp.photo_url = f"/{filepath}"
+        await db.commit()
+
+    return {"photo_url": f"/{filepath}", "message": "Photo uploaded"}
+
+
+@router.post("/photo-request")
+async def submit_photo_change_request(request: Request, db: AsyncSession = Depends(get_db)):
+    """Student/Teacher/Staff submits a photo for admin approval."""
+    user = await get_current_user(request)
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+    from models.photo_request import PhotoChangeRequest, PhotoApprovalStatus
+    import aiofiles
+
+    form = await request.form()
+    file = form.get("file")
+    entity_type = form.get("entity_type", "student")  # student, teacher, employee
+    entity_id = form.get("entity_id", "")
+    if not file or not entity_id:
+        raise HTTPException(400, "Missing file or entity_id")
+
+    contents = await file.read()
+    if len(contents) > 512000:
+        raise HTTPException(400, "Photo must be under 500KB")
+
+    branch_id = uuid.UUID(user["branch_id"])
+
+    # Get current photo
+    current_photo = None
+    if entity_type == "student":
+        s = await db.scalar(select(Student).where(Student.id == uuid.UUID(entity_id)))
+        current_photo = s.photo_url if s else None
+    elif entity_type == "teacher":
+        t = await db.scalar(select(Teacher).where(Teacher.id == uuid.UUID(entity_id)))
+        current_photo = t.photo_url if t else None
+    else:
+        from models.employee import Employee
+        e = await db.scalar(select(Employee).where(Employee.id == uuid.UUID(entity_id)))
+        current_photo = e.photo_url if e else None
+
+    upload_dir = os.path.join("static", "uploads", "photo_requests")
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = "jpg" if "jpeg" in (file.content_type or "") else "png"
+    filename = f"{entity_type}_{entity_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+
+    req = PhotoChangeRequest(
+        branch_id=branch_id,
+        entity_type=entity_type,
+        entity_id=uuid.UUID(entity_id),
+        requested_by=uuid.UUID(user["id"]),
+        current_photo_url=current_photo,
+        new_photo_url=f"/{filepath}",
+    )
+    db.add(req)
+    await db.commit()
+
+    return {"success": True, "message": "Photo change request submitted for admin approval", "request_id": str(req.id)}
+
+
+@router.get("/photo-requests")
+async def list_photo_requests(request: Request, db: AsyncSession = Depends(get_db)):
+    """Admin: list pending photo change requests."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from models.photo_request import PhotoChangeRequest, PhotoApprovalStatus
+
+    result = await db.execute(
+        select(PhotoChangeRequest)
+        .where(PhotoChangeRequest.branch_id == branch_id, PhotoChangeRequest.status == PhotoApprovalStatus.PENDING)
+        .order_by(PhotoChangeRequest.created_at.desc())
+    )
+    reqs = result.scalars().all()
+
+    items = []
+    for r in reqs:
+        name = ""
+        if r.entity_type == "student":
+            s = await db.scalar(select(Student).where(Student.id == r.entity_id))
+            name = s.full_name if s else "Unknown"
+        elif r.entity_type == "teacher":
+            t = await db.scalar(select(Teacher).where(Teacher.id == r.entity_id))
+            name = t.full_name if t else "Unknown"
+        else:
+            from models.employee import Employee
+            e = await db.scalar(select(Employee).where(Employee.id == r.entity_id))
+            name = f"{e.first_name} {e.last_name or ''}".strip() if e else "Unknown"
+
+        items.append({
+            "id": str(r.id),
+            "entity_type": r.entity_type,
+            "entity_id": str(r.entity_id),
+            "name": name,
+            "current_photo_url": r.current_photo_url or "",
+            "new_photo_url": r.new_photo_url,
+            "created_at": r.created_at.strftime("%d %b %Y %I:%M %p") if r.created_at else "",
+        })
+
+    return {"requests": items, "count": len(items)}
+
+
+@router.post("/photo-requests/{request_id}/approve")
+async def approve_photo_request(request_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Admin approves photo change — updates the entity's photo_url."""
+    user = await verify_school_admin(request)
+    from models.photo_request import PhotoChangeRequest, PhotoApprovalStatus
+    from datetime import datetime
+
+    req = await db.scalar(select(PhotoChangeRequest).where(PhotoChangeRequest.id == uuid.UUID(request_id)))
+    if not req:
+        raise HTTPException(404, "Request not found")
+
+    req.status = PhotoApprovalStatus.APPROVED
+    req.reviewed_by = uuid.UUID(user["id"])
+    req.reviewed_at = datetime.utcnow()
+
+    # Apply the new photo to the entity
+    if req.entity_type == "student":
+        s = await db.scalar(select(Student).where(Student.id == req.entity_id))
+        if s:
+            s.photo_url = req.new_photo_url
+    elif req.entity_type == "teacher":
+        t = await db.scalar(select(Teacher).where(Teacher.id == req.entity_id))
+        if t:
+            t.photo_url = req.new_photo_url
+    else:
+        from models.employee import Employee
+        e = await db.scalar(select(Employee).where(Employee.id == req.entity_id))
+        if e:
+            e.photo_url = req.new_photo_url
+
+    await db.commit()
+    return {"success": True, "message": "Photo approved and updated"}
+
+
+@router.post("/photo-requests/{request_id}/reject")
+async def reject_photo_request(request_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    """Admin rejects photo change."""
+    user = await verify_school_admin(request)
+    from models.photo_request import PhotoChangeRequest, PhotoApprovalStatus
+    from datetime import datetime
+
+    req = await db.scalar(select(PhotoChangeRequest).where(PhotoChangeRequest.id == uuid.UUID(request_id)))
+    if not req:
+        raise HTTPException(404, "Request not found")
+
+    body = await request.json()
+    req.status = PhotoApprovalStatus.REJECTED
+    req.reviewed_by = uuid.UUID(user["id"])
+    req.reviewed_at = datetime.utcnow()
+    req.rejection_reason = body.get("reason", "")
+    await db.commit()
+    return {"success": True, "message": "Photo request rejected"}
+
+
+# ═══════════════════════════════════════════════════════════
+# SCHOOL BRANDING — LOGO UPLOAD & THEME COLOR
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/branding/logo")
+async def upload_school_logo(request: Request, db: AsyncSession = Depends(get_db)):
+    """Upload/update school logo for the branch."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from models.branch import Branch
+    import aiofiles
+
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        raise HTTPException(400, "No file")
+
+    contents = await file.read()
+    if len(contents) > 1024000:
+        raise HTTPException(400, "Logo must be under 1MB")
+
+    upload_dir = os.path.join("static", "uploads", "logos")
+    os.makedirs(upload_dir, exist_ok=True)
+    ext = "png" if "png" in (file.content_type or "") else "jpg"
+    filename = f"logo_{branch_id}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+
+    branch = await db.scalar(select(Branch).where(Branch.id == branch_id))
+    if branch:
+        branch.logo_url = f"/{filepath}"
+        await db.commit()
+
+    return {"logo_url": f"/{filepath}", "message": "Logo uploaded"}
+
+
+@router.get("/branding")
+async def get_branding(request: Request, db: AsyncSession = Depends(get_db)):
+    """Get current branding settings (logo, theme color, school details)."""
+    user = await get_current_user(request)
+    if not user:
+        return {"error": "unauthorized"}
+    branch_id = uuid.UUID(user["branch_id"])
+    from models.branch import Branch, BranchSettings
+
+    branch = await db.scalar(select(Branch).where(Branch.id == branch_id))
+    settings = await db.scalar(select(BranchSettings).where(BranchSettings.branch_id == branch_id))
+
+    return {
+        "logo_url": branch.logo_url or "" if branch else "",
+        "school_name": branch.name if branch else "",
+        "motto": branch.motto or "" if branch else "",
+        "theme_color": settings.theme_color if settings else "#4F46E5",
+        "language": settings.language if settings else "en",
+    }
+
+
+@router.put("/branding/theme")
+async def update_theme_color(request: Request, db: AsyncSession = Depends(get_db)):
+    """Update the school's theme color."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from models.branch import BranchSettings
+
+    body = await request.json()
+    color = body.get("theme_color", "#4F46E5")
+
+    # Validate hex color
+    import re
+    if not re.match(r'^#[0-9A-Fa-f]{6}$', color):
+        raise HTTPException(400, "Invalid color format. Use #RRGGBB")
+
+    settings = await db.scalar(select(BranchSettings).where(BranchSettings.branch_id == branch_id))
+    if settings:
+        settings.theme_color = color
+    else:
+        settings = BranchSettings(branch_id=branch_id, theme_color=color)
+        db.add(settings)
+    await db.commit()
+    return {"success": True, "theme_color": color}
+
+
+# ══════════════════════════════════════════════════════════════
+#   REPORTS CENTER — All report generation endpoints
+# ══════════════════════════════════════════════════════════════
+
+@router.get("/reports/student-attendance")
+async def report_student_attendance(
+    request: Request,
+    class_id: str = None, section_id: str = None,
+    month: int = None, year: int = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Student attendance report: per-student present/absent/late counts for a month."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from datetime import datetime
+    import calendar
+    now = datetime.utcnow()
+    m = month or now.month
+    y = year or now.year
+    first_day = date(y, m, 1)
+    last_day = date(y, m, calendar.monthrange(y, m)[1])
+
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec
+
+    # Build student query
+    sq = select(S).where(S.branch_id == branch_id, S.is_active == True)
+    if class_id:
+        sq = sq.where(S.class_id == class_id)
+    if section_id:
+        sq = sq.where(S.section_id == section_id)
+    sq = sq.order_by(S.class_id, S.roll_number)
+    students = (await db.execute(sq)).scalars().all()
+
+    if not students:
+        return {"report_name": "Student Attendance Report", "month": m, "year": y,
+                "summary": {}, "columns": [], "rows": [], "total": 0}
+
+    sids = [s.id for s in students]
+
+    # Fetch attendance records
+    att_q = select(Attendance).where(
+        Attendance.branch_id == branch_id,
+        Attendance.date >= first_day,
+        Attendance.date <= last_day,
+        Attendance.student_id.in_(sids),
+    )
+    atts = (await db.execute(att_q)).scalars().all()
+
+    # Build lookup: student_id → list of statuses
+    att_map = {}
+    for a in atts:
+        att_map.setdefault(str(a.student_id), []).append(a.status.value if a.status else "present")
+
+    # Fetch class/section names
+    cls_map = {}
+    sec_map = {}
+    cls_ids = set(str(s.class_id) for s in students if s.class_id)
+    sec_ids = set(str(s.section_id) for s in students if s.section_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+    if sec_ids:
+        for s in (await db.execute(select(Sec).where(Sec.id.in_([uuid.UUID(x) for x in sec_ids])))).scalars().all():
+            sec_map[str(s.id)] = s.name
+
+    working_days = len(set(str(a.student_id) + str(a.date) for a in atts)) // max(len(sids), 1) if atts else 0
+    # Better: count distinct dates
+    distinct_dates = set(a.date for a in atts)
+    working_days = len(distinct_dates)
+
+    rows = []
+    total_present = 0
+    total_absent = 0
+    for st in students:
+        sid = str(st.id)
+        statuses = att_map.get(sid, [])
+        present = sum(1 for s in statuses if s == "present")
+        absent = sum(1 for s in statuses if s == "absent")
+        late = sum(1 for s in statuses if s == "late")
+        half_day = sum(1 for s in statuses if s == "half_day")
+        excused = sum(1 for s in statuses if s == "excused")
+        total = present + absent + late + half_day + excused
+        pct = round((present + late + half_day) / total * 100, 1) if total else 0
+        total_present += present + late + half_day
+        total_absent += absent
+        rows.append({
+            "name": st.full_name,
+            "roll_no": st.roll_number or "",
+            "class": cls_map.get(str(st.class_id), ""),
+            "section": sec_map.get(str(st.section_id), ""),
+            "present": present,
+            "absent": absent,
+            "late": late,
+            "half_day": half_day,
+            "excused": excused,
+            "total_days": total,
+            "percentage": pct,
+        })
+
+    overall_pct = round(total_present / (total_present + total_absent) * 100, 1) if (total_present + total_absent) else 0
+
+    return {
+        "report_name": "Student Attendance Report",
+        "month": m, "year": y, "working_days": working_days,
+        "summary": {"total_students": len(rows), "avg_attendance": overall_pct},
+        "columns": ["Name", "Roll No", "Class", "Section", "Present", "Absent", "Late", "Half Day", "Excused", "Total Days", "Attendance %"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/teacher-attendance")
+async def report_teacher_attendance(
+    request: Request,
+    month: int = None, year: int = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Teacher attendance report: per-teacher present/absent/late/leave counts."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from datetime import datetime
+    import calendar
+    from models.teacher_attendance import TeacherAttendance as TA
+    from models.teacher import Teacher as T
+
+    now = datetime.utcnow()
+    m = month or now.month
+    y = year or now.year
+    first_day = date(y, m, 1)
+    last_day = date(y, m, calendar.monthrange(y, m)[1])
+
+    teachers = (await db.execute(
+        select(T).where(T.branch_id == branch_id, T.is_active == True).order_by(T.first_name)
+    )).scalars().all()
+
+    if not teachers:
+        return {"report_name": "Teacher Attendance Report", "month": m, "year": y,
+                "summary": {}, "columns": [], "rows": [], "total": 0}
+
+    tids = [t.id for t in teachers]
+    atts = (await db.execute(
+        select(TA).where(TA.branch_id == branch_id, TA.date >= first_day, TA.date <= last_day, TA.teacher_id.in_(tids))
+    )).scalars().all()
+
+    att_map = {}
+    for a in atts:
+        att_map.setdefault(str(a.teacher_id), []).append(a.status.value if a.status else "present")
+
+    rows = []
+    for t in teachers:
+        tid = str(t.id)
+        statuses = att_map.get(tid, [])
+        present = sum(1 for s in statuses if s == "present")
+        absent = sum(1 for s in statuses if s == "absent")
+        late = sum(1 for s in statuses if s == "late")
+        on_leave = sum(1 for s in statuses if s == "on_leave")
+        half_day = sum(1 for s in statuses if s == "half_day")
+        total = present + absent + late + on_leave + half_day
+        pct = round((present + late + half_day) / total * 100, 1) if total else 0
+        rows.append({
+            "name": t.full_name,
+            "employee_id": t.employee_id or "",
+            "designation": t.designation or "",
+            "present": present,
+            "absent": absent,
+            "late": late,
+            "on_leave": on_leave,
+            "half_day": half_day,
+            "total_days": total,
+            "percentage": pct,
+        })
+
+    return {
+        "report_name": "Teacher Attendance Report",
+        "month": m, "year": y,
+        "summary": {"total_teachers": len(rows)},
+        "columns": ["Name", "Employee ID", "Designation", "Present", "Absent", "Late", "On Leave", "Half Day", "Total Days", "Attendance %"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/academic-performance")
+async def report_academic_performance(
+    request: Request,
+    exam_id: str = None, class_id: str = None, section_id: str = None,
+    threshold: str = "all",
+    db: AsyncSession = Depends(get_db),
+):
+    """Academic performance report: marks, percentages, toppers, below-threshold students.
+    threshold: 'all', 'below70', 'below80', 'above90', 'toppers'
+    """
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.exam import Exam, ExamSubject, Marks as M
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec, Subject as Sub
+
+    # Find latest published exam if none specified
+    if not exam_id:
+        latest = await db.scalar(
+            select(Exam).where(Exam.branch_id == branch_id, Exam.is_published == True)
+            .order_by(Exam.start_date.desc())
+        )
+        if not latest:
+            return {"report_name": "Academic Performance Report", "summary": {},
+                    "columns": [], "rows": [], "total": 0, "exam_name": "No exams found"}
+        exam_id = str(latest.id)
+
+    exam = await db.scalar(select(Exam).where(Exam.id == uuid.UUID(exam_id)))
+    exam_name = exam.name if exam else "Exam"
+
+    # Get exam subjects
+    es_q = select(ExamSubject).where(ExamSubject.exam_id == uuid.UUID(exam_id))
+    if class_id:
+        es_q = es_q.where(ExamSubject.class_id == uuid.UUID(class_id))
+    exam_subjects = (await db.execute(es_q)).scalars().all()
+
+    if not exam_subjects:
+        return {"report_name": "Academic Performance Report", "exam_name": exam_name,
+                "summary": {}, "columns": [], "rows": [], "total": 0}
+
+    es_ids = [es.id for es in exam_subjects]
+
+    # Get all marks
+    marks = (await db.execute(
+        select(M).where(M.exam_subject_id.in_(es_ids))
+    )).scalars().all()
+
+    # Build subject name map
+    sub_ids = set(es.subject_id for es in exam_subjects if es.subject_id)
+    sub_map = {}
+    if sub_ids:
+        for s in (await db.execute(select(Sub).where(Sub.id.in_(list(sub_ids))))).scalars().all():
+            sub_map[str(s.id)] = s.name
+
+    # Build exam_subject map: es_id -> {subject_name, max_marks, class_id}
+    es_map = {}
+    for es in exam_subjects:
+        es_map[str(es.id)] = {
+            "subject": sub_map.get(str(es.subject_id), "Unknown"),
+            "max_marks": float(es.max_marks) if es.max_marks else 100,
+            "class_id": str(es.class_id) if es.class_id else "",
+        }
+
+    # Aggregate per student: total marks, total max, subject-wise
+    student_data = {}
+    for mk in marks:
+        sid = str(mk.student_id)
+        esid = str(mk.exam_subject_id)
+        es_info = es_map.get(esid, {})
+        if sid not in student_data:
+            student_data[sid] = {"marks_total": 0, "max_total": 0, "subjects": [], "is_absent_any": False}
+        obtained = float(mk.marks_obtained) if mk.marks_obtained and not mk.is_absent else 0
+        max_m = es_info.get("max_marks", 100)
+        student_data[sid]["marks_total"] += obtained
+        student_data[sid]["max_total"] += max_m
+        student_data[sid]["subjects"].append({
+            "subject": es_info.get("subject", ""),
+            "obtained": obtained, "max": max_m,
+        })
+        if mk.is_absent:
+            student_data[sid]["is_absent_any"] = True
+
+    # Get student info
+    sids_uuid = [uuid.UUID(sid) for sid in student_data.keys()]
+    st_q = select(S).where(S.id.in_(sids_uuid))
+    if section_id:
+        st_q = st_q.where(S.section_id == uuid.UUID(section_id))
+    students_list = (await db.execute(st_q)).scalars().all()
+    st_map = {str(s.id): s for s in students_list}
+
+    # Class/section maps
+    cls_map = {}
+    sec_map = {}
+    cls_ids = set(str(s.class_id) for s in students_list if s.class_id)
+    sec_ids_set = set(str(s.section_id) for s in students_list if s.section_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+    if sec_ids_set:
+        for s in (await db.execute(select(Sec).where(Sec.id.in_([uuid.UUID(x) for x in sec_ids_set])))).scalars().all():
+            sec_map[str(s.id)] = s.name
+
+    rows = []
+    for sid, data in student_data.items():
+        st = st_map.get(sid)
+        if not st:
+            continue
+        pct = round(data["marks_total"] / data["max_total"] * 100, 1) if data["max_total"] else 0
+
+        # Apply threshold filter
+        if threshold == "below70" and pct >= 70:
+            continue
+        elif threshold == "below80" and pct >= 80:
+            continue
+        elif threshold == "above90" and pct < 90:
+            continue
+
+        rows.append({
+            "name": st.full_name,
+            "roll_no": st.roll_number or "",
+            "class": cls_map.get(str(st.class_id), ""),
+            "section": sec_map.get(str(st.section_id), ""),
+            "marks_obtained": round(data["marks_total"], 1),
+            "max_marks": round(data["max_total"], 1),
+            "percentage": pct,
+            "grade": _calc_grade(pct),
+            "subjects": data["subjects"],
+        })
+
+    # Sort by percentage descending
+    rows.sort(key=lambda r: r["percentage"], reverse=True)
+
+    # Add rank
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+
+    # If toppers, limit to top 10
+    if threshold == "toppers":
+        rows = rows[:10]
+
+    summary = {
+        "total_students": len(rows),
+        "avg_percentage": round(sum(r["percentage"] for r in rows) / len(rows), 1) if rows else 0,
+        "highest": rows[0]["percentage"] if rows else 0,
+        "lowest": rows[-1]["percentage"] if rows else 0,
+    }
+
+    return {
+        "report_name": "Academic Performance Report",
+        "exam_name": exam_name,
+        "threshold": threshold,
+        "summary": summary,
+        "columns": ["Rank", "Name", "Roll No", "Class", "Section", "Marks", "Max Marks", "Percentage", "Grade"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+def _calc_grade(pct):
+    if pct >= 90: return "A+"
+    if pct >= 80: return "A"
+    if pct >= 70: return "B+"
+    if pct >= 60: return "B"
+    if pct >= 50: return "C"
+    if pct >= 40: return "D"
+    return "F"
+
+
+@router.get("/reports/fee-collection")
+async def report_fee_collection(
+    request: Request,
+    class_id: str = None, status: str = "all",
+    month: int = None, year: int = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Fee collection report: student-wise fee status, outstanding, paid amounts.
+    status: 'all', 'pending', 'paid', 'overdue', 'partial'
+    """
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.fee import FeeRecord as FR, FeeStructure as FS
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec
+
+    fr_q = select(FR).where(FR.branch_id == branch_id)
+    if status != "all":
+        from models.fee import PaymentStatus
+        status_map = {"pending": PaymentStatus.PENDING, "paid": PaymentStatus.PAID,
+                      "overdue": PaymentStatus.OVERDUE, "partial": PaymentStatus.PARTIAL}
+        if status in status_map:
+            fr_q = fr_q.where(FR.status == status_map[status])
+    if month and year:
+        import calendar
+        first_day = date(year, month, 1)
+        last_day = date(year, month, calendar.monthrange(year, month)[1])
+        fr_q = fr_q.where(FR.due_date >= first_day, FR.due_date <= last_day)
+
+    records = (await db.execute(fr_q.order_by(FR.due_date.desc()).limit(1000))).scalars().all()
+
+    # Get student info
+    sids = list(set(r.student_id for r in records if r.student_id))
+    st_map = {}
+    if sids:
+        for s in (await db.execute(select(S).where(S.id.in_(sids)))).scalars().all():
+            st_map[str(s.id)] = s
+
+    cls_map = {}
+    sec_map = {}
+    cls_ids = set(str(s.class_id) for s in st_map.values() if s.class_id)
+    sec_ids_set = set(str(s.section_id) for s in st_map.values() if s.section_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+    if sec_ids_set:
+        for s in (await db.execute(select(Sec).where(Sec.id.in_([uuid.UUID(x) for x in sec_ids_set])))).scalars().all():
+            sec_map[str(s.id)] = s.name
+
+    # Get fee structure names
+    fs_ids = list(set(str(r.fee_structure_id) for r in records if r.fee_structure_id))
+    fs_map = {}
+    if fs_ids:
+        for f in (await db.execute(select(FS).where(FS.id.in_([uuid.UUID(x) for x in fs_ids])))).scalars().all():
+            fs_map[str(f.id)] = f.fee_name
+
+    total_due = 0
+    total_paid = 0
+    total_outstanding = 0
+    rows = []
+    for r in records:
+        st = st_map.get(str(r.student_id))
+        if not st:
+            continue
+        if class_id and str(st.class_id) != class_id:
+            continue
+        due = float(r.amount_due or 0)
+        paid = float(r.amount_paid or 0)
+        outstanding = due - paid
+        total_due += due
+        total_paid += paid
+        total_outstanding += outstanding
+        rows.append({
+            "name": st.full_name,
+            "roll_no": st.roll_number or "",
+            "class": cls_map.get(str(st.class_id), ""),
+            "section": sec_map.get(str(st.section_id), ""),
+            "fee_name": fs_map.get(str(r.fee_structure_id), ""),
+            "amount_due": due,
+            "amount_paid": paid,
+            "outstanding": round(outstanding, 2),
+            "status": r.status.value if r.status else "pending",
+            "due_date": r.due_date.strftime("%d %b %Y") if r.due_date else "",
+            "payment_date": r.payment_date.strftime("%d %b %Y") if r.payment_date else "",
+            "payment_mode": r.payment_mode.value if r.payment_mode else "",
+        })
+
+    return {
+        "report_name": "Fee Collection Report",
+        "summary": {
+            "total_records": len(rows),
+            "total_due": round(total_due, 2),
+            "total_collected": round(total_paid, 2),
+            "total_outstanding": round(total_outstanding, 2),
+            "collection_rate": round(total_paid / total_due * 100, 1) if total_due else 0,
+        },
+        "columns": ["Name", "Roll No", "Class", "Section", "Fee", "Due", "Paid", "Outstanding", "Status", "Due Date", "Paid Date", "Mode"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/transport")
+async def report_transport(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Transport report: route-wise student assignments, vehicle details."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.transport import TransportRoute, Vehicle, StudentTransport, RouteStop
+    from models.student import Student as S
+    from models.academic import Class as Cls
+
+    routes = (await db.execute(
+        select(TransportRoute).where(TransportRoute.branch_id == branch_id, TransportRoute.is_active == True)
+    )).scalars().all()
+
+    # Vehicle map
+    v_ids = [r.vehicle_id for r in routes if r.vehicle_id]
+    v_map = {}
+    if v_ids:
+        for v in (await db.execute(select(Vehicle).where(Vehicle.id.in_(v_ids)))).scalars().all():
+            v_map[str(v.id)] = v
+
+    # Student transport assignments
+    r_ids = [r.id for r in routes]
+    assignments = []
+    if r_ids:
+        assignments = (await db.execute(
+            select(StudentTransport).where(StudentTransport.route_id.in_(r_ids), StudentTransport.is_active == True)
+        )).scalars().all()
+
+    # Route stops
+    stop_map = {}
+    if r_ids:
+        stops = (await db.execute(select(RouteStop).where(RouteStop.route_id.in_(r_ids)))).scalars().all()
+        for s in stops:
+            stop_map[str(s.id)] = s.stop_name
+
+    # Student info
+    s_ids = [a.student_id for a in assignments if a.student_id]
+    st_map = {}
+    if s_ids:
+        for s in (await db.execute(select(S).where(S.id.in_(s_ids)))).scalars().all():
+            st_map[str(s.id)] = s
+    cls_map = {}
+    cls_ids = set(str(s.class_id) for s in st_map.values() if s.class_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+
+    # Route to student assignments map
+    route_students = {}
+    for a in assignments:
+        rid = str(a.route_id)
+        route_students.setdefault(rid, []).append(a)
+
+    rows = []
+    total_students = 0
+    for r in routes:
+        rid = str(r.id)
+        vehicle = v_map.get(str(r.vehicle_id)) if r.vehicle_id else None
+        assigned = route_students.get(rid, [])
+        total_students += len(assigned)
+
+        student_names = []
+        for a in assigned:
+            st = st_map.get(str(a.student_id))
+            if st:
+                cls_name = cls_map.get(str(st.class_id), "")
+                pickup = stop_map.get(str(a.pickup_stop_id), "") if a.pickup_stop_id else ""
+                student_names.append({"name": st.full_name, "class": cls_name, "stop": pickup})
+
+        rows.append({
+            "route_name": r.route_name or "",
+            "route_number": r.route_number or "",
+            "vehicle_number": vehicle.vehicle_number if vehicle else "",
+            "vehicle_type": vehicle.vehicle_type if vehicle else "",
+            "driver_name": vehicle.driver_name if vehicle else "",
+            "driver_phone": vehicle.driver_phone if vehicle else "",
+            "capacity": vehicle.capacity if vehicle else 0,
+            "students_assigned": len(assigned),
+            "monthly_fee": float(r.monthly_fee) if r.monthly_fee else 0,
+            "students": student_names,
+        })
+
+    return {
+        "report_name": "Transport Report",
+        "summary": {"total_routes": len(rows), "total_students": total_students},
+        "columns": ["Route", "Route No", "Vehicle", "Type", "Driver", "Phone", "Capacity", "Students", "Monthly Fee"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/houses")
+async def report_houses(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """House report: house-wise student count and points."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.mega_modules import House, StudentHouse
+    from models.student import Student as S
+    from models.academic import Class as Cls
+
+    houses = (await db.execute(
+        select(House).where(House.branch_id == branch_id, House.is_active == True)
+    )).scalars().all()
+
+    if not houses:
+        return {"report_name": "House Report", "summary": {}, "columns": [], "rows": [], "total": 0}
+
+    h_ids = [h.id for h in houses]
+    sh_all = (await db.execute(
+        select(StudentHouse).where(StudentHouse.house_id.in_(h_ids))
+    )).scalars().all()
+
+    # Get student info
+    s_ids = [sh.student_id for sh in sh_all if sh.student_id]
+    st_map = {}
+    if s_ids:
+        for s in (await db.execute(select(S).where(S.id.in_(s_ids), S.is_active == True))).scalars().all():
+            st_map[str(s.id)] = s
+    cls_map = {}
+    cls_ids = set(str(s.class_id) for s in st_map.values() if s.class_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+
+    # Build house → students map
+    h_students = {}
+    for sh in sh_all:
+        hid = str(sh.house_id)
+        st = st_map.get(str(sh.student_id))
+        if st:
+            h_students.setdefault(hid, []).append(st)
+
+    rows = []
+    for h in houses:
+        hid = str(h.id)
+        students = h_students.get(hid, [])
+        student_list = [{"name": s.full_name, "class": cls_map.get(str(s.class_id), ""), "roll_no": s.roll_number or ""} for s in students]
+        rows.append({
+            "house_name": h.name,
+            "color": h.color or "",
+            "points": h.points or 0,
+            "student_count": len(students),
+            "students": student_list,
+        })
+
+    rows.sort(key=lambda r: r["points"], reverse=True)
+
+    return {
+        "report_name": "House Report",
+        "summary": {"total_houses": len(rows), "total_students": sum(r["student_count"] for r in rows)},
+        "columns": ["House", "Color", "Points", "Students"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/tc-alumni")
+async def report_tc_alumni(
+    request: Request,
+    action: str = "all",
+    db: AsyncSession = Depends(get_db),
+):
+    """TC/Alumni/Separation report: students who left, got TC, dropped out.
+    action: 'all', 'tc_issued', 'dropout', 'promoted', 'detained'
+    """
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.mega_modules import StudentPromotion
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec
+
+    q = select(StudentPromotion).where(StudentPromotion.branch_id == branch_id)
+    if action != "all":
+        q = q.where(StudentPromotion.action == action)
+    q = q.order_by(StudentPromotion.promoted_at.desc())
+
+    promos = (await db.execute(q)).scalars().all()
+
+    s_ids = list(set(p.student_id for p in promos if p.student_id))
+    st_map = {}
+    if s_ids:
+        for s in (await db.execute(select(S).where(S.id.in_(s_ids)))).scalars().all():
+            st_map[str(s.id)] = s
+
+    cls_map = {}
+    all_cls = set()
+    for p in promos:
+        if p.from_class_id: all_cls.add(p.from_class_id)
+        if p.to_class_id: all_cls.add(p.to_class_id)
+    if all_cls:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_(list(all_cls))))).scalars().all():
+            cls_map[str(c.id)] = c.name
+
+    rows = []
+    tc_count = 0
+    dropout_count = 0
+    for p in promos:
+        st = st_map.get(str(p.student_id))
+        act = p.action or ""
+        if act == "tc_issued": tc_count += 1
+        elif act == "dropout": dropout_count += 1
+        rows.append({
+            "name": st.full_name if st else "Unknown",
+            "admission_number": st.admission_number if st else "",
+            "from_class": cls_map.get(str(p.from_class_id), "") if p.from_class_id else "",
+            "to_class": cls_map.get(str(p.to_class_id), "") if p.to_class_id else "",
+            "action": act,
+            "academic_year": p.academic_year_from or "",
+            "remarks": p.remarks or "",
+            "date": p.promoted_at.strftime("%d %b %Y") if p.promoted_at else "",
+        })
+
+    return {
+        "report_name": "TC / Alumni / Separation Report",
+        "summary": {"total": len(rows), "tc_issued": tc_count, "dropouts": dropout_count},
+        "columns": ["Name", "Adm No", "From Class", "To Class", "Action", "Year", "Remarks", "Date"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/login-history")
+async def report_login_history(
+    request: Request,
+    role: str = "all",
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+):
+    """Login history report: recent login activity by role."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.user import User as U
+
+    since = date.today() - timedelta(days=days)
+
+    q = select(U).where(U.branch_id == branch_id)
+    if role != "all":
+        from models.user import UserRole as UR
+        role_map = {"student": UR.STUDENT, "teacher": UR.TEACHER, "school_admin": UR.SCHOOL_ADMIN}
+        if role in role_map:
+            q = q.where(U.role == role_map[role])
+    q = q.order_by(U.last_login.desc().nullslast()).limit(500)
+
+    users = (await db.execute(q)).scalars().all()
+
+    rows = []
+    active_count = 0
+    inactive_count = 0
+    for u in users:
+        last = u.last_login
+        is_active = last and last.date() >= since if last else False
+        if is_active:
+            active_count += 1
+        else:
+            inactive_count += 1
+        rows.append({
+            "name": u.full_name,
+            "email": u.email or u.phone or "",
+            "role": u.role.value if u.role else "",
+            "last_login": last.strftime("%d %b %Y %I:%M %p") if last else "Never",
+            "is_active": is_active,
+            "status": "Active" if is_active else "Inactive",
+        })
+
+    return {
+        "report_name": "Login History Report",
+        "days": days,
+        "summary": {"total_users": len(rows), "active": active_count, "inactive": inactive_count},
+        "columns": ["Name", "Email", "Role", "Last Login", "Status"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/student-directory")
+async def report_student_directory(
+    request: Request,
+    class_id: str = None, section_id: str = None,
+    filter_type: str = "all",
+    limit: int = 500,
+    db: AsyncSession = Depends(get_db),
+):
+    """Student directory report: comprehensive student list with parent contacts.
+    filter_type: 'all', 'transport', 'medical', 'new_admissions'
+    """
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec
+
+    q = select(S).where(S.branch_id == branch_id, S.is_active == True)
+    if class_id:
+        q = q.where(S.class_id == uuid.UUID(class_id))
+    if section_id:
+        q = q.where(S.section_id == uuid.UUID(section_id))
+    if filter_type == "transport":
+        q = q.where(S.uses_transport == True)
+    elif filter_type == "medical":
+        q = q.where(S.medical_conditions.isnot(None), S.medical_conditions != "")
+    elif filter_type == "new_admissions":
+        from datetime import datetime
+        current_year = datetime.utcnow().year
+        q = q.where(S.admission_date >= date(current_year, 1, 1))
+    q = q.order_by(S.class_id, S.roll_number).limit(min(limit, 1000))
+
+    students = (await db.execute(q)).scalars().all()
+
+    cls_map = {}
+    sec_map = {}
+    cls_ids = set(str(s.class_id) for s in students if s.class_id)
+    sec_ids_set = set(str(s.section_id) for s in students if s.section_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+    if sec_ids_set:
+        for s in (await db.execute(select(Sec).where(Sec.id.in_([uuid.UUID(x) for x in sec_ids_set])))).scalars().all():
+            sec_map[str(s.id)] = s.name
+
+    rows = []
+    for s in students:
+        rows.append({
+            "name": s.full_name,
+            "admission_number": s.admission_number or "",
+            "roll_no": s.roll_number or "",
+            "class": cls_map.get(str(s.class_id), ""),
+            "section": sec_map.get(str(s.section_id), ""),
+            "gender": s.gender.value if s.gender else "",
+            "dob": s.date_of_birth.strftime("%d %b %Y") if s.date_of_birth else "",
+            "father_name": s.father_name or "",
+            "father_phone": s.father_phone or "",
+            "mother_name": s.mother_name or "",
+            "mother_phone": s.mother_phone or "",
+            "address": s.address or "",
+            "transport": "Yes" if s.uses_transport else "No",
+            "medical": s.medical_conditions or "",
+            "admission_date": s.admission_date.strftime("%d %b %Y") if s.admission_date else "",
+        })
+
+    return {
+        "report_name": "Student Directory",
+        "filter": filter_type,
+        "summary": {"total_students": len(rows)},
+        "columns": ["Name", "Adm No", "Roll No", "Class", "Section", "Gender", "DOB", "Father", "Father Phone", "Mother", "Mother Phone", "Address", "Transport", "Medical", "Admission Date"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/student-leaves")
+async def report_student_leaves(
+    request: Request,
+    class_id: str = None, month: int = None, year: int = None,
+    status: str = "all",
+    db: AsyncSession = Depends(get_db),
+):
+    """Student leave report: leave applications with status."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.student_leave import StudentLeave as SL
+    from models.student import Student as S
+    from models.academic import Class as Cls, Section as Sec
+    from datetime import datetime
+    import calendar
+
+    q = select(SL).where(SL.branch_id == branch_id)
+    if month and year:
+        first_day = date(year, month, 1)
+        last_day = date(year, month, calendar.monthrange(year, month)[1])
+        q = q.where(SL.start_date >= first_day, SL.start_date <= last_day)
+    if status != "all":
+        from models.student_leave import ApprovalStatus
+        status_map = {"pending": ApprovalStatus.PENDING, "approved": ApprovalStatus.APPROVED, "rejected": ApprovalStatus.REJECTED}
+        if status in status_map:
+            q = q.where(SL.teacher_status == status_map[status])
+    q = q.order_by(SL.created_at.desc())
+
+    leaves = (await db.execute(q)).scalars().all()
+
+    s_ids = list(set(l.student_id for l in leaves if l.student_id))
+    st_map = {}
+    if s_ids:
+        st_q = select(S).where(S.id.in_(s_ids))
+        if class_id:
+            st_q = st_q.where(S.class_id == uuid.UUID(class_id))
+        for s in (await db.execute(st_q)).scalars().all():
+            st_map[str(s.id)] = s
+
+    cls_map = {}
+    sec_map = {}
+    cls_ids = set(str(s.class_id) for s in st_map.values() if s.class_id)
+    sec_ids_set = set(str(s.section_id) for s in st_map.values() if s.section_id)
+    if cls_ids:
+        for c in (await db.execute(select(Cls).where(Cls.id.in_([uuid.UUID(x) for x in cls_ids])))).scalars().all():
+            cls_map[str(c.id)] = c.name
+    if sec_ids_set:
+        for s in (await db.execute(select(Sec).where(Sec.id.in_([uuid.UUID(x) for x in sec_ids_set])))).scalars().all():
+            sec_map[str(s.id)] = s.name
+
+    rows = []
+    for l in leaves:
+        st = st_map.get(str(l.student_id))
+        if not st:
+            continue
+        rows.append({
+            "name": st.full_name,
+            "class": cls_map.get(str(st.class_id), ""),
+            "section": sec_map.get(str(st.section_id), ""),
+            "start_date": l.start_date.strftime("%d %b %Y") if l.start_date else "",
+            "end_date": l.end_date.strftime("%d %b %Y") if l.end_date else "",
+            "total_days": l.total_days or 0,
+            "reason_type": l.reason_type.value if l.reason_type else "",
+            "reason": l.reason_text or "",
+            "teacher_status": l.teacher_status.value if l.teacher_status else "pending",
+            "applied_on": l.created_at.strftime("%d %b %Y") if l.created_at else "",
+        })
+
+    return {
+        "report_name": "Student Leave Report",
+        "summary": {"total_leaves": len(rows)},
+        "columns": ["Name", "Class", "Section", "From", "To", "Days", "Type", "Reason", "Status", "Applied On"],
+        "rows": rows,
+        "total": len(rows),
+    }
+
+
+@router.get("/reports/exams-list")
+async def report_exams_list(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """Get list of exams for report filter dropdowns."""
+    user = await verify_school_admin(request)
+    branch_id = user.get("branch_id")
+    from models.exam import Exam
+
+    exams = (await db.execute(
+        select(Exam).where(Exam.branch_id == branch_id).order_by(Exam.start_date.desc())
+    )).scalars().all()
+
+    return {"exams": [{"id": str(e.id), "name": e.name, "published": e.is_published,
+                        "start_date": e.start_date.strftime("%d %b %Y") if e.start_date else ""}
+                       for e in exams]}

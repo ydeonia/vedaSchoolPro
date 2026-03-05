@@ -12,6 +12,7 @@ from models.teacher import Teacher
 from models.timetable import PeriodDefinition, TimetableSlot, PeriodType, DayOfWeek
 from utils.permissions import get_current_user, require_role, require_auth, require_privilege
 import uuid
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 router = APIRouter(prefix="/school")
 templates = Jinja2Templates(directory="templates")
@@ -46,8 +47,53 @@ async def board_results_page(request: Request, db: AsyncSession = Depends(get_db
 @require_privilege("activities")
 async def activities_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.state.user
+    branch_id = get_branch_id(request)
+    from models.activity import Activity, StudentActivity
+    from models.academic import Class as Cls
+
+    activities = (await db.execute(
+        select(Activity).where(Activity.branch_id == branch_id, Activity.is_active == True)
+        .order_by(Activity.created_at.desc())
+    )).scalars().all()
+
+    classes = (await db.execute(
+        select(Cls).where(Cls.branch_id == branch_id, Cls.is_active == True).order_by(Cls.numeric_order)
+    )).scalars().all()
+
+    # Enrich with participant count
+    activity_data = []
+    for a in activities:
+        count = await db.scalar(
+            select(func.count()).select_from(StudentActivity).where(StudentActivity.activity_id == a.id)
+        ) or 0
+        activity_data.append({"activity": a, "participant_count": count})
+
+    stats = {
+        "total": len(activities),
+        "upcoming": sum(1 for a in activities if a.status == "upcoming"),
+        "ongoing": sum(1 for a in activities if a.status == "ongoing"),
+        "completed": sum(1 for a in activities if a.status == "completed"),
+    }
+
     return templates.TemplateResponse("school_admin/activities.html", {
         "request": request, "user": user, "active_page": "activities",
+        "activity_data": activity_data, "classes": classes, "stats": stats,
+    })
+
+
+@router.get("/events", response_class=HTMLResponse)
+@require_privilege("activities")
+async def events_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    branch_id = get_branch_id(request)
+    from models.event import SchoolEvent
+    events = (await db.execute(
+        select(SchoolEvent).where(SchoolEvent.branch_id == branch_id, SchoolEvent.is_active == True)
+        .order_by(SchoolEvent.start_date.desc())
+    )).scalars().all()
+    return templates.TemplateResponse("school_admin/events.html", {
+        "request": request, "user": user, "active_page": "events",
+        "events": events,
     })
 
 
@@ -96,6 +142,46 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     )
     academic_year = ay_result.scalar_one_or_none()
 
+    # ─── GENDER STATS ───
+    from models.student import Gender, AdmissionStatus
+    male_count = await db.scalar(
+        select(func.count(Student.id)).where(Student.branch_id == branch_id, Student.is_active == True, Student.gender == Gender.MALE)
+    ) or 0
+    female_count = await db.scalar(
+        select(func.count(Student.id)).where(Student.branch_id == branch_id, Student.is_active == True, Student.gender == Gender.FEMALE)
+    ) or 0
+
+    # ─── ACTIVE / INACTIVE / LEFT STATS ───
+    total_all_students = await db.scalar(
+        select(func.count(Student.id)).where(Student.branch_id == branch_id)
+    ) or 0
+    inactive_count = total_all_students - student_count
+    left_count = await db.scalar(
+        select(func.count(Student.id)).where(
+            Student.branch_id == branch_id,
+            Student.admission_status.in_([AdmissionStatus.LEFT, AdmissionStatus.TC_ISSUED, AdmissionStatus.WITHDRAWN])
+        )
+    ) or 0
+
+    # ─── NEW ADMISSIONS (THIS MONTH) ───
+    new_admissions_month = await db.scalar(
+        select(func.count(Student.id)).where(
+            Student.branch_id == branch_id,
+            func.extract('month', Student.admission_date) == today.month,
+            func.extract('year', Student.admission_date) == today.year,
+        )
+    ) or 0
+
+    # ─── CLASS-WISE STUDENT DISTRIBUTION ───
+    class_wise_result = await db.execute(
+        select(Class.name, func.count(Student.id))
+        .join(Student, Student.class_id == Class.id)
+        .where(Class.branch_id == branch_id, Class.is_active == True, Student.is_active == True)
+        .group_by(Class.name, Class.numeric_order)
+        .order_by(Class.numeric_order)
+    )
+    class_wise_data = [{"class": row[0], "count": row[1]} for row in class_wise_result.all()]
+
     # ─── LIVE: Student Attendance Today ───
     students_present = await db.scalar(
         select(func.count(func.distinct(StudentAttendance.student_id)))
@@ -129,7 +215,6 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     total_slots = await db.scalar(
         select(func.count(TimetableSlot.id)).where(TimetableSlot.branch_id == branch_id)
     ) or 0
-    # Approximate today's slots (total / 6 days)
     today_expected = round(total_slots / 6) if total_slots > 0 else 0
     periods_done_today = await db.scalar(
         select(func.count(PeriodLog.id)).where(PeriodLog.date == today, PeriodLog.status == 'completed')
@@ -177,7 +262,7 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     if not academic_year:
         alerts.append({"type": "danger", "icon": "fa-calendar", "text": "No academic year set! Configure it now.", "link": "/school/academic-years"})
 
-    # Recent students (keep existing)
+    # Recent students
     students_result = await db.execute(
         select(Student)
         .where(Student.branch_id == branch_id, Student.is_active == True)
@@ -189,7 +274,13 @@ async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     return templates.TemplateResponse("school_admin/dashboard.html", {
         "request": request, "user": user, "active_page": "dashboard",
         "academic_year": academic_year,
-        "stats": {"total_students": student_count, "total_teachers": teacher_count, "total_classes": class_count},
+        "stats": {
+            "total_students": student_count, "total_teachers": teacher_count, "total_classes": class_count,
+            "male": male_count, "female": female_count,
+            "total_all": total_all_students, "inactive": inactive_count, "left": left_count,
+            "new_admissions_month": new_admissions_month,
+        },
+        "class_wise": json.dumps(class_wise_data),
         "live": {
             "students_present": students_present, "students_absent": students_absent,
             "students_marked": students_marked, "att_pct": att_pct,
@@ -278,12 +369,18 @@ async def subjects_page(request: Request, db: AsyncSession = Depends(get_db)):
     })
 
 
+# ═══════════════════════════════════════════════════════════════
+# TEACHERS PAGE — with dynamic on_leave + subjects for dropdown
+# ═══════════════════════════════════════════════════════════════
 @router.get("/teachers", response_class=HTMLResponse)
 @require_privilege("employee_management")
 async def teachers_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.state.user
     branch_id = get_branch_id(request)
     action = request.query_params.get("action")
+    import json
+    from sqlalchemy import text as sql_text
+    from datetime import date as date_type
 
     result = await db.execute(
         select(Teacher)
@@ -292,12 +389,121 @@ async def teachers_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     teachers = result.scalars().all()
 
+    # Build teachers JSON for edit modal
+    teachers_json = []
+    for t in teachers:
+        teachers_json.append({
+            "id": str(t.id), "first_name": t.first_name, "last_name": t.last_name or "",
+            "employee_id": t.employee_id or "", "designation": t.designation or "",
+            "email": t.email or "", "phone": t.phone or "",
+            "qualification": t.qualification or "", "specialization": t.specialization or "",
+            "experience_years": t.experience_years or 0,
+            "joining_date": t.joining_date.isoformat() if t.joining_date else "",
+            "address": t.address or "",
+        })
+
+    # Get classes with sections for assign modal
+    classes_result = await db.execute(
+        select(Class)
+        .where(Class.branch_id == branch_id, Class.is_active == True)
+        .options(selectinload(Class.sections))
+        .order_by(Class.numeric_order)
+    )
+    classes = classes_result.scalars().unique().all()
+
+    sections_map = {}
+    classes_json = []
+    for cls in classes:
+        classes_json.append({"id": str(cls.id), "name": cls.name})
+        sections_map[str(cls.id)] = [
+            {"id": str(sec.id), "name": sec.name}
+            for sec in cls.sections if sec.is_active
+        ]
+
+    # Get subjects for assign modal + specialization dropdown
+    subjects_result = await db.execute(
+        select(Subject).where(Subject.branch_id == branch_id, Subject.is_active == True).order_by(Subject.name)
+    )
+    subjects = subjects_result.scalars().all()
+    subjects_json = [{"id": str(s.id), "name": s.name} for s in subjects]
+
+    # Build teacher -> teaching assignments map
+    teacher_assignments = {}
+    try:
+        assign_result = await db.execute(sql_text(
+            "SELECT tca.teacher_id, c.name as class_name, COALESCE(s.name, 'All') as section, "
+            "sub.name as subject, tca.class_id, tca.section_id, tca.subject_id "
+            "FROM teacher_class_assignments tca "
+            "JOIN classes c ON c.id = tca.class_id "
+            "JOIN subjects sub ON sub.id = tca.subject_id "
+            "LEFT JOIN sections s ON s.id = tca.section_id "
+            "WHERE tca.branch_id = :bid AND tca.is_active = true "
+            "ORDER BY c.numeric_order, s.name"
+        ), {"bid": str(branch_id)})
+        for row in assign_result:
+            tid = str(row.teacher_id)
+            if tid not in teacher_assignments:
+                teacher_assignments[tid] = []
+            teacher_assignments[tid].append({
+                "class_name": row.class_name, "section": row.section,
+                "subject": row.subject, "class_id": str(row.class_id),
+                "section_id": str(row.section_id) if row.section_id else None,
+                "subject_id": str(row.subject_id),
+            })
+    except Exception:
+        pass  # Table may not exist yet
+
+    # ─── Class Teacher Map (from sections.class_teacher_id) ───
+    class_teacher_map = {}
+    try:
+        ct_result = await db.execute(sql_text(
+            "SELECT s.class_teacher_id as teacher_id, c.name as class_name, "
+            "s.name as section_name "
+            "FROM sections s "
+            "JOIN classes c ON c.id = s.class_id "
+            "WHERE c.branch_id = :bid AND s.class_teacher_id IS NOT NULL"
+        ), {"bid": str(branch_id)})
+        for row in ct_result:
+            tid = str(row.teacher_id)
+            label = f"{row.class_name} - {row.section_name}"
+            if tid in class_teacher_map:
+                class_teacher_map[tid] += f", {label}"
+            else:
+                class_teacher_map[tid] = label
+    except Exception as e:
+        print(f"class_teacher_map error: {e}")
+
+    # ─── Dynamic On Leave Detection (from leave_requests table) ───
+    teachers_on_leave = {}
+    try:
+        leave_result = await db.execute(sql_text(
+            "SELECT lr.teacher_id, lr.leave_type, lr.start_date, lr.end_date "
+            "FROM leave_requests lr "
+            "WHERE lr.status = 'approved' "
+            "AND lr.start_date <= :today AND lr.end_date >= :today"
+        ), {"today": date_type.today()})
+        for row in leave_result:
+            tid = str(row.teacher_id)
+            days_left = (row.end_date - date_type.today()).days
+            teachers_on_leave[tid] = f"{row.leave_type or 'Leave'} (ends in {days_left}d)"
+    except Exception as e:
+        print(f"teachers_on_leave check: {e}")
+
     return templates.TemplateResponse("school_admin/teachers.html", {
         "request": request,
         "user": user,
         "active_page": "teachers",
         "teachers": teachers,
         "action": action,
+        "classes": classes,
+        "classes_json": json.dumps(classes_json),
+        "sections_json": json.dumps(sections_map),
+        "subjects_json": json.dumps(subjects_json),
+        "subjects": subjects,
+        "teachers_json": json.dumps(teachers_json),
+        "teacher_assignments": teacher_assignments,
+        "class_teacher_map": class_teacher_map,
+        "teachers_on_leave": teachers_on_leave,
     })
 
 
@@ -309,7 +515,6 @@ async def students_page(request: Request, db: AsyncSession = Depends(get_db)):
     action = request.query_params.get("action")
     selected_class = request.query_params.get("class_id", "")
 
-    # Get classes with sections
     classes_result = await db.execute(
         select(Class)
         .where(Class.branch_id == branch_id, Class.is_active == True)
@@ -318,7 +523,6 @@ async def students_page(request: Request, db: AsyncSession = Depends(get_db)):
     )
     classes = classes_result.scalars().unique().all()
 
-    # Build class-section JSON map for frontend
     import json
     sections_map = {}
     for cls in classes:
@@ -327,7 +531,6 @@ async def students_page(request: Request, db: AsyncSession = Depends(get_db)):
             for sec in cls.sections if sec.is_active
         ]
 
-    # Get students
     query = select(Student).where(
         Student.branch_id == branch_id, Student.is_active == True
     ).options(
@@ -353,12 +556,23 @@ async def students_page(request: Request, db: AsyncSession = Depends(get_db)):
 @require_privilege("student_admission", "student_attendance", "student_documents")
 async def student_profile(request: Request, student_id: str, db: AsyncSession = Depends(get_db)):
     user = request.state.user
-    # The template loads data via /api/school/students/{id}/profile JS call
     return templates.TemplateResponse("school_admin/student_profile.html", {
         "request": request,
         "user": user,
         "active_page": "students",
         "student_id": student_id,
+    })
+
+
+@router.get("/teachers/{teacher_id}", response_class=HTMLResponse)
+@require_privilege("employee_management")
+async def teacher_profile_page(request: Request, teacher_id: str, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/teacher_profile.html", {
+        "request": request,
+        "user": user,
+        "active_page": "teachers",
+        "teacher_id": teacher_id,
     })
 
 
@@ -442,17 +656,61 @@ async def attendance_reports_page(request: Request, db: AsyncSession = Depends(g
 async def timetable_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.state.user
     branch_id = get_branch_id(request)
-    import json
+    import json, traceback
+    from models.timetable import BellScheduleTemplate, ClassScheduleAssignment
+    try:
+        return await _timetable_page_impl(request, user, branch_id, db, json)
+    except Exception as e:
+        print(f"[ERROR] Timetable page crashed: {e}")
+        traceback.print_exc()
+        # Return a basic page with the error visible in console
+        return templates.TemplateResponse("school_admin/timetable.html", {
+            "request": request, "user": user, "active_page": "timetable",
+            "classes": [], "sections_json": "{}",
+            "periods": [], "periods_json": "[]",
+            "templates_json": "[]", "assignments_json": "{}",
+            "subjects_json": "[]", "teachers_json": "[]", "days": [],
+        })
 
-    # Get period definitions
-    periods_result = await db.execute(
-        select(PeriodDefinition)
-        .where(PeriodDefinition.branch_id == branch_id, PeriodDefinition.is_active == True)
-        .order_by(PeriodDefinition.period_number)
-    )
-    periods = periods_result.scalars().all()
+async def _timetable_page_impl(request, user, branch_id, db, json):
+    from models.timetable import BellScheduleTemplate, ClassScheduleAssignment
 
-    # Get classes with sections
+    # Load bell schedule templates (fail-safe if tables don't exist yet)
+    bell_templates = []
+    assignments_map = {}
+    try:
+        templates_result = await db.execute(
+            select(BellScheduleTemplate)
+            .where(BellScheduleTemplate.branch_id == branch_id, BellScheduleTemplate.is_active == True)
+            .order_by(BellScheduleTemplate.is_default.desc(), BellScheduleTemplate.name)
+        )
+        bell_templates = templates_result.scalars().all()
+
+        assignments_result = await db.execute(
+            select(ClassScheduleAssignment)
+            .where(ClassScheduleAssignment.branch_id == branch_id, ClassScheduleAssignment.is_active == True)
+        )
+        assignments = assignments_result.scalars().all()
+
+        for a in assignments:
+            key = str(a.class_id)
+            assignments_map[key] = str(a.template_id)
+    except Exception:
+        await db.rollback()  # Reset session so subsequent queries don't cascade-fail
+        bell_templates = []
+        assignments_map = {}
+
+    try:
+        periods_result = await db.execute(
+            select(PeriodDefinition)
+            .where(PeriodDefinition.branch_id == branch_id, PeriodDefinition.is_active == True)
+            .order_by(PeriodDefinition.period_number)
+        )
+        periods = periods_result.scalars().all()
+    except Exception:
+        await db.rollback()  # Reset session so subsequent queries don't cascade-fail
+        periods = []
+
     classes_result = await db.execute(
         select(Class)
         .where(Class.branch_id == branch_id, Class.is_active == True)
@@ -468,25 +726,29 @@ async def timetable_page(request: Request, db: AsyncSession = Depends(get_db)):
             for sec in cls.sections if sec.is_active
         ]
 
-    # Get subjects
     subjects_result = await db.execute(
         select(Subject).where(Subject.branch_id == branch_id, Subject.is_active == True).order_by(Subject.name)
     )
     subjects = subjects_result.scalars().all()
 
-    # Get teachers
     teachers_result = await db.execute(
         select(Teacher).where(Teacher.branch_id == branch_id, Teacher.is_active == True).order_by(Teacher.first_name)
     )
     teachers = teachers_result.scalars().all()
 
-    # Build JSON for frontend
     periods_json = [
         {"id": str(p.id), "number": p.period_number, "label": p.label,
          "start": p.start_time.strftime("%H:%M") if p.start_time else "",
          "end": p.end_time.strftime("%H:%M") if p.end_time else "",
-         "type": p.period_type.value}
+         "type": p.period_type.value if p.period_type else "regular",
+         "template_id": str(p.template_id) if p.template_id else None}
         for p in periods
+    ]
+
+    templates_json = [
+        {"id": str(t.id), "name": t.name, "description": t.description or "",
+         "is_default": t.is_default}
+        for t in bell_templates
     ]
 
     subjects_json = [{"id": str(s.id), "name": s.name, "code": s.code or ""} for s in subjects]
@@ -502,6 +764,8 @@ async def timetable_page(request: Request, db: AsyncSession = Depends(get_db)):
         "sections_json": json.dumps(sections_map),
         "periods": periods,
         "periods_json": json.dumps(periods_json),
+        "templates_json": json.dumps(templates_json),
+        "assignments_json": json.dumps(assignments_map),
         "subjects_json": json.dumps(subjects_json),
         "teachers_json": json.dumps(teachers_json),
         "days": days,
@@ -523,7 +787,6 @@ async def teacher_tracking_page(request: Request, db: AsyncSession = Depends(get
     today = date_type.today()
     month_start = today.replace(day=1)
 
-    # Get all teachers
     teachers_result = await db.execute(
         select(Teacher).where(Teacher.branch_id == branch_id, Teacher.is_active == True).order_by(Teacher.first_name)
     )
@@ -531,21 +794,18 @@ async def teacher_tracking_page(request: Request, db: AsyncSession = Depends(get
 
     teacher_stats = []
     for t in teachers:
-        # Weekly assigned periods
         assigned_result = await db.execute(
             select(func.count(TimetableSlot.id))
             .where(TimetableSlot.teacher_id == t.id, TimetableSlot.is_active == True)
         )
         weekly_assigned = assigned_result.scalar() or 0
 
-        # Today's completed
         today_result = await db.execute(
             select(func.count(PeriodLog.id))
             .where(PeriodLog.teacher_id == t.id, PeriodLog.date == today)
         )
         today_done = today_result.scalar() or 0
 
-        # Month completed
         month_result = await db.execute(
             select(func.count(PeriodLog.id))
             .where(PeriodLog.teacher_id == t.id, PeriodLog.date >= month_start, PeriodLog.date <= today)
@@ -589,10 +849,17 @@ async def teacher_attendance_page(request: Request, db: AsyncSession = Depends(g
 @require_privilege("teacher_attendance")
 async def leave_management_page(request: Request, db: AsyncSession = Depends(get_db)):
     user = request.state.user
+    branch_id = uuid.UUID(user["branch_id"])
+    from models.teacher import Teacher
+    teachers = (await db.execute(
+        select(Teacher).where(Teacher.branch_id == branch_id, Teacher.is_active == True)
+        .order_by(Teacher.first_name)
+    )).scalars().all()
     return templates.TemplateResponse("school_admin/leave_management.html", {
         "request": request,
         "user": user,
         "active_page": "leave_management",
+        "teachers": teachers,
     })
 
 
@@ -606,13 +873,11 @@ async def exams_page(request: Request, db: AsyncSession = Depends(get_db)):
     branch_id = get_branch_id(request)
     import json
 
-    # Get current academic year
     ay_result = await db.execute(
         select(AcademicYear).where(AcademicYear.branch_id == branch_id, AcademicYear.is_current == True)
     )
     academic_year = ay_result.scalar_one_or_none()
 
-    # Get exams
     exams = []
     if academic_year:
         exams_result = await db.execute(
@@ -623,7 +888,6 @@ async def exams_page(request: Request, db: AsyncSession = Depends(get_db)):
         )
         exams = exams_result.scalars().unique().all()
 
-    # Get classes & subjects
     classes_result = await db.execute(
         select(Class).where(Class.branch_id == branch_id, Class.is_active == True)
         .options(selectinload(Class.sections))
@@ -730,13 +994,7 @@ from models.branch import PaymentGatewayConfig
 @router.get("/payment-settings", response_class=HTMLResponse)
 @require_privilege("fee_structure", "school_settings")
 async def payment_settings_page(request: Request, db: AsyncSession = Depends(get_db)):
-    user = request.state.user
-    branch_id = get_branch_id(request)
-    result = await db.execute(select(PaymentGatewayConfig).where(PaymentGatewayConfig.branch_id == branch_id))
-    config = result.scalar_one_or_none()
-    return templates.TemplateResponse("school_admin/payment_settings.html", {
-        "request": request, "user": user, "active_page": "payment_settings", "config": config,
-    })
+    return RedirectResponse("/school/settings#payment", status_code=302)
 
 @router.get("/fee-structure", response_class=HTMLResponse)
 @require_privilege("fee_structure")
@@ -794,28 +1052,17 @@ async def announcements_page(request: Request, db: AsyncSession = Depends(get_db
     })
 
 @router.get("/notifications", response_class=HTMLResponse)
-@require_privilege("announcements")
-async def notification_center_page(request: Request, db: AsyncSession = Depends(get_db)):
+@require_auth
+async def notification_center_page(request: Request):
     user = request.state.user
-    branch_id = get_branch_id(request)
-    notifs_result = await db.execute(
-        select(Notification).where(Notification.branch_id == branch_id)
-        .order_by(Notification.created_at.desc()).limit(100))
-    notifs = notifs_result.scalars().all()
     return templates.TemplateResponse("school_admin/notification_center.html", {
-        "request": request, "user": user, "active_page": "notifications", "notifications": notifs,
+        "request": request, "user": user, "active_page": "notifications", "notifications": [],
     })
 
 @router.get("/communication-settings", response_class=HTMLResponse)
 @require_privilege("school_settings")
 async def comm_settings_page(request: Request, db: AsyncSession = Depends(get_db)):
-    user = request.state.user
-    branch_id = get_branch_id(request)
-    result = await db.execute(select(CommunicationConfig).where(CommunicationConfig.branch_id == branch_id))
-    config = result.scalar_one_or_none()
-    return templates.TemplateResponse("school_admin/communication_settings.html", {
-        "request": request, "user": user, "active_page": "comm_settings", "config": config,
-    })
+    return RedirectResponse("/school/settings#notifications", status_code=302)
 
 
 @router.get("/data-export", response_class=HTMLResponse)
@@ -952,6 +1199,22 @@ async def digital_library_page(request: Request, db: AsyncSession = Depends(get_
     })
 
 
+@router.get("/online-classes", response_class=HTMLResponse)
+@require_privilege("online_classes")
+async def online_classes_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    branch_id = get_branch_id(request)
+    from models.online_class import OnlinePlatformConfig
+    config = (await db.execute(
+        select(OnlinePlatformConfig).where(OnlinePlatformConfig.branch_id == branch_id)
+    )).scalar_one_or_none()
+    platform_configured = bool(config and (config.google_enabled or config.zoom_enabled or config.teams_enabled))
+    return templates.TemplateResponse("school_admin/online_classes.html", {
+        "request": request, "user": user, "active_page": "online_classes",
+        "platform_configured": platform_configured,
+    })
+
+
 @router.get("/admission", response_class=HTMLResponse)
 @require_privilege("student_admission")
 async def admission_wizard(request: Request, db: AsyncSession = Depends(get_db)):
@@ -970,6 +1233,7 @@ async def separation_wizard(request: Request, db: AsyncSession = Depends(get_db)
     principal_sig = ""
     stamp_url = ""
     try:
+        from models.branch import Branch
         branch = await db.scalar(select(Branch).where(Branch.id == uuid.UUID(user.get("branch_id"))))
         if branch:
             branch_name = branch.name or ""
@@ -1025,8 +1289,20 @@ async def donations_page(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/notification-settings", response_class=HTMLResponse)
 @require_privilege("school_settings")
 async def notification_settings_page(request: Request, db: AsyncSession = Depends(get_db)):
-    return templates.TemplateResponse("school_admin/notification_settings.html", {
-        "request": request, "user": request.state.user, "active_page": "notification_settings",
+    return RedirectResponse("/school/settings#notifications", status_code=302)
+
+@router.get("/registration-settings", response_class=HTMLResponse)
+@require_privilege("school_settings")
+async def registration_settings_page(request: Request, db: AsyncSession = Depends(get_db)):
+    return RedirectResponse("/school/settings#registration", status_code=302)
+
+
+@router.get("/assets", response_class=HTMLResponse)
+@require_role(UserRole.SCHOOL_ADMIN)
+async def assets_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/assets.html", {
+        "request": request, "user": user, "active_page": "assets",
     })
 
 
@@ -1037,4 +1313,121 @@ async def transactions_page(request: Request, db: AsyncSession = Depends(get_db)
     branch_id = get_branch_id(request)
     return templates.TemplateResponse("school_admin/transactions.html", {
         "request": request, "user": user, "active_page": "transactions", "branch_id": str(branch_id),
+    })
+
+
+# ═══════════════════════════════════════════════════════════
+# REPORT CARD MANAGEMENT PAGES
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/exam-cycles", response_class=HTMLResponse)
+@require_privilege("exam_management")
+async def exam_cycles_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/exam_cycles.html", {
+        "request": request, "user": user, "active_page": "exam_cycles",
+    })
+
+
+@router.get("/report-card-designer", response_class=HTMLResponse)
+@require_privilege("results")
+async def report_card_designer_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/report_card_designer.html", {
+        "request": request, "user": user, "active_page": "report_card_designer",
+    })
+
+
+# ═══════════════════════════════════════════════════════════
+# SCHOOL TIMING SETTINGS
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/school-timing", response_class=HTMLResponse)
+@require_privilege("school_settings")
+async def school_timing_page(request: Request, db: AsyncSession = Depends(get_db)):
+    return RedirectResponse("/school/settings#timing", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════
+# UNIFIED SETTINGS PAGE
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/settings", response_class=HTMLResponse)
+@require_privilege("school_settings")
+async def unified_settings_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    branch_id = get_branch_id(request)
+
+    from models.branch import BranchSettings
+    from utils.timezone import TIMEZONE_LABELS
+
+    bs = (await db.execute(
+        select(BranchSettings).where(BranchSettings.branch_id == branch_id)
+    )).scalar_one_or_none()
+
+    current_tz = "Asia/Kolkata"
+    timing_data = {}
+    if bs:
+        current_tz = bs.timezone or "Asia/Kolkata"
+        cd = bs.custom_data or {}
+        timing_data = cd.get("school_timing", {})
+
+    # Timing defaults
+    for k, v in {
+        "school_start_time": "07:30", "school_end_time": "14:30",
+        "gate_open_time": "07:00", "late_grace_minutes": 15,
+        "lunch_start_time": "12:30", "lunch_end_time": "13:00",
+        "half_day_end_time": "12:00", "saturday_enabled": True,
+        "saturday_start_time": "07:30", "saturday_end_time": "12:00",
+    }.items():
+        timing_data.setdefault(k, v)
+
+    tz_label = TIMEZONE_LABELS.get(current_tz, current_tz)
+
+    return templates.TemplateResponse("school_admin/settings_unified.html", {
+        "request": request,
+        "user": user,
+        "active_page": "settings",
+        "current_tz": current_tz,
+        "tz_label": tz_label,
+        "timing": timing_data,
+    })
+
+
+# ═══════════════════════════════════════════════════════════
+# PHOTO APPROVAL MANAGEMENT
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/photo-approvals", response_class=HTMLResponse)
+@require_privilege("employee_management")
+async def photo_approvals_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/photo_approvals.html", {
+        "request": request, "user": user, "active_page": "photo_approvals",
+    })
+
+
+# ═══════════════════════════════════════════════════════════
+# REPORT CENTER
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/reports/center", response_class=HTMLResponse)
+@require_privilege("analytics")
+async def reports_center_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/reports.html", {
+        "request": request, "user": user, "active_page": "reports_center",
+    })
+
+
+# ═══════════════════════════════════════════════════════════
+# SCHOOL BRANDING PAGE
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/branding", response_class=HTMLResponse)
+@require_privilege("school_settings")
+async def branding_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("school_admin/branding.html", {
+        "request": request, "user": user, "active_page": "branding",
     })

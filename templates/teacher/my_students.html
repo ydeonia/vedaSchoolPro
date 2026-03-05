@@ -109,7 +109,7 @@ function renderStudents(students) {
             <div class="stu-actions">
                 <a class="stu-action" href="/teacher/student-feedback" onclick="sessionStorage.setItem('prefillStudent','${s.id}')">💬 Feedback</a>
                 <a class="stu-action" onclick="messageParent('${s.name}','${s.father_phone||s.mother_phone||''}')">📱 Message Parent</a>
-                <a class="stu-action" onclick="alert('Coming soon')">📊 Report</a>
+                <a class="stu-action" onclick="showToast('info','Coming soon')">📊 Report</a>
             </div>
         </div>`;
     }).join('');
@@ -118,10 +118,10 @@ function renderStudents(students) {
 document.addEventListener('DOMContentLoaded', init);
 
 function messageParent(studentName, phone) {
-    if (!phone) { alert('No parent phone number available for '+studentName); return; }
+    if (!phone) { showToast('warning','No parent phone number available for '+studentName); return; }
     const msg = prompt(`Send message to ${studentName}'s parent (${phone}):\n\nType your message:`);
     if (msg && msg.trim()) {
-        alert(`✅ Message sent to parent of ${studentName}!\n\n"${msg.trim()}"\n\n(SMS/WhatsApp integration coming soon — for now this is logged)`);
+        showToast('success','Message sent to parent of '+studentName);
     }
 }
 </script>

@@ -19,6 +19,7 @@ class NotificationType(str, enum.Enum):
     HOSTEL = "hostel"
     ACK = "ack"
     ALERT = "alert"
+    ONLINE_CLASS = "online_class"
 
 
 class NotificationChannel(str, enum.Enum):

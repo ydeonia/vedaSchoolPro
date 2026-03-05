@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+
+{% block title %}My Account{% endblock %}
+{% block page_title %}My Account{% endblock %}
+{% block page_subtitle %}Manage your profile, password, phone & email{% endblock %}
+
+{% block content %}
+<div style="max-width: 720px; margin: 0 auto;">
+
+    <!-- Profile Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 16px; padding: 20px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; color: white; flex-shrink: 0;" id="profileAvatar">
+                {{ user.first_name[0] }}{{ (user.last_name or ' ')[0] }}
+            </div>
+            <div>
+                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 700;">{{ user.first_name }} {{ user.last_name or '' }}</h2>
+                <p style="margin: 4px 0 0; font-size: 0.82rem; color: var(--text-secondary);">
+                    {{ user.role | replace('_', ' ') | title }}
+                    {% if user.designation %} &middot; {{ user.designation }}{% endif %}
+                </p>
+                <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: var(--text-light);">
+                    {% if user.email %}<span><i class="fas fa-envelope" style="width: 14px;"></i> {{ user.email }}</span>{% endif %}
+                    {% if user.phone %}<span><i class="fas fa-phone" style="width: 14px;"></i> +91 {{ user.phone }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Section -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
+            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-lock" style="color: var(--primary); margin-right: 8px;"></i>Change Password</h3>
+        </div>
+        <div style="padding: 20px;">
+            <div id="pwdSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+            <div id="pwdError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-size: 0.8rem;">Current Password</label>
+                <div style="position:relative;"><input type="password" id="currentPassword" class="form-input" placeholder="Enter current password" style="padding-right:40px;">
+                <button type="button" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('currentPassword'),this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);"><i class="fas fa-eye"></i></button></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label class="form-label" style="font-size: 0.8rem;">New Password</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <div style="position:relative;flex:1;"><input type="password" id="newPassword" class="form-input" placeholder="Min 6 characters" oninput="_acctPwdStr(this.value)" style="padding-right:40px;">
+                    <button type="button" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('newPassword'),this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);"><i class="fas fa-eye"></i></button></div>
+                    <button type="button" onclick="_acctAutoGen()" style="border:none;background:var(--primary-light,#e0e7ff);color:var(--primary);padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;white-space:nowrap;" title="Auto-generate"><i class="fas fa-magic"></i></button>
+                    <button type="button" onclick="_acctCopyPwd()" style="border:none;background:var(--primary-light,#e0e7ff);color:var(--primary);padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;" title="Copy"><i class="fas fa-copy"></i></button>
+                </div>
+                <div style="height:4px;border-radius:4px;margin-top:5px;background:#e2e8f0;overflow:hidden;"><div id="acctPwdFill" style="height:100%;width:0;transition:all .3s;border-radius:4px;"></div></div>
+                <div id="acctPwdText" style="font-size:0.68rem;font-weight:700;margin-top:2px;color:var(--text-light);"></div>
+            </div>
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="font-size: 0.8rem;">Confirm New Password</label>
+                <input type="password" id="confirmPassword" class="form-input" placeholder="Re-enter new password">
+            </div>
+            <button class="btn btn-primary" onclick="changePassword()" id="changePwdBtn" style="width: 100%;">
+                <i class="fas fa-key"></i> Update Password
+            </button>
+        </div>
+    </div>
+
+    <!-- Change Phone Section -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
+            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-mobile-alt" style="color: #059669; margin-right: 8px;"></i>Change Phone Number</h3>
+        </div>
+        <div style="padding: 20px;">
+            <p style="font-size: 0.78rem; color: var(--text-light); margin: 0 0 14px;">Current: <strong>+91 {{ user.phone or 'Not set' }}</strong></p>
+            <div id="phoneSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+            <div id="phoneError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+
+            <!-- Step 1: Enter new phone -->
+            <div id="phoneStep1">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.8rem;">New Phone Number</label>
+                    <div style="display: flex; gap: 0;">
+                        <span style="display: flex; align-items: center; padding: 0 12px; background: var(--bg, #f1f5f9); border: 1.5px solid var(--border); border-right: none; border-radius: 8px 0 0 8px; font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">+91</span>
+                        <input type="tel" id="newPhone" class="form-input" placeholder="Enter 10-digit number" maxlength="10" inputmode="numeric" style="border-radius: 0 8px 8px 0;">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="sendPhoneOtp()" id="sendPhoneOtpBtn" style="width: 100%;">
+                    <i class="fas fa-paper-plane"></i> Send OTP to New Number
+                </button>
+            </div>
+
+            <!-- Step 2: Enter OTP -->
+            <div id="phoneStep2" style="display: none;">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <p style="font-size: 0.82rem; color: var(--text-secondary);">OTP sent to <strong id="phoneOtpDisplay">******1234</strong></p>
+                    <div id="phoneDevHint" style="display: none; padding: 6px 12px; background: #fef3c7; border-radius: 6px; font-size: 0.75rem; color: #92400e; font-weight: 600; margin-top: 6px;"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.8rem;">Enter 6-digit OTP</label>
+                    <input type="text" id="phoneOtpInput" class="form-input" placeholder="Enter OTP" maxlength="6" inputmode="numeric" style="text-align: center; font-size: 1.2rem; letter-spacing: 8px; font-weight: 700;">
+                </div>
+                <button class="btn btn-primary" onclick="verifyPhoneOtp()" id="verifyPhoneOtpBtn" style="width: 100%;">
+                    <i class="fas fa-check-circle"></i> Verify & Update Phone
+                </button>
+                <button class="btn" onclick="resetPhoneFlow()" style="width: 100%; margin-top: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem;">
+                    <i class="fas fa-arrow-left"></i> Change Number
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Email Section -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
+            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-envelope" style="color: #D97706; margin-right: 8px;"></i>Change Email Address</h3>
+        </div>
+        <div style="padding: 20px;">
+            <p style="font-size: 0.78rem; color: var(--text-light); margin: 0 0 14px;">Current: <strong>{{ user.email or 'Not set' }}</strong> {% if user.email %}<span style="font-size:0.65rem;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;">Verified</span>{% endif %}</p>
+            <div id="emailSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+            <div id="emailError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
+
+            <!-- Step 1: Enter new email -->
+            <div id="emailStep1">
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.8rem;">New Email Address</label>
+                    <input type="email" id="newEmail" class="form-input" placeholder="Enter new email address">
+                </div>
+                <button class="btn btn-primary" onclick="sendEmailCode()" id="sendEmailCodeBtn" style="width: 100%;">
+                    <i class="fas fa-paper-plane"></i> Send Verification Code
+                </button>
+            </div>
+
+            <!-- Step 2: Enter Code -->
+            <div id="emailStep2" style="display: none;">
+                <div style="text-align: center; margin-bottom: 12px;">
+                    <p style="font-size: 0.82rem; color: var(--text-secondary);">Code sent to <strong id="emailCodeDisplay">abc***@mail.com</strong></p>
+                    <div id="emailDevHint" style="display: none; padding: 6px 12px; background: #fef3c7; border-radius: 6px; font-size: 0.75rem; color: #92400e; font-weight: 600; margin-top: 6px;"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 14px;">
+                    <label class="form-label" style="font-size: 0.8rem;">Enter 6-digit Code</label>
+                    <input type="text" id="emailCodeInput" class="form-input" placeholder="Enter code" maxlength="6" inputmode="numeric" style="text-align: center; font-size: 1.2rem; letter-spacing: 8px; font-weight: 700;">
+                </div>
+                <button class="btn btn-primary" onclick="verifyEmailCode()" id="verifyEmailCodeBtn" style="width: 100%;">
+                    <i class="fas fa-check-circle"></i> Verify & Update Email
+                </button>
+                <button class="btn" onclick="resetEmailFlow()" style="width: 100%; margin-top: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem;">
+                    <i class="fas fa-arrow-left"></i> Change Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function $(id) { return document.getElementById(id); }
+    function show(id) { var el = $(id); if (el) el.style.display = 'block'; }
+    function hide(id) { var el = $(id); if (el) el.style.display = 'none'; }
+    function setText(id, msg) { var el = $(id); if (el) { el.textContent = msg; el.style.display = 'block'; } }
+
+    /* Password helpers */
+    function _genPwd(len){
+        len=len||12;var up='ABCDEFGHJKLMNPQRSTUVWXYZ',lo='abcdefghjkmnpqrstuvwxyz',di='23456789',sp='@#$!%&';
+        var p=up[Math.random()*up.length|0]+lo[Math.random()*lo.length|0]+di[Math.random()*di.length|0]+sp[Math.random()*sp.length|0];
+        var all=up+lo+di+sp;for(var i=p.length;i<len;i++)p+=all[Math.random()*all.length|0];
+        return p.split('').sort(function(){return Math.random()-.5;}).join('');
+    }
+    function _score(p){var s=0;if(p.length>=6)s++;if(p.length>=10)s++;if(/[A-Z]/.test(p))s++;if(/[0-9]/.test(p))s++;if(/[^A-Za-z0-9]/.test(p))s++;return s;}
+    var _colors=['#ef4444','#f97316','#eab308','#22c55e','#16a34a'];
+    var _labels=['Very Weak','Weak','Fair','Strong','Very Strong'];
+    window._acctPwdStr=function(v){
+        var s=_score(v),pct=s?s*20:0;
+        $('acctPwdFill').style.width=pct+'%';
+        $('acctPwdFill').style.background=_colors[Math.max(0,s-1)]||'#e2e8f0';
+        $('acctPwdText').textContent=s?_labels[s-1]:'';
+        $('acctPwdText').style.color=_colors[Math.max(0,s-1)]||'var(--text-light)';
+    };
+    window._acctAutoGen=function(){var p=_genPwd();var f=$('newPassword');f.type='text';f.value=p;_acctPwdStr(p);};
+    window._acctCopyPwd=function(){var v=$('newPassword').value;if(!v)return;navigator.clipboard.writeText(v);};
+
+    function apiCall(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        }).then(function(resp) {
+            return resp.json().then(function(data) { return data; });
+        });
+    }
+
+    /* ─── Change Password ─── */
+    window.changePassword = function() {
+        hide('pwdSuccess'); hide('pwdError');
+        var current = $('currentPassword').value;
+        var newPwd = $('newPassword').value;
+        var confirm = $('confirmPassword').value;
+
+        if (!current || !newPwd) { setText('pwdError', 'Please fill all fields'); return; }
+        if (newPwd !== confirm) { setText('pwdError', 'New passwords do not match'); return; }
+        if (newPwd.length < 6) { setText('pwdError', 'Password must be at least 6 characters'); return; }
+
+        var btn = $('changePwdBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...'; }
+
+        apiCall('/api/account/change-password', {
+            current_password: current, new_password: newPwd, confirm_password: confirm
+        }).then(function(data) {
+            if (data.success) {
+                setText('pwdSuccess', data.message || 'Password updated!');
+                $('currentPassword').value = '';
+                $('newPassword').value = '';
+                $('confirmPassword').value = '';
+            } else {
+                setText('pwdError', data.error || 'Failed');
+            }
+        }).catch(function() {
+            setText('pwdError', 'Connection failed');
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-key"></i> Update Password'; }
+        });
+    };
+
+    /* ─── Change Phone ─── */
+    var newPhoneVal = '';
+
+    window.sendPhoneOtp = function() {
+        hide('phoneError'); hide('phoneSuccess');
+        newPhoneVal = ($('newPhone').value || '').replace(/\D/g, '');
+        if (newPhoneVal.length !== 10) { setText('phoneError', 'Enter a valid 10-digit number'); return; }
+
+        var btn = $('sendPhoneOtpBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...'; }
+
+        apiCall('/api/account/change-phone/send-otp', { new_phone: newPhoneVal })
+        .then(function(data) {
+            if (data.success) {
+                hide('phoneStep1'); show('phoneStep2');
+                var d = $('phoneOtpDisplay');
+                if (d) d.textContent = '+91 ******' + newPhoneVal.slice(-4);
+                if (data.dev_hint) {
+                    var h = $('phoneDevHint');
+                    if (h) { h.textContent = 'Your OTP: ' + data.dev_hint; h.style.display = 'block'; }
+                }
+                if (data.sms_error) {
+                    var h = $('phoneDevHint');
+                    if (h && !data.dev_hint) { h.textContent = 'SMS not sent: ' + data.sms_error; h.style.display = 'block'; }
+                }
+                var inp = $('phoneOtpInput');
+                if (inp) inp.focus();
+            } else {
+                setText('phoneError', data.error || 'Failed');
+            }
+        }).catch(function() {
+            setText('phoneError', 'Connection failed');
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP to New Number'; }
+        });
+    };
+
+    window.verifyPhoneOtp = function() {
+        hide('phoneError');
+        var otp = ($('phoneOtpInput').value || '').trim();
+        if (otp.length !== 6) { setText('phoneError', 'Enter 6-digit OTP'); return; }
+
+        var btn = $('verifyPhoneOtpBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
+
+        apiCall('/api/account/change-phone/verify', { new_phone: newPhoneVal, otp: otp })
+        .then(function(data) {
+            if (data.success) {
+                /* Update cookie with new token */
+                if (data.new_token) {
+                    document.cookie = 'access_token=' + data.new_token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
+                }
+                setText('phoneSuccess', data.message || 'Phone updated!');
+                hide('phoneStep2'); show('phoneStep1');
+                $('phoneOtpInput').value = '';
+                $('newPhone').value = '';
+                /* Reload to reflect changes */
+                setTimeout(function() { window.location.reload(); }, 1500);
+            } else {
+                setText('phoneError', data.error || 'Verification failed');
+            }
+        }).catch(function() {
+            setText('phoneError', 'Connection failed');
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update Phone'; }
+        });
+    };
+
+    window.resetPhoneFlow = function() {
+        hide('phoneStep2'); show('phoneStep1');
+        hide('phoneError'); hide('phoneDevHint');
+        $('phoneOtpInput').value = '';
+    };
+
+    /* ─── Change Email ─── */
+    var newEmailVal = '';
+
+    window.sendEmailCode = function() {
+        hide('emailError'); hide('emailSuccess');
+        newEmailVal = ($('newEmail').value || '').trim().toLowerCase();
+        if (!newEmailVal || newEmailVal.indexOf('@') === -1) { setText('emailError', 'Enter a valid email address'); return; }
+
+        var btn = $('sendEmailCodeBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...'; }
+
+        apiCall('/api/account/change-email/send-code', { new_email: newEmailVal })
+        .then(function(data) {
+            if (data.success) {
+                hide('emailStep1'); show('emailStep2');
+                var d = $('emailCodeDisplay');
+                if (d) d.textContent = newEmailVal.substring(0, 3) + '***@' + (newEmailVal.split('@')[1] || '...');
+                if (data.dev_hint) {
+                    var h = $('emailDevHint');
+                    if (h) { h.textContent = 'DEV CODE: ' + data.dev_hint; h.style.display = 'block'; }
+                }
+                var inp = $('emailCodeInput');
+                if (inp) inp.focus();
+            } else {
+                setText('emailError', data.error || 'Failed');
+            }
+        }).catch(function() {
+            setText('emailError', 'Connection failed');
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Verification Code'; }
+        });
+    };
+
+    window.verifyEmailCode = function() {
+        hide('emailError');
+        var code = ($('emailCodeInput').value || '').trim();
+        if (code.length !== 6) { setText('emailError', 'Enter 6-digit code'); return; }
+
+        var btn = $('verifyEmailCodeBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...'; }
+
+        apiCall('/api/account/change-email/verify', { new_email: newEmailVal, code: code })
+        .then(function(data) {
+            if (data.success) {
+                if (data.new_token) {
+                    document.cookie = 'access_token=' + data.new_token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
+                }
+                setText('emailSuccess', data.message || 'Email updated!');
+                hide('emailStep2'); show('emailStep1');
+                $('emailCodeInput').value = '';
+                $('newEmail').value = '';
+                setTimeout(function() { window.location.reload(); }, 1500);
+            } else {
+                setText('emailError', data.error || 'Verification failed');
+            }
+        }).catch(function() {
+            setText('emailError', 'Connection failed');
+        }).finally(function() {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update Email'; }
+        });
+    };
+
+    window.resetEmailFlow = function() {
+        hide('emailStep2'); show('emailStep1');
+        hide('emailError'); hide('emailDevHint');
+        $('emailCodeInput').value = '';
+    };
+})();
+</script>
+{% endblock %}

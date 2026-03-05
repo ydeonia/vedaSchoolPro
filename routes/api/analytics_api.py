@@ -144,8 +144,8 @@ async def fee_collection_trend(request: Request, months: int = 6, db: AsyncSessi
         c = await db.scalar(
             select(func.sum(FeeRecord.amount_paid)).where(
                 FeeRecord.branch_id == branch_id,
-                extract('month', FeeRecord.paid_date) == m,
-                extract('year', FeeRecord.paid_date) == y
+                extract('month', FeeRecord.payment_date) == m,
+                extract('year', FeeRecord.payment_date) == y
             )) or 0
         collected.append(float(c))
 
@@ -353,7 +353,7 @@ async def overview_stats(request: Request, db: AsyncSession = Depends(get_db)):
             FeeRecord.status.in_(['pending', 'partial', 'overdue']))) or 0
     collected_today = await db.scalar(
         select(func.sum(FeeRecord.amount_paid)).where(
-            FeeRecord.branch_id == branch_id, FeeRecord.paid_date == today)) or 0
+            FeeRecord.branch_id == branch_id, FeeRecord.payment_date == today)) or 0
 
     # New admissions
     new_admissions = await db.scalar(

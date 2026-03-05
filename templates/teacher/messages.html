@@ -141,7 +141,7 @@ async function sendNewMessage() {
     const to = document.getElementById('msgTo').value;
     const subject = document.getElementById('msgSubject').value.trim();
     const body = document.getElementById('msgBody').value.trim();
-    if (!subject || !body) { alert('Fill in subject and message'); return; }
+    if (!subject || !body) { showToast('warning','Fill in subject and message'); return; }
     // Add to local threads (API integration later)
     const toLabel = {principal:'🏫 Principal',admin:'👤 School Admin',hr:'📋 HR Department'}[to];
     threads.unshift({subject, to:toLabel, last_message:body.substring(0,60)+'...', time:'Just now', unread:false, messages:[{text:body, sender:'You', time:'Just now', mine:true}]});

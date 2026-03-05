@@ -34,8 +34,9 @@ async def admissions_page(request: Request, db: AsyncSession = Depends(get_db)):
     )).scalars().all()
 
     stats = {}
-    for status in ['enquiry', 'application', 'interview', 'approved', 'enrolled', 'rejected']:
+    for status in ['inquiry', 'applied', 'document_pending', 'interview', 'admitted', 'enrolled', 'rejected', 'withdrawn']:
         stats[status] = sum(1 for a in admissions if a.status.value == status)
+    stats['total'] = len(admissions)
 
     return templates.TemplateResponse("school_admin/admissions.html", {
         "request": request, "user": user, "active_page": "admissions",

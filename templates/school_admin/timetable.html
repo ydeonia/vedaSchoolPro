@@ -2,14 +2,24 @@
 
 {% block title %}Timetable{% endblock %}
 {% block page_title %}Timetable Management{% endblock %}
-{% block page_subtitle %}Configure periods, assign teachers, and manage schedules{% endblock %}
+{% block page_subtitle %}Bell schedules, class timetables, substitutions, and workload analysis{% endblock %}
 
 {% block extra_css %}
 <style>
-    .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg); padding: 4px; border-radius: var(--radius); }
-    .tab-btn { padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); transition: all 0.2s; cursor: pointer; border: none; background: none; }
+    .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg); padding: 4px; border-radius: var(--radius); overflow-x: auto; }
+    .tab-btn { padding: 10px 20px; border-radius: var(--radius-sm); font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); transition: all 0.2s; cursor: pointer; border: none; background: none; white-space: nowrap; }
     .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 6px rgba(79,70,229,0.3); }
     .tab-btn:hover:not(.active) { background: var(--border-light); }
+    .tab-btn .badge-count { background: var(--danger); color: white; border-radius: 10px; padding: 2px 7px; font-size: 0.7rem; margin-left: 6px; }
+
+    /* Bell Schedule - Template List */
+    .sched-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; }
+    .tmpl-card { padding: 14px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border-light); cursor: pointer; transition: all 0.2s; margin-bottom: 8px; }
+    .tmpl-card:hover { border-color: var(--primary-light); background: var(--primary-50); }
+    .tmpl-card.active { border-color: var(--primary); background: var(--primary-50); box-shadow: 0 2px 8px rgba(79,70,229,0.15); }
+    .tmpl-name { font-weight: 700; font-size: 0.95rem; }
+    .tmpl-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px; }
+    .tmpl-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; background: var(--success-light); color: var(--success); margin-left: 6px; }
 
     /* Period Setup */
     .period-row { display: grid; grid-template-columns: 50px 1fr 120px 120px 140px 40px; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border-light); }
@@ -18,6 +28,13 @@
     .period-row input:focus, .period-row select:focus { border-color: var(--primary); outline: none; }
     .period-num { width: 36px; height: 36px; border-radius: 50%; background: var(--primary-50); color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; }
     .period-num.break { background: var(--warning-light); color: var(--warning); }
+
+    /* Assign Classes */
+    .class-checkbox-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
+    .class-checkbox-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); cursor: pointer; transition: all 0.15s; font-size: 0.85rem; }
+    .class-checkbox-item:hover { border-color: var(--primary-light); background: var(--primary-50); }
+    .class-checkbox-item.checked { border-color: var(--primary); background: var(--primary-50); }
+    .class-checkbox-item input[type="checkbox"] { accent-color: var(--primary); }
 
     /* Timetable Grid */
     .tt-grid { width: 100%; border-collapse: separate; border-spacing: 0; }
@@ -33,9 +50,12 @@
     }
     .tt-cell:hover { background: var(--primary-50); }
     .tt-cell.filled { background: linear-gradient(135deg, #EEF2FF, #E0E7FF); border: 1px solid var(--primary-light); }
+    .tt-cell.filled.conflict { border: 2px solid var(--danger); background: linear-gradient(135deg, #FEF2F2, #FEE2E2); }
     .tt-cell.break-cell { background: var(--warning-light); cursor: default; text-align: center; color: var(--warning); font-weight: 700; font-size: 0.75rem; display: flex; align-items: center; justify-content: center; }
+    .tt-cell.free-cell { background: var(--success-light); }
     .tt-subject { font-weight: 700; color: var(--primary-dark); font-size: 0.82rem; }
     .tt-teacher { color: var(--text-secondary); font-size: 0.72rem; margin-top: 2px; }
+    .tt-room { color: var(--text-light); font-size: 0.68rem; margin-top: 1px; }
     .tt-cell .remove-btn { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--danger); color: white; font-size: 0.6rem; display: none; align-items: center; justify-content: center; cursor: pointer; }
     .tt-cell:hover .remove-btn { display: flex; }
 
@@ -45,13 +65,53 @@
     .teacher-chip.free { background: var(--success-light); color: var(--success); }
     .teacher-chip.busy { background: var(--danger-light); color: var(--danger); }
 
+    /* Substitution Cards */
+    .sub-card { padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+    .sub-card:hover { box-shadow: var(--shadow-sm); }
+    .sub-status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+    .sub-status.pending { background: var(--warning-light); color: var(--warning); }
+    .sub-status.approved { background: var(--success-light); color: var(--success); }
+    .sub-status.rejected { background: var(--danger-light); color: var(--danger); }
+    .sub-status.completed { background: var(--primary-50); color: var(--primary); }
+
+    /* Absent Teacher Card */
+    .absent-card { padding: 14px; border-radius: var(--radius-sm); border-left: 4px solid var(--danger); background: var(--bg-card, white); margin-bottom: 10px; }
+    .absent-card .teacher-name { font-weight: 700; font-size: 0.95rem; }
+    .absent-card .leave-info { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; }
+    .absent-slots { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+    .absent-slot-chip { padding: 4px 10px; border-radius: var(--radius-sm); background: var(--bg); font-size: 0.75rem; font-weight: 600; border: 1px solid var(--border-light); }
+
+    /* Subject Hours Table */
+    .sh-row { display: grid; grid-template-columns: 1fr 120px 120px 100px; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
+    .sh-row.header { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); border-bottom: 2px solid var(--border); }
+    .sh-row input[type="number"] { padding: 6px 10px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); text-align: center; width: 80px; font-size: 0.85rem; }
+    .sh-row input[type="number"]:focus { border-color: var(--primary); outline: none; }
+    .sh-status { padding: 3px 10px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; }
+    .sh-status.ok { background: var(--success-light); color: var(--success); }
+    .sh-status.under { background: var(--warning-light); color: var(--warning); }
+    .sh-status.over { background: var(--danger-light); color: var(--danger); }
+
     /* Quick Setup Templates */
     .quick-period-btn { padding: 10px 16px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: white; font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; }
     .quick-period-btn:hover { border-color: var(--primary); background: var(--primary-50); }
+    .quick-period-btn.selected { border-color: var(--primary); background: var(--primary-50); }
 
-    @media (max-width: 768px) {
+    /* Workload bar */
+    .workload-bar { height: 8px; border-radius: 4px; background: var(--border-light); overflow: hidden; }
+    .workload-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+
+    /* Suggestion card */
+    .sug-card { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); margin-bottom: 6px; cursor: pointer; transition: all 0.15s; }
+    .sug-card:hover { border-color: var(--primary); background: var(--primary-50); }
+    .sug-card .sug-match { font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .sug-card .sug-match.yes { background: var(--success-light); color: var(--success); }
+    .sug-card .sug-match.no { background: var(--border-light); color: var(--text-secondary); }
+
+    @media (max-width: 900px) {
+        .sched-layout { grid-template-columns: 1fr; }
         .period-row { grid-template-columns: 40px 1fr 90px 90px 100px 36px; }
         .tt-grid { font-size: 0.72rem; }
+        .sh-row { grid-template-columns: 1fr 80px 80px 80px; }
     }
 </style>
 {% endblock %}
@@ -59,70 +119,54 @@
 {% block content %}
 <!-- Tabs -->
 <div class="tab-bar">
-    <button class="tab-btn active" onclick="switchView('periods')"><i class="fas fa-clock"></i> Period Setup</button>
-    <button class="tab-btn" onclick="switchView('timetable')"><i class="fas fa-table"></i> Class Timetable</button>
-    <button class="tab-btn" onclick="switchView('freeperiods')"><i class="fas fa-user-clock"></i> Free Teachers</button>
+    <button class="tab-btn active" onclick="switchTab('bellschedules')"><i class="fas fa-bell"></i> Bell Schedules</button>
+    <button class="tab-btn" onclick="switchTab('classtimetable')"><i class="fas fa-table"></i> Class Timetable</button>
+    <button class="tab-btn" onclick="switchTab('teachertimetable')"><i class="fas fa-chalkboard-teacher"></i> Teacher Timetable</button>
+    <button class="tab-btn" onclick="switchTab('substitutions')"><i class="fas fa-exchange-alt"></i> Substitutions</button>
+    <button class="tab-btn" onclick="switchTab('subjecthours')"><i class="fas fa-book-open"></i> Subject Hours</button>
+    <button class="tab-btn" onclick="switchTab('freeteachers')"><i class="fas fa-user-clock"></i> Free Teachers</button>
 </div>
 
-<!-- ═══ TAB 1: Period Setup ═══ -->
-<div id="view-periods">
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-clock" style="color: var(--primary); margin-right: 8px;"></i> Define School Periods</h2>
-            <div style="display: flex; gap: 8px;">
-                <button class="quick-period-btn" onclick="quickSetup('standard')">
-                    <i class="fas fa-magic"></i> Standard (8 periods)
-                </button>
-                <button class="quick-period-btn" onclick="quickSetup('extended')">
-                    <i class="fas fa-magic"></i> Extended (10 periods)
-                </button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="period-row header">
-                <div>#</div>
-                <div>Label</div>
-                <div>Start Time</div>
-                <div>End Time</div>
-                <div>Type</div>
-                <div></div>
-            </div>
-            <div id="periodsContainer">
-                {% if periods %}
-                    {% for p in periods %}
-                    <div class="period-row" data-idx="{{ loop.index }}">
-                        <div class="period-num {{ 'break' if p.period_type.value != 'regular' else '' }}">{{ p.period_number }}</div>
-                        <input type="text" value="{{ p.label }}" class="p-label">
-                        <input type="time" value="{{ p.start_time.strftime('%H:%M') if p.start_time else '' }}" class="p-start">
-                        <input type="time" value="{{ p.end_time.strftime('%H:%M') if p.end_time else '' }}" class="p-end">
-                        <select class="p-type">
-                            <option value="regular" {{ 'selected' if p.period_type.value == 'regular' }}>Regular</option>
-                            <option value="break" {{ 'selected' if p.period_type.value == 'break' }}>Break</option>
-                            <option value="lunch" {{ 'selected' if p.period_type.value == 'lunch' }}>Lunch</option>
-                            <option value="assembly" {{ 'selected' if p.period_type.value == 'assembly' }}>Assembly</option>
-                        </select>
-                        <button onclick="removePeriodRow(this)" style="color: var(--danger); font-size: 0.9rem;"><i class="fas fa-trash"></i></button>
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 1: Bell Schedules                                      -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-bellschedules">
+    <div class="sched-layout">
+        <!-- Left Panel: Template List -->
+        <div>
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="fas fa-layer-group" style="color: var(--primary); margin-right: 8px;"></i> Schedules</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openModal('createScheduleModal')"><i class="fas fa-plus"></i> Create</button>
+                </div>
+                <div class="card-body" id="templateListPanel">
+                    <div class="empty-state" style="padding: 20px;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading...</p>
                     </div>
-                    {% endfor %}
-                {% endif %}
-            </div>
-
-            <div style="margin-top: 12px; display: flex; gap: 8px;">
-                <button class="btn btn-secondary btn-sm" onclick="addPeriodRow()">
-                    <i class="fas fa-plus"></i> Add Period
-                </button>
+                </div>
             </div>
         </div>
-        <div class="card-footer">
-            <button class="btn btn-primary" onclick="savePeriods()" id="savePeriodBtn">
-                <i class="fas fa-save"></i> Save Period Structure
-            </button>
+
+        <!-- Right Panel: Period Editor + Assign -->
+        <div id="templateEditorPanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="empty-state">
+                        <i class="fas fa-bell" style="font-size: 2.5rem; color: var(--primary);"></i>
+                        <h3>Select a Schedule</h3>
+                        <p>Choose a bell schedule from the left panel to view and edit its periods</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ═══ TAB 2: Class Timetable ═══ -->
-<div id="view-timetable" style="display: none;">
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 2: Class Timetable                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-classtimetable" style="display: none;">
     <div class="card mb-3">
         <div class="card-body" style="padding: 16px 24px;">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -138,6 +182,9 @@
                 <button class="btn btn-primary" onclick="loadTimetable()">
                     <i class="fas fa-table"></i> Load Timetable
                 </button>
+                <button class="btn btn-secondary" onclick="checkConflicts()" title="Check teacher and room conflicts">
+                    <i class="fas fa-exclamation-triangle"></i> Conflicts
+                </button>
             </div>
         </div>
     </div>
@@ -146,17 +193,126 @@
         <div class="card">
             <div class="card-body">
                 <div class="empty-state">
-                    <i class="fas fa-calendar-week"></i>
+                    <i class="fas fa-calendar-week" style="font-size: 2.5rem; color: var(--primary);"></i>
                     <h3>Select a Class</h3>
-                    <p>Choose a class and section to view/edit the timetable grid</p>
+                    <p>Choose a class and section to view or edit the timetable grid</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ═══ TAB 3: Free Teachers ═══ -->
-<div id="view-freeperiods" style="display: none;">
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 3: Teacher Timetable                                   -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-teachertimetable" style="display: none;">
+    <div class="card mb-3">
+        <div class="card-body" style="padding: 16px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <select id="ttTeacher" class="form-select" style="flex: 1; min-width: 200px; padding: 10px;">
+                    <option value="">Select Teacher</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadTeacherTimetable()">
+                    <i class="fas fa-chalkboard-teacher"></i> Load Timetable
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="teacherTTStats" style="display: none;" class="mb-3"></div>
+
+    <div id="teacherTTArea">
+        <div class="card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-chalkboard-teacher" style="font-size: 2.5rem; color: var(--primary);"></i>
+                    <h3>Select a Teacher</h3>
+                    <p>Choose a teacher to view their full weekly timetable and workload</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 4: Substitutions                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-substitutions" style="display: none;">
+    <div class="card mb-3">
+        <div class="card-body" style="padding: 16px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <input type="date" id="subDate" class="form-input" style="min-width: 180px; padding: 10px;">
+                <button class="btn btn-primary" onclick="loadSubstitutions()">
+                    <i class="fas fa-search"></i> Load
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Absent Teachers Panel -->
+    <div class="card mb-3" id="absentTeachersCard" style="display: none;">
+        <div class="card-header">
+            <h2><i class="fas fa-user-times" style="color: var(--danger); margin-right: 8px;"></i> Absent Teachers</h2>
+        </div>
+        <div class="card-body" id="absentTeachersPanel">
+        </div>
+    </div>
+
+    <!-- Active Substitutions -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-exchange-alt" style="color: var(--primary); margin-right: 8px;"></i> Substitutions</h2>
+        </div>
+        <div class="card-body" id="substitutionsPanel">
+            <div class="empty-state">
+                <i class="fas fa-exchange-alt" style="font-size: 2.5rem; color: var(--primary);"></i>
+                <h3>Manage Substitutions</h3>
+                <p>Select a date and load to view absent teachers and manage substitutions</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 5: Subject Hours                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-subjecthours" style="display: none;">
+    <div class="card mb-3">
+        <div class="card-body" style="padding: 16px 24px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <select id="shClass" class="form-select" style="flex: 1; min-width: 200px; padding: 10px;">
+                    <option value="">Select Class</option>
+                    {% for cls in classes %}
+                    <option value="{{ cls.id }}">{{ cls.name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-primary" onclick="loadSubjectHours()">
+                    <i class="fas fa-book-open"></i> Load
+                </button>
+                <button class="btn btn-secondary" onclick="validateSubjectHours()" id="shValidateBtn" style="display: none;">
+                    <i class="fas fa-check-double"></i> Validate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="subjectHoursArea">
+        <div class="card">
+            <div class="card-body">
+                <div class="empty-state">
+                    <i class="fas fa-book-open" style="font-size: 2.5rem; color: var(--primary);"></i>
+                    <h3>Configure Subject Hours</h3>
+                    <p>Select a class to configure weekly period allocation for each subject</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- TAB 6: Free Teachers                                       -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="tab-freeteachers" style="display: none;">
     <div class="card mb-3">
         <div class="card-body" style="padding: 16px 24px;">
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -175,7 +331,49 @@
         </div>
     </div>
     <div id="freeTeachersArea">
-        <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-clock"></i><h3>Who is Free?</h3><p>Select a day and period to see which teachers are available</p></div></div></div>
+        <div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-user-clock" style="font-size: 2.5rem; color: var(--primary);"></i><h3>Who is Free?</h3><p>Select a day and period to see which teachers are available</p></div></div></div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- MODALS                                                     -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<!-- Create Schedule Modal -->
+<div class="modal-overlay" id="createScheduleModal" style="display:none;">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Create Bell Schedule</h2>
+            <button class="modal-close" onclick="closeModal('createScheduleModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Schedule Name</label>
+                <input type="text" id="newTmplName" class="form-input" placeholder="e.g. Regular Schedule">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description (optional)</label>
+                <input type="text" id="newTmplDesc" class="form-input" placeholder="e.g. Monday to Friday schedule">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quick Setup</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="quick-period-btn" id="qsStandard" onclick="selectQuickSetup('standard')">
+                        <i class="fas fa-clock"></i> Standard (8 periods)
+                    </button>
+                    <button class="quick-period-btn" id="qsExtended" onclick="selectQuickSetup('extended')">
+                        <i class="fas fa-clock"></i> Extended (10 periods)
+                    </button>
+                    <button class="quick-period-btn" id="qsCustom" onclick="selectQuickSetup('custom')">
+                        <i class="fas fa-sliders-h"></i> Custom
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('createScheduleModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createSchedule()" id="createSchedBtn"><i class="fas fa-plus"></i> Create Schedule</button>
+        </div>
     </div>
 </div>
 
@@ -203,6 +401,7 @@
                 <label class="form-label">Room (optional)</label>
                 <input type="text" id="slotRoom" class="form-input" placeholder="e.g. Room 101">
             </div>
+            <div id="slotFreeInfo" style="display: none; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); font-size: 0.82rem; margin-top: 8px;"></div>
             <div id="slotConflictMsg" style="display: none; padding: 10px; background: var(--danger-light); color: var(--danger); border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600;"></div>
         </div>
         <div class="modal-footer">
@@ -211,140 +410,430 @@
         </div>
     </div>
 </div>
+
+<!-- Conflicts Modal -->
+<div class="modal-overlay" id="conflictsModal" style="display:none;">
+    <div class="modal" style="max-width: 700px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-exclamation-triangle" style="color: var(--warning); margin-right: 8px;"></i> Timetable Conflicts</h2>
+            <button class="modal-close" onclick="closeModal('conflictsModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="conflictsContent">
+            <div style="text-align: center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('conflictsModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Substitution Suggestions Modal -->
+<div class="modal-overlay" id="suggestionsModal" style="display:none;">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2 id="suggestionsTitle">Substitute Suggestions</h2>
+            <button class="modal-close" onclick="closeModal('suggestionsModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="suggestionsContent">
+            <div style="text-align: center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('suggestionsModal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Template Name Modal -->
+<div class="modal-overlay" id="editTemplateModal" style="display:none;">
+    <div class="modal" style="max-width: 500px;">
+        <div class="modal-header">
+            <h2>Edit Schedule</h2>
+            <button class="modal-close" onclick="closeModal('editTemplateModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">Schedule Name</label>
+                <input type="text" id="editTmplName" class="form-input">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <input type="text" id="editTmplDesc" class="form-input">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('editTemplateModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="updateTemplateMeta()"><i class="fas fa-save"></i> Save</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// ═══════════════════════════════════════════════════════════
+// DATA INITIALIZATION
+// ═══════════════════════════════════════════════════════════
 const classSections = {{ sections_json | safe }};
 const subjectsData = {{ subjects_json | safe }};
 const teachersData = {{ teachers_json | safe }};
 let periodsData = {{ periods_json | safe }};
-const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-const DAY_LABELS = {monday:'Mon', tuesday:'Tue', wednesday:'Wed', thursday:'Thu', friday:'Fri', saturday:'Sat'};
+let templatesData = {{ templates_json | default('[]') | safe }};
+let assignmentsMap = {{ assignments_json | default('{}') | safe }};
+const DAYS = {{ days | tojson }};
+const DAY_LABELS = {monday:'Mon', tuesday:'Tue', wednesday:'Wed', thursday:'Thu', friday:'Fri', saturday:'Sat', sunday:'Sun'};
+const DAY_FULL = {monday:'Monday', tuesday:'Tuesday', wednesday:'Wednesday', thursday:'Thursday', friday:'Friday', saturday:'Saturday', sunday:'Sunday'};
+
 let currentTimetable = {};
 let editingSlot = {};
+let selectedTemplateId = null;
+let selectedTemplatePeriods = [];
+let quickSetupChoice = 'standard';
+let currentSubSlotId = null;
+let currentSubOriginalTeacherId = null;
 
-// ─── Tab Switching ───
-function switchView(view) {
-    ['periods', 'timetable', 'freeperiods'].forEach(v => {
-        document.getElementById('view-' + v).style.display = v === view ? 'block' : 'none';
+// Build lookup maps
+const subMap = {}; subjectsData.forEach(s => subMap[s.id] = s);
+const tchMap = {}; teachersData.forEach(t => tchMap[t.id] = t);
+
+// ═══════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════
+const TAB_IDS = ['bellschedules', 'classtimetable', 'teachertimetable', 'substitutions', 'subjecthours', 'freeteachers'];
+
+function switchTab(tab) {
+    TAB_IDS.forEach(t => {
+        document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
     });
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     event.target.closest('.tab-btn').classList.add('active');
-    if (view === 'freeperiods') populateFPPeriods();
+
+    if (tab === 'bellschedules') renderTemplateList();
+    if (tab === 'freeteachers') populateFPPeriods();
+    if (tab === 'teachertimetable') populateTeacherDropdown();
+    if (tab === 'substitutions') initSubDate();
 }
 
-// Set today's day as default in free teacher view
-(function() {
-    const dayMap = [null,'monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
-    const today = dayMap[new Date().getDay()];
-    if (today && document.getElementById('fpDay')) {
-        const opt = document.querySelector(`#fpDay option[value="${today}"]`);
-        if (opt) opt.selected = true;
+// ═══════════════════════════════════════════════════════════
+// TAB 1: BELL SCHEDULES
+// ═══════════════════════════════════════════════════════════
+
+function renderTemplateList() {
+    const panel = document.getElementById('templateListPanel');
+    if (templatesData.length === 0) {
+        panel.innerHTML = '<div class="empty-state" style="padding: 20px;"><i class="fas fa-bell"></i><p>No schedules yet. Create one to get started.</p></div>';
+        return;
     }
-})();
+    let html = '';
+    templatesData.forEach(t => {
+        const isActive = t.id === selectedTemplateId;
+        html += `<div class="tmpl-card ${isActive ? 'active' : ''}" onclick="selectTemplate('${t.id}')">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                    <div class="tmpl-name">${t.name}${t.is_default ? '<span class="tmpl-badge">Default</span>' : ''}</div>
+                    <div class="tmpl-meta">${t.period_count || 0} periods &middot; ${t.assigned_class_count || 0} classes</div>
+                    ${t.description ? '<div class="tmpl-meta">' + t.description + '</div>' : ''}
+                </div>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); openEditTemplate('${t.id}')" title="Edit name"><i class="fas fa-pen" style="font-size: 0.72rem;"></i></button>
+                    <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation(); deleteTemplate('${t.id}')" title="Delete" style="color: var(--danger);"><i class="fas fa-trash" style="font-size: 0.72rem;"></i></button>
+                </div>
+            </div>
+        </div>`;
+    });
+    panel.innerHTML = html;
+}
 
-// ─── PERIOD SETUP ───
-let periodCounter = document.querySelectorAll('#periodsContainer .period-row').length;
+async function selectTemplate(id) {
+    selectedTemplateId = id;
+    renderTemplateList();
 
-function addPeriodRow(label='', start='', end='', type='regular') {
-    periodCounter++;
-    const container = document.getElementById('periodsContainer');
-    const isBreak = type !== 'regular';
+    const editorPanel = document.getElementById('templateEditorPanel');
+    editorPanel.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
+
+    try {
+        const result = await apiCall(`/api/school/timetable/v2/templates/${id}`);
+        const tmpl = result.template;
+        selectedTemplatePeriods = result.periods || [];
+        const assignments = result.assignments || [];
+
+        let html = '<div class="card">';
+        html += `<div class="card-header">
+            <h2><i class="fas fa-clock" style="color: var(--primary); margin-right: 8px;"></i> ${tmpl.name} &mdash; Periods</h2>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-secondary btn-sm" onclick="addTemplatePeriodRow()"><i class="fas fa-plus"></i> Add Period</button>
+            </div>
+        </div>`;
+        html += '<div class="card-body">';
+        html += `<div class="period-row header">
+            <div>#</div><div>Label</div><div>Start Time</div><div>End Time</div><div>Type</div><div></div>
+        </div>`;
+        html += '<div id="tmplPeriodsContainer">';
+        selectedTemplatePeriods.forEach((p, i) => {
+            html += buildTemplatePeriodRow(p, i);
+        });
+        html += '</div></div>';
+        html += `<div class="card-footer">
+            <button class="btn btn-primary" onclick="saveTemplatePeriods()" id="saveTmplPeriodsBtn"><i class="fas fa-save"></i> Save Periods</button>
+        </div>`;
+        html += '</div>';
+
+        // Assign to Classes section
+        html += '<div class="card" style="margin-top: 16px;">';
+        html += `<div class="card-header">
+            <h2><i class="fas fa-school" style="color: var(--primary); margin-right: 8px;"></i> Assign to Classes</h2>
+        </div>`;
+        html += '<div class="card-body">';
+        html += '<div class="class-checkbox-grid" id="assignClassGrid">';
+
+        const assignedClassIds = assignments.map(a => String(a.class_id));
+        {% for cls in classes %}
+        const isAssigned_{{ loop.index }} = assignedClassIds.includes('{{ cls.id }}');
+        html += `<label class="class-checkbox-item ${isAssigned_{{ loop.index }} ? 'checked' : ''}">
+            <input type="checkbox" value="{{ cls.id }}" ${isAssigned_{{ loop.index }} ? 'checked' : ''} onchange="this.parentElement.classList.toggle('checked', this.checked)">
+            <span>{{ cls.name }}</span>
+        </label>`;
+        {% endfor %}
+
+        html += '</div></div>';
+        html += `<div class="card-footer">
+            <button class="btn btn-primary" onclick="saveTemplateAssignments()" id="saveAssignBtn"><i class="fas fa-save"></i> Save Assignments</button>
+        </div>`;
+        html += '</div>';
+
+        editorPanel.innerHTML = html;
+    } catch(e) {
+        editorPanel.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error loading schedule</h3><p>${e.message}</p></div></div></div>`;
+    }
+}
+
+function buildTemplatePeriodRow(p, idx) {
+    const isBreak = p.period_type !== 'regular';
+    return `<div class="period-row" data-period-id="${p.id || ''}">
+        <div class="period-num ${isBreak ? 'break' : ''}">${idx + 1}</div>
+        <input type="text" value="${p.label || ''}" class="tp-label">
+        <input type="time" value="${p.start_time || ''}" class="tp-start">
+        <input type="time" value="${p.end_time || ''}" class="tp-end">
+        <select class="tp-type" onchange="this.closest('.period-row').querySelector('.period-num').className='period-num '+(this.value!=='regular'?'break':'')">
+            <option value="regular" ${p.period_type==='regular'?'selected':''}>Regular</option>
+            <option value="break" ${p.period_type==='break'?'selected':''}>Break</option>
+            <option value="lunch" ${p.period_type==='lunch'?'selected':''}>Lunch</option>
+            <option value="assembly" ${p.period_type==='assembly'?'selected':''}>Assembly</option>
+        </select>
+        <button onclick="removeTemplatePeriodRow(this)" style="color: var(--danger); font-size: 0.9rem; background: none; border: none; cursor: pointer;"><i class="fas fa-trash"></i></button>
+    </div>`;
+}
+
+function addTemplatePeriodRow() {
+    const container = document.getElementById('tmplPeriodsContainer');
+    if (!container) return;
+    const count = container.querySelectorAll('.period-row').length;
     const div = document.createElement('div');
     div.className = 'period-row';
+    div.setAttribute('data-period-id', '');
     div.innerHTML = `
-        <div class="period-num ${isBreak ? 'break' : ''}">${periodCounter}</div>
-        <input type="text" value="${label || 'Period ' + periodCounter}" class="p-label">
-        <input type="time" value="${start}" class="p-start">
-        <input type="time" value="${end}" class="p-end">
-        <select class="p-type" onchange="this.closest('.period-row').querySelector('.period-num').className='period-num '+(this.value!=='regular'?'break':'')">
-            <option value="regular" ${type==='regular'?'selected':''}>Regular</option>
-            <option value="break" ${type==='break'?'selected':''}>Break</option>
-            <option value="lunch" ${type==='lunch'?'selected':''}>Lunch</option>
-            <option value="assembly" ${type==='assembly'?'selected':''}>Assembly</option>
+        <div class="period-num">${count + 1}</div>
+        <input type="text" value="Period ${count + 1}" class="tp-label">
+        <input type="time" value="" class="tp-start">
+        <input type="time" value="" class="tp-end">
+        <select class="tp-type" onchange="this.closest('.period-row').querySelector('.period-num').className='period-num '+(this.value!=='regular'?'break':'')">
+            <option value="regular" selected>Regular</option>
+            <option value="break">Break</option>
+            <option value="lunch">Lunch</option>
+            <option value="assembly">Assembly</option>
         </select>
-        <button onclick="removePeriodRow(this)" style="color: var(--danger);"><i class="fas fa-trash"></i></button>
+        <button onclick="removeTemplatePeriodRow(this)" style="color: var(--danger); font-size: 0.9rem; background: none; border: none; cursor: pointer;"><i class="fas fa-trash"></i></button>
     `;
     container.appendChild(div);
 }
 
-function removePeriodRow(btn) {
+function removeTemplatePeriodRow(btn) {
     btn.closest('.period-row').remove();
-    reindexPeriods();
+    reindexTemplatePeriods();
 }
 
-function reindexPeriods() {
-    const rows = document.querySelectorAll('#periodsContainer .period-row');
-    periodCounter = rows.length;
+function reindexTemplatePeriods() {
+    const rows = document.querySelectorAll('#tmplPeriodsContainer .period-row');
     rows.forEach((row, i) => {
         row.querySelector('.period-num').textContent = i + 1;
     });
 }
 
-function quickSetup(template) {
-    document.getElementById('periodsContainer').innerHTML = '';
-    periodCounter = 0;
-
-    if (template === 'standard') {
-        addPeriodRow('Assembly', '07:30', '08:00', 'assembly');
-        addPeriodRow('Period 1', '08:00', '08:40', 'regular');
-        addPeriodRow('Period 2', '08:40', '09:20', 'regular');
-        addPeriodRow('Period 3', '09:20', '10:00', 'regular');
-        addPeriodRow('Break', '10:00', '10:20', 'break');
-        addPeriodRow('Period 4', '10:20', '11:00', 'regular');
-        addPeriodRow('Period 5', '11:00', '11:40', 'regular');
-        addPeriodRow('Lunch', '11:40', '12:20', 'lunch');
-        addPeriodRow('Period 6', '12:20', '01:00', 'regular');
-        addPeriodRow('Period 7', '01:00', '01:40', 'regular');
-        addPeriodRow('Period 8', '01:40', '02:20', 'regular');
-    } else {
-        addPeriodRow('Assembly', '07:30', '07:50', 'assembly');
-        addPeriodRow('Period 1', '07:50', '08:25', 'regular');
-        addPeriodRow('Period 2', '08:25', '09:00', 'regular');
-        addPeriodRow('Period 3', '09:00', '09:35', 'regular');
-        addPeriodRow('Short Break', '09:35', '09:50', 'break');
-        addPeriodRow('Period 4', '09:50', '10:25', 'regular');
-        addPeriodRow('Period 5', '10:25', '11:00', 'regular');
-        addPeriodRow('Period 6', '11:00', '11:35', 'regular');
-        addPeriodRow('Lunch', '11:35', '12:10', 'lunch');
-        addPeriodRow('Period 7', '12:10', '12:45', 'regular');
-        addPeriodRow('Period 8', '12:45', '01:20', 'regular');
-        addPeriodRow('Period 9', '01:20', '01:55', 'regular');
-        addPeriodRow('Period 10', '01:55', '02:30', 'regular');
-    }
-    showToast('info', 'Template Applied', `${template === 'standard' ? '8' : '10'} period template loaded`);
-}
-
-async function savePeriods() {
-    const rows = document.querySelectorAll('#periodsContainer .period-row');
+async function saveTemplatePeriods() {
+    if (!selectedTemplateId) return;
+    const rows = document.querySelectorAll('#tmplPeriodsContainer .period-row');
     const periods = [];
     rows.forEach((row, i) => {
-        periods.push({
-            period_number: i + 1,
-            label: row.querySelector('.p-label').value,
-            start_time: row.querySelector('.p-start').value,
-            end_time: row.querySelector('.p-end').value,
-            period_type: row.querySelector('.p-type').value,
-        });
+        const existingId = row.getAttribute('data-period-id');
+        const pObj = {
+            label: row.querySelector('.tp-label').value,
+            start_time: row.querySelector('.tp-start').value,
+            end_time: row.querySelector('.tp-end').value,
+            period_type: row.querySelector('.tp-type').value,
+        };
+        if (existingId) pObj.id = existingId;
+        periods.push(pObj);
     });
 
     if (periods.length === 0) { showToast('warning', 'No Periods', 'Add at least one period'); return; }
 
-    const btn = document.getElementById('savePeriodBtn');
+    const btn = document.getElementById('saveTmplPeriodsBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
     try {
-        const result = await apiCall('/api/school/timetable/periods/setup', 'POST', { periods });
-        showToast('success', 'Periods Saved! ✅', result.message);
-        // Refresh periods data
-        const fresh = await apiCall('/api/school/timetable/periods');
-        periodsData = fresh.periods;
-    } catch(e) {}
-    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Period Structure';
+        await apiCall(`/api/school/timetable/v2/templates/${selectedTemplateId}/periods/bulk`, 'POST', { periods });
+        showToast('success', 'Periods Saved', 'Bell schedule periods updated successfully');
+        await refreshTemplatesData();
+        await selectTemplate(selectedTemplateId);
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Periods';
 }
 
-// ─── CLASS TIMETABLE ───
+async function saveTemplateAssignments() {
+    if (!selectedTemplateId) return;
+    const checkboxes = document.querySelectorAll('#assignClassGrid input[type="checkbox"]:checked');
+    const classIds = Array.from(checkboxes).map(cb => cb.value);
+
+    const btn = document.getElementById('saveAssignBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        await apiCall('/api/school/timetable/v2/assignments/bulk', 'POST', {
+            template_id: selectedTemplateId,
+            class_ids: classIds
+        });
+        showToast('success', 'Assignments Saved', `Schedule assigned to ${classIds.length} class(es)`);
+        await refreshTemplatesData();
+        // Update local assignments map
+        classIds.forEach(cid => { assignmentsMap[cid] = selectedTemplateId; });
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Assignments';
+}
+
+function selectQuickSetup(type) {
+    quickSetupChoice = type;
+    document.querySelectorAll('.quick-period-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('qs' + type.charAt(0).toUpperCase() + type.slice(1)).classList.add('selected');
+}
+
+async function createSchedule() {
+    const name = document.getElementById('newTmplName').value.trim();
+    if (!name) { showToast('warning', 'Enter Name', 'Please enter a schedule name'); return; }
+    const desc = document.getElementById('newTmplDesc').value.trim();
+
+    let periods = [];
+    if (quickSetupChoice === 'standard') {
+        periods = [
+            {label:'Assembly', start_time:'07:30', end_time:'08:00', period_type:'assembly'},
+            {label:'Period 1', start_time:'08:00', end_time:'08:40', period_type:'regular'},
+            {label:'Period 2', start_time:'08:40', end_time:'09:20', period_type:'regular'},
+            {label:'Period 3', start_time:'09:20', end_time:'10:00', period_type:'regular'},
+            {label:'Break', start_time:'10:00', end_time:'10:20', period_type:'break'},
+            {label:'Period 4', start_time:'10:20', end_time:'11:00', period_type:'regular'},
+            {label:'Period 5', start_time:'11:00', end_time:'11:40', period_type:'regular'},
+            {label:'Lunch', start_time:'11:40', end_time:'12:20', period_type:'lunch'},
+            {label:'Period 6', start_time:'12:20', end_time:'13:00', period_type:'regular'},
+            {label:'Period 7', start_time:'13:00', end_time:'13:40', period_type:'regular'},
+            {label:'Period 8', start_time:'13:40', end_time:'14:20', period_type:'regular'},
+        ];
+    } else if (quickSetupChoice === 'extended') {
+        periods = [
+            {label:'Assembly', start_time:'07:30', end_time:'07:50', period_type:'assembly'},
+            {label:'Period 1', start_time:'07:50', end_time:'08:25', period_type:'regular'},
+            {label:'Period 2', start_time:'08:25', end_time:'09:00', period_type:'regular'},
+            {label:'Period 3', start_time:'09:00', end_time:'09:35', period_type:'regular'},
+            {label:'Short Break', start_time:'09:35', end_time:'09:50', period_type:'break'},
+            {label:'Period 4', start_time:'09:50', end_time:'10:25', period_type:'regular'},
+            {label:'Period 5', start_time:'10:25', end_time:'11:00', period_type:'regular'},
+            {label:'Period 6', start_time:'11:00', end_time:'11:35', period_type:'regular'},
+            {label:'Lunch', start_time:'11:35', end_time:'12:10', period_type:'lunch'},
+            {label:'Period 7', start_time:'12:10', end_time:'12:45', period_type:'regular'},
+            {label:'Period 8', start_time:'12:45', end_time:'13:20', period_type:'regular'},
+            {label:'Period 9', start_time:'13:20', end_time:'13:55', period_type:'regular'},
+            {label:'Period 10', start_time:'13:55', end_time:'14:30', period_type:'regular'},
+        ];
+    }
+
+    const btn = document.getElementById('createSchedBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+    try {
+        const result = await apiCall('/api/school/timetable/v2/templates', 'POST', {
+            name, description: desc, periods
+        });
+        showToast('success', 'Schedule Created', `"${name}" has been created`);
+        closeModal('createScheduleModal');
+        document.getElementById('newTmplName').value = '';
+        document.getElementById('newTmplDesc').value = '';
+        await refreshTemplatesData();
+        renderTemplateList();
+        if (result.template && result.template.id) {
+            selectTemplate(result.template.id);
+        }
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-plus"></i> Create Schedule';
+}
+
+function openEditTemplate(id) {
+    const tmpl = templatesData.find(t => t.id === id);
+    if (!tmpl) return;
+    document.getElementById('editTmplName').value = tmpl.name;
+    document.getElementById('editTmplDesc').value = tmpl.description || '';
+    document.getElementById('editTemplateModal').dataset.templateId = id;
+    openModal('editTemplateModal');
+}
+
+async function updateTemplateMeta() {
+    const id = document.getElementById('editTemplateModal').dataset.templateId;
+    const name = document.getElementById('editTmplName').value.trim();
+    if (!name) { showToast('warning', 'Enter Name', ''); return; }
+    const description = document.getElementById('editTmplDesc').value.trim();
+
+    try {
+        await apiCall(`/api/school/timetable/v2/templates/${id}`, 'PUT', { name, description });
+        showToast('success', 'Updated', 'Schedule name updated');
+        closeModal('editTemplateModal');
+        await refreshTemplatesData();
+        renderTemplateList();
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+}
+
+function deleteTemplate(id) {
+    const tmpl = templatesData.find(t => t.id === id);
+    showConfirm('Delete Schedule', `Are you sure you want to delete "${tmpl ? tmpl.name : 'this schedule'}"? This action cannot be undone.`, async () => {
+        try {
+            await apiCall(`/api/school/timetable/v2/templates/${id}`, 'DELETE');
+            showToast('info', 'Deleted', 'Schedule removed');
+            if (selectedTemplateId === id) {
+                selectedTemplateId = null;
+                document.getElementById('templateEditorPanel').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell" style="font-size: 2.5rem; color: var(--primary);"></i><h3>Select a Schedule</h3><p>Choose a bell schedule from the left panel</p></div></div></div>';
+            }
+            await refreshTemplatesData();
+            renderTemplateList();
+        } catch(e) {
+            showToast('error', 'Error', e.message);
+        }
+    }, {icon: 'fas fa-trash', danger: true, yesText: 'Delete'});
+}
+
+async function refreshTemplatesData() {
+    try {
+        const result = await apiCall('/api/school/timetable/v2/templates');
+        templatesData = result.templates || [];
+    } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 2: CLASS TIMETABLE
+// ═══════════════════════════════════════════════════════════
+
 function onTTClassChange(classId) {
     const sec = document.getElementById('ttSection');
     sec.innerHTML = '<option value="">All Sections</option>';
@@ -354,10 +843,18 @@ function onTTClassChange(classId) {
     }
 }
 
+function getPeriodsForClass(classId) {
+    const templateId = assignmentsMap[classId];
+    if (templateId) {
+        return periodsData.filter(p => p.template_id === templateId);
+    }
+    return periodsData;
+}
+
 async function loadTimetable() {
     const classId = document.getElementById('ttClass').value;
     const sectionId = document.getElementById('ttSection').value;
-    if (!classId) { showToast('warning', 'Select Class', ''); return; }
+    if (!classId) { showToast('warning', 'Select Class', 'Please select a class first'); return; }
 
     const area = document.getElementById('timetableArea');
     area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
@@ -366,25 +863,20 @@ async function loadTimetable() {
         const params = new URLSearchParams({ class_id: classId });
         if (sectionId) params.append('section_id', sectionId);
         const result = await apiCall(`/api/school/timetable/load?${params}`);
-        currentTimetable = result.timetable;
-        renderTimetable();
+        currentTimetable = result.timetable || {};
+        renderClassTimetable(classId);
     } catch(e) {
-        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle"></i><h3>Error</h3></div></div></div>';
+        area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error loading timetable</h3><p>' + e.message + '</p></div></div></div>';
     }
 }
 
-function renderTimetable() {
-    const regularPeriods = periodsData.filter(p => p.type === 'regular' || p.type === 'assembly');
-    const allPeriods = periodsData; // includes breaks
+function renderClassTimetable(classId) {
+    const allPeriods = getPeriodsForClass(classId);
 
     if (allPeriods.length === 0) {
-        document.getElementById('timetableArea').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-clock"></i><h3>No Periods Defined</h3><p>Go to Period Setup tab first to define your school periods</p></div></div></div>';
+        document.getElementById('timetableArea').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-clock" style="color: var(--warning);"></i><h3>No Periods Defined</h3><p>Go to the Bell Schedules tab to create a schedule and assign it to this class</p></div></div></div>';
         return;
     }
-
-    // Build subject/teacher lookup
-    const subMap = {}; subjectsData.forEach(s => subMap[s.id] = s.name);
-    const tchMap = {}; teachersData.forEach(t => tchMap[t.id] = t.name);
 
     let html = '<div class="card"><div class="card-body" style="padding: 0; overflow-x: auto;"><table class="tt-grid"><thead><tr><th>Period</th>';
     DAYS.forEach(d => { html += `<th>${DAY_LABELS[d]}</th>`; });
@@ -392,18 +884,20 @@ function renderTimetable() {
 
     allPeriods.forEach(p => {
         const isBreak = p.type === 'break' || p.type === 'lunch';
-        html += `<tr><td><div style="font-size: 0.78rem;"><strong>${p.label}</strong><br><span class="text-xs text-muted">${p.start} - ${p.end}</span></div></td>`;
+        html += `<tr><td><div style="font-size: 0.78rem;"><strong>${p.label}</strong><br><span class="text-xs text-muted">${p.start || ''} - ${p.end || ''}</span></div></td>`;
 
         DAYS.forEach(day => {
             if (isBreak) {
-                html += `<td><div class="tt-cell break-cell">${p.type === 'lunch' ? '🍽 Lunch' : '☕ Break'}</div></td>`;
+                html += `<td><div class="tt-cell break-cell">${p.type === 'lunch' ? 'Lunch' : 'Break'}</div></td>`;
             } else {
                 const slot = currentTimetable[day]?.[p.id];
                 if (slot && slot.subject_id) {
+                    const subName = subMap[slot.subject_id]?.name || '?';
+                    const tchName = tchMap[slot.teacher_id]?.name || '';
                     html += `<td><div class="tt-cell filled" onclick="editSlot('${p.id}','${day}')">
-                        <div class="tt-subject">${subMap[slot.subject_id] || '?'}</div>
-                        <div class="tt-teacher">${tchMap[slot.teacher_id] || ''}</div>
-                        ${slot.room ? '<div class="text-xs text-muted">' + slot.room + '</div>' : ''}
+                        <div class="tt-subject">${subName}</div>
+                        <div class="tt-teacher">${tchName}</div>
+                        ${slot.room ? '<div class="tt-room"><i class="fas fa-door-open"></i> ' + slot.room + '</div>' : ''}
                         <div class="remove-btn" onclick="event.stopPropagation(); removeSlot('${p.id}','${day}')"><i class="fas fa-times"></i></div>
                     </div></td>`;
                 } else {
@@ -427,7 +921,7 @@ function editSlot(periodId, day) {
     // Populate subject dropdown
     const subSel = document.getElementById('slotSubject');
     subSel.innerHTML = '<option value="">-- No Subject --</option>';
-    subjectsData.forEach(s => { subSel.innerHTML += `<option value="${s.id}" ${slot?.subject_id===s.id?'selected':''}>${s.name}</option>`; });
+    subjectsData.forEach(s => { subSel.innerHTML += `<option value="${s.id}" ${slot?.subject_id===s.id?'selected':''}>${s.name}${s.code ? ' (' + s.code + ')' : ''}</option>`; });
 
     // Populate teacher dropdown
     const tchSel = document.getElementById('slotTeacher');
@@ -437,9 +931,24 @@ function editSlot(periodId, day) {
     document.getElementById('slotRoom').value = slot?.room || '';
     document.getElementById('slotConflictMsg').style.display = 'none';
 
+    // Show free teacher info
+    loadSlotFreeInfo(periodId, day);
+
     const p = periodsData.find(pp => pp.id === periodId);
-    document.getElementById('slotModalTitle').textContent = `${p?.label || 'Period'} — ${DAY_LABELS[day] || day}`;
+    document.getElementById('slotModalTitle').textContent = `${p?.label || 'Period'} - ${DAY_FULL[day] || day}`;
     openModal('slotModal');
+}
+
+async function loadSlotFreeInfo(periodId, day) {
+    const infoDiv = document.getElementById('slotFreeInfo');
+    infoDiv.style.display = 'block';
+    infoDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking teacher availability...';
+    try {
+        const result = await apiCall(`/api/school/timetable/free-teachers?period_id=${periodId}&day=${day}`);
+        infoDiv.innerHTML = `<i class="fas fa-info-circle" style="color: var(--primary);"></i> <strong>${result.free.length}</strong> teachers free, <strong>${result.busy.length}</strong> busy out of <strong>${result.total}</strong> total`;
+    } catch(e) {
+        infoDiv.style.display = 'none';
+    }
 }
 
 async function saveSlot() {
@@ -450,7 +959,7 @@ async function saveSlot() {
     const room = document.getElementById('slotRoom').value;
 
     const btn = document.getElementById('saveSlotBtn');
-    btn.disabled = true;
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
     try {
         await apiCall('/api/school/timetable/slot', 'POST', {
@@ -459,46 +968,523 @@ async function saveSlot() {
             subject_id: subjectId || null, teacher_id: teacherId || null, room: room || null,
         });
 
-        // Update local data
         if (!currentTimetable[editingSlot.day]) currentTimetable[editingSlot.day] = {};
         currentTimetable[editingSlot.day][editingSlot.periodId] = {
             subject_id: subjectId || null, teacher_id: teacherId || null, room,
         };
-        renderTimetable();
+        renderClassTimetable(classId);
         closeModal('slotModal');
-        showToast('success', 'Slot Saved', '');
+        showToast('success', 'Slot Saved', 'Timetable slot updated successfully');
     } catch(e) {
         document.getElementById('slotConflictMsg').textContent = e.message;
         document.getElementById('slotConflictMsg').style.display = 'block';
     }
-    btn.disabled = false;
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save';
 }
 
 async function removeSlot(periodId, day) {
-    if (!confirm('Remove this timetable slot? You can always re-assign it later.')) return;
-    const classId = document.getElementById('ttClass').value;
-    const sectionId = document.getElementById('ttSection').value;
-    try {
-        await apiCall(`/api/school/timetable/slot?class_id=${classId}&section_id=${sectionId}&period_id=${periodId}&day=${day}`, 'DELETE');
-        if (currentTimetable[day]) delete currentTimetable[day][periodId];
-        renderTimetable();
-        showToast('info', 'Slot Removed', 'You can re-assign this slot anytime');
-    } catch(e) {}
+    showConfirm('Remove Slot', 'Remove this timetable slot? You can always re-assign it later.', async () => {
+        const classId = document.getElementById('ttClass').value;
+        const sectionId = document.getElementById('ttSection').value;
+        try {
+            await apiCall(`/api/school/timetable/slot?class_id=${classId}&section_id=${sectionId}&period_id=${periodId}&day=${day}`, 'DELETE');
+            if (currentTimetable[day]) delete currentTimetable[day][periodId];
+            renderClassTimetable(classId);
+            showToast('info', 'Slot Removed', 'You can re-assign this slot anytime');
+        } catch(e) {
+            showToast('error', 'Error', e.message);
+        }
+    }, {danger: true, yesText: 'Remove'});
 }
 
-// ─── FREE TEACHERS ───
+async function checkConflicts() {
+    openModal('conflictsModal');
+    const content = document.getElementById('conflictsContent');
+    content.innerHTML = '<div style="text-align: center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i><p style="margin-top: 10px;">Checking for conflicts...</p></div>';
+
+    try {
+        const [teacherRes, roomRes] = await Promise.all([
+            apiCall('/api/school/timetable/v2/conflicts/teacher'),
+            apiCall('/api/school/timetable/v2/conflicts/room')
+        ]);
+
+        const tConflicts = teacherRes.conflicts || [];
+        const rConflicts = roomRes.conflicts || [];
+        const total = tConflicts.length + rConflicts.length;
+
+        let html = '';
+        if (total === 0) {
+            html = '<div class="empty-state" style="padding: 20px;"><i class="fas fa-check-circle" style="font-size: 2rem; color: var(--success);"></i><h3>No Conflicts Found</h3><p>All timetable slots are conflict-free</p></div>';
+        } else {
+            html += `<div style="margin-bottom: 16px; padding: 10px; background: var(--warning-light); border-radius: var(--radius-sm); font-weight: 600; color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> ${total} conflict(s) detected</div>`;
+
+            if (tConflicts.length > 0) {
+                html += '<h4 style="margin-bottom: 10px;"><i class="fas fa-user" style="color: var(--danger);"></i> Teacher Conflicts</h4>';
+                tConflicts.forEach(c => {
+                    html += `<div style="padding: 8px 12px; border-left: 3px solid var(--danger); background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 0.85rem;">
+                        <strong>${c.teacher_name}</strong> is double-booked on <strong>${DAY_FULL[c.day] || c.day}</strong> during <strong>${c.period_label}</strong>
+                        <br><span class="text-muted">${c.class1} &amp; ${c.class2}</span>
+                    </div>`;
+                });
+            }
+            if (rConflicts.length > 0) {
+                html += '<h4 style="margin: 16px 0 10px;"><i class="fas fa-door-open" style="color: var(--warning);"></i> Room Conflicts</h4>';
+                rConflicts.forEach(c => {
+                    html += `<div style="padding: 8px 12px; border-left: 3px solid var(--warning); background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; font-size: 0.85rem;">
+                        Room <strong>${c.room}</strong> is double-booked on <strong>${DAY_FULL[c.day] || c.day}</strong> during <strong>${c.period_label}</strong>
+                        <br><span class="text-muted">${c.class1} &amp; ${c.class2}</span>
+                    </div>`;
+                });
+            }
+        }
+        content.innerHTML = html;
+    } catch(e) {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error</h3><p>${e.message}</p></div>`;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 3: TEACHER TIMETABLE
+// ═══════════════════════════════════════════════════════════
+
+function populateTeacherDropdown() {
+    const sel = document.getElementById('ttTeacher');
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">Select Teacher</option>';
+    teachersData.forEach(t => {
+        sel.innerHTML += `<option value="${t.id}" ${t.id === currentVal ? 'selected' : ''}>${t.name}</option>`;
+    });
+}
+
+async function loadTeacherTimetable() {
+    const teacherId = document.getElementById('ttTeacher').value;
+    if (!teacherId) { showToast('warning', 'Select Teacher', 'Please select a teacher first'); return; }
+
+    const area = document.getElementById('teacherTTArea');
+    const statsArea = document.getElementById('teacherTTStats');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
+    statsArea.style.display = 'none';
+
+    try {
+        const [ttResult, workloadResult] = await Promise.all([
+            apiCall(`/api/school/timetable/v2/view/teacher/${teacherId}`),
+            apiCall('/api/school/timetable/v2/workload')
+        ]);
+
+        const timetable = ttResult.timetable || {};
+        const teacher = ttResult.teacher || {};
+        const workloadList = workloadResult.workload || [];
+        const myWorkload = workloadList.find(w => String(w.teacher_id) === String(teacherId));
+
+        // Stats
+        if (myWorkload) {
+            const totalP = myWorkload.total_periods || 0;
+            const freeP = myWorkload.free_periods || 0;
+            const pct = totalP > 0 ? Math.round((totalP / (totalP + freeP)) * 100) : 0;
+            statsArea.style.display = 'block';
+            statsArea.innerHTML = `<div class="stats-grid">
+                <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-chalkboard"></i></div><div class="stat-info"><div class="stat-value">${totalP}</div><div class="stat-label">Teaching Periods</div></div></div>
+                <div class="stat-card"><div class="stat-icon green"><i class="fas fa-coffee"></i></div><div class="stat-info"><div class="stat-value">${freeP}</div><div class="stat-label">Free Periods</div></div></div>
+                <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-percentage"></i></div><div class="stat-info"><div class="stat-value">${pct}%</div><div class="stat-label">Utilization</div></div></div>
+                <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-book"></i></div><div class="stat-info"><div class="stat-value">${(myWorkload.subjects || []).length}</div><div class="stat-label">Subjects</div></div></div>
+            </div>`;
+        }
+
+        // Build the grid
+        // We need to figure out all distinct periods across all days
+        const allPeriodSlots = [];
+        const seenPeriods = new Set();
+        DAYS.forEach(day => {
+            const daySlots = timetable[day] || [];
+            daySlots.forEach(slot => {
+                const key = slot.period_number + '_' + slot.label;
+                if (!seenPeriods.has(key)) {
+                    seenPeriods.add(key);
+                    allPeriodSlots.push({ number: slot.period_number, label: slot.label, start: slot.start, end: slot.end });
+                }
+            });
+        });
+        allPeriodSlots.sort((a, b) => a.number - b.number);
+
+        if (allPeriodSlots.length === 0) {
+            area.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-calendar-check" style="color: var(--success);"></i><h3>No Classes Assigned</h3><p>This teacher has no timetable slots assigned yet</p></div></div></div>';
+            return;
+        }
+
+        // Build lookup: day -> period_number -> slot
+        const slotLookup = {};
+        DAYS.forEach(day => {
+            slotLookup[day] = {};
+            (timetable[day] || []).forEach(slot => {
+                slotLookup[day][slot.period_number] = slot;
+            });
+        });
+
+        let html = '<div class="card"><div class="card-body" style="padding: 0; overflow-x: auto;"><table class="tt-grid"><thead><tr><th>Period</th>';
+        DAYS.forEach(d => { html += `<th>${DAY_LABELS[d]}</th>`; });
+        html += '</tr></thead><tbody>';
+
+        allPeriodSlots.forEach(p => {
+            html += `<tr><td><div style="font-size: 0.78rem;"><strong>${p.label}</strong><br><span class="text-xs text-muted">${p.start || ''} - ${p.end || ''}</span></div></td>`;
+            DAYS.forEach(day => {
+                const slot = slotLookup[day]?.[p.number];
+                if (slot && slot.class_name) {
+                    html += `<td><div class="tt-cell filled">
+                        <div class="tt-subject">${slot.subject_name || ''}</div>
+                        <div class="tt-teacher">${slot.class_name}${slot.section_name ? ' - ' + slot.section_name : ''}</div>
+                        ${slot.room ? '<div class="tt-room"><i class="fas fa-door-open"></i> ' + slot.room + '</div>' : ''}
+                    </div></td>`;
+                } else {
+                    html += `<td><div class="tt-cell free-cell" style="display: flex; align-items: center; justify-content: center; font-size: 0.72rem; color: var(--success); font-weight: 600;">
+                        <i class="fas fa-check" style="margin-right: 4px;"></i> Free
+                    </div></td>`;
+                }
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table></div></div>';
+        area.innerHTML = html;
+    } catch(e) {
+        area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error</h3><p>${e.message}</p></div></div></div>`;
+        statsArea.style.display = 'none';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 4: SUBSTITUTIONS
+// ═══════════════════════════════════════════════════════════
+
+function initSubDate() {
+    const dateInput = document.getElementById('subDate');
+    if (!dateInput.value) {
+        const today = new Date();
+        dateInput.value = today.toISOString().split('T')[0];
+    }
+}
+
+async function loadSubstitutions() {
+    const date = document.getElementById('subDate').value;
+    if (!date) { showToast('warning', 'Select Date', 'Please select a date'); return; }
+
+    // Load absent teachers
+    const absentCard = document.getElementById('absentTeachersCard');
+    const absentPanel = document.getElementById('absentTeachersPanel');
+    absentCard.style.display = 'block';
+    absentPanel.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div>';
+
+    // Load substitutions
+    const subPanel = document.getElementById('substitutionsPanel');
+    subPanel.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div>';
+
+    try {
+        const [absentRes, subRes] = await Promise.all([
+            apiCall(`/api/school/timetable/v2/substitutions/absent-teachers?date=${date}`),
+            apiCall(`/api/school/timetable/v2/substitutions?date=${date}`)
+        ]);
+
+        // Render absent teachers
+        const absentTeachers = absentRes.teachers || [];
+        if (absentTeachers.length === 0) {
+            absentPanel.innerHTML = '<div style="padding: 16px; text-align: center; color: var(--success); font-weight: 600;"><i class="fas fa-check-circle"></i> No absent teachers on this date</div>';
+        } else {
+            let ahtml = '';
+            absentTeachers.forEach(t => {
+                ahtml += `<div class="absent-card">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div>
+                            <div class="teacher-name"><i class="fas fa-user-times" style="color: var(--danger); margin-right: 6px;"></i> ${t.name}</div>
+                            <div class="leave-info">${t.leave_type || 'Leave'} &middot; ${t.start_date || ''} to ${t.end_date || ''}</div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="showTeacherSlots('${t.id}', '${date}', '${t.name}')">
+                            <i class="fas fa-exchange-alt"></i> Assign Substitutes
+                        </button>
+                    </div>
+                    <div class="absent-slots" id="absent-slots-${t.id}"></div>
+                </div>`;
+            });
+            absentPanel.innerHTML = ahtml;
+        }
+
+        // Render substitutions list
+        const subs = subRes.substitutions || [];
+        if (subs.length === 0) {
+            subPanel.innerHTML = '<div class="empty-state" style="padding: 20px;"><i class="fas fa-exchange-alt"></i><p>No substitutions recorded for this date</p></div>';
+        } else {
+            let shtml = '';
+            subs.forEach(s => {
+                shtml += `<div class="sub-card">
+                    <div>
+                        <div style="font-weight: 700; font-size: 0.95rem;">${s.class_name || ''} &mdash; ${s.period_label || ''} &mdash; ${s.subject_name || ''}</div>
+                        <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">
+                            <i class="fas fa-user-times" style="color: var(--danger);"></i> ${s.original_teacher_name || 'N/A'}
+                            <i class="fas fa-arrow-right" style="margin: 0 6px; color: var(--text-light);"></i>
+                            <i class="fas fa-user-check" style="color: var(--success);"></i> ${s.substitute_teacher_name || 'N/A'}
+                        </div>
+                        ${s.reason ? '<div style="font-size: 0.78rem; color: var(--text-light); margin-top: 2px; font-style: italic;">' + s.reason + '</div>' : ''}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="sub-status ${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</span>
+                        <button class="btn btn-ghost btn-sm" onclick="deleteSubstitution('${s.id}')" style="color: var(--danger);" title="Remove"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            });
+            subPanel.innerHTML = shtml;
+        }
+    } catch(e) {
+        absentPanel.innerHTML = `<div style="color: var(--danger); padding: 16px;">${e.message}</div>`;
+        subPanel.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><p>${e.message}</p></div>`;
+    }
+}
+
+async function showTeacherSlots(teacherId, date, teacherName) {
+    // For now, we open the suggestions modal with a general prompt
+    // We would need to load the teacher's slots for this day and show them
+    // Since the API gives slots via the teacher view, let's load it
+    try {
+        const ttResult = await apiCall(`/api/school/timetable/v2/view/teacher/${teacherId}`);
+        const dayOfWeek = getDayOfWeek(date);
+        const daySlots = (ttResult.timetable || {})[dayOfWeek] || [];
+
+        if (daySlots.length === 0) {
+            showToast('info', 'No Slots', `${teacherName} has no scheduled slots for this day`);
+            return;
+        }
+
+        const slotsDiv = document.getElementById('absent-slots-' + teacherId);
+        if (slotsDiv) {
+            let html = '';
+            daySlots.forEach(slot => {
+                html += `<div class="absent-slot-chip" style="cursor: pointer;" onclick="openSuggestionsForSlot('${slot.slot_id || ''}', '${date}', '${teacherId}', '${teacherName}', '${slot.label} - ${slot.class_name || ''}')">
+                    <i class="fas fa-clock" style="color: var(--primary); margin-right: 4px;"></i>
+                    ${slot.label} (${slot.start}-${slot.end}) &mdash; ${slot.class_name || ''}${slot.section_name ? ' ' + slot.section_name : ''} &mdash; ${slot.subject_name || ''}
+                </div>`;
+            });
+            slotsDiv.innerHTML = html;
+        }
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+}
+
+function getDayOfWeek(dateStr) {
+    const d = new Date(dateStr);
+    const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+    return days[d.getDay()];
+}
+
+async function openSuggestionsForSlot(slotId, date, originalTeacherId, teacherName, slotLabel) {
+    if (!slotId) {
+        showToast('warning', 'Slot Info Missing', 'Cannot find the slot ID for this period');
+        return;
+    }
+    currentSubSlotId = slotId;
+    currentSubOriginalTeacherId = originalTeacherId;
+
+    document.getElementById('suggestionsTitle').textContent = `Substitute for ${teacherName} - ${slotLabel}`;
+    openModal('suggestionsModal');
+
+    const content = document.getElementById('suggestionsContent');
+    content.innerHTML = '<div style="text-align: center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i><p style="margin-top: 10px;">Finding available teachers...</p></div>';
+
+    try {
+        const result = await apiCall(`/api/school/timetable/v2/substitutions/suggestions?slot_id=${slotId}&date=${date}`);
+        const suggestions = result.suggestions || [];
+
+        if (suggestions.length === 0) {
+            content.innerHTML = '<div class="empty-state" style="padding: 20px;"><i class="fas fa-user-slash" style="color: var(--warning);"></i><h3>No Suggestions</h3><p>No free teachers available for this slot</p></div>';
+            return;
+        }
+
+        let html = '<div style="margin-bottom: 10px; font-size: 0.82rem; color: var(--text-secondary);">Click a teacher to assign them as substitute:</div>';
+        suggestions.forEach(s => {
+            html += `<div class="sug-card" onclick="assignSubstitute('${s.id}', '${date}')">
+                <div>
+                    <div style="font-weight: 700;">${s.name}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">Workload: ${s.workload || 0} periods</div>
+                </div>
+                <span class="sug-match ${s.subject_match ? 'yes' : 'no'}">${s.subject_match ? 'Subject Match' : 'No Match'}</span>
+            </div>`;
+        });
+        content.innerHTML = html;
+    } catch(e) {
+        content.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><p>${e.message}</p></div>`;
+    }
+}
+
+async function assignSubstitute(substituteTeacherId, date) {
+    if (!currentSubSlotId || !currentSubOriginalTeacherId) return;
+
+    try {
+        await apiCall('/api/school/timetable/v2/substitutions', 'POST', {
+            date: date,
+            timetable_slot_id: currentSubSlotId,
+            original_teacher_id: currentSubOriginalTeacherId,
+            substitute_teacher_id: substituteTeacherId,
+            reason: 'Teacher absent'
+        });
+        showToast('success', 'Substitute Assigned', 'Substitution recorded successfully');
+        closeModal('suggestionsModal');
+        loadSubstitutions();
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+}
+
+function deleteSubstitution(id) {
+    showConfirm('Remove Substitution', 'Are you sure you want to remove this substitution record?', async () => {
+        try {
+            await apiCall(`/api/school/timetable/v2/substitutions/${id}`, 'DELETE');
+            showToast('info', 'Removed', 'Substitution removed');
+            loadSubstitutions();
+        } catch(e) {
+            showToast('error', 'Error', e.message);
+        }
+    }, {danger: true, yesText: 'Remove'});
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 5: SUBJECT HOURS
+// ═══════════════════════════════════════════════════════════
+
+let subjectHoursData = [];
+
+async function loadSubjectHours() {
+    const classId = document.getElementById('shClass').value;
+    if (!classId) { showToast('warning', 'Select Class', 'Please select a class'); return; }
+
+    const area = document.getElementById('subjectHoursArea');
+    area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 40px;"><i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary);"></i></div></div>';
+    document.getElementById('shValidateBtn').style.display = 'inline-flex';
+
+    try {
+        const result = await apiCall(`/api/school/timetable/v2/subject-hours?class_id=${classId}`);
+        subjectHoursData = result.items || [];
+        renderSubjectHours(classId);
+    } catch(e) {
+        area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error</h3><p>${e.message}</p></div></div></div>`;
+    }
+}
+
+function renderSubjectHours(classId) {
+    const area = document.getElementById('subjectHoursArea');
+
+    // Merge subject hours data with all subjects
+    const hoursMap = {};
+    subjectHoursData.forEach(item => { hoursMap[item.subject_id] = item; });
+
+    let html = '<div class="card">';
+    html += `<div class="card-header">
+        <h2><i class="fas fa-book-open" style="color: var(--primary); margin-right: 8px;"></i> Subject Hour Configuration</h2>
+    </div>`;
+    html += '<div class="card-body">';
+    html += `<div class="sh-row header">
+        <div>Subject</div><div>Configured / Week</div><div>Actual / Week</div><div>Status</div>
+    </div>`;
+    html += '<div id="shRowsContainer">';
+
+    subjectsData.forEach(s => {
+        const item = hoursMap[s.id];
+        const configured = item ? item.periods_per_week : 0;
+        html += `<div class="sh-row" data-subject-id="${s.id}">
+            <div style="font-weight: 600;">${s.name}${s.code ? ' <span style="color: var(--text-light);">(' + s.code + ')</span>' : ''}</div>
+            <div><input type="number" class="sh-configured" value="${configured}" min="0" max="50"></div>
+            <div class="sh-actual">&mdash;</div>
+            <div class="sh-status-cell">&mdash;</div>
+        </div>`;
+    });
+
+    html += '</div></div>';
+    html += `<div class="card-footer">
+        <button class="btn btn-primary" onclick="saveSubjectHours()" id="saveShBtn"><i class="fas fa-save"></i> Save Configuration</button>
+    </div>`;
+    html += '</div>';
+    area.innerHTML = html;
+}
+
+async function saveSubjectHours() {
+    const classId = document.getElementById('shClass').value;
+    if (!classId) return;
+
+    const rows = document.querySelectorAll('#shRowsContainer .sh-row');
+    const items = [];
+    rows.forEach(row => {
+        const subjectId = row.getAttribute('data-subject-id');
+        const ppw = parseInt(row.querySelector('.sh-configured').value) || 0;
+        if (ppw > 0) {
+            items.push({ subject_id: subjectId, periods_per_week: ppw });
+        }
+    });
+
+    const btn = document.getElementById('saveShBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    try {
+        await apiCall('/api/school/timetable/v2/subject-hours', 'POST', { class_id: classId, items });
+        showToast('success', 'Saved', 'Subject hours configuration saved');
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Configuration';
+}
+
+async function validateSubjectHours() {
+    const classId = document.getElementById('shClass').value;
+    if (!classId) { showToast('warning', 'Select Class', ''); return; }
+
+    const btn = document.getElementById('shValidateBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+
+    try {
+        const result = await apiCall(`/api/school/timetable/v2/subject-hours/validate?class_id=${classId}`);
+        const validation = result.validation || [];
+
+        // Update actual and status columns
+        const rows = document.querySelectorAll('#shRowsContainer .sh-row');
+        const valMap = {};
+        validation.forEach(v => { valMap[v.subject_name] = v; });
+
+        rows.forEach(row => {
+            const subjectId = row.getAttribute('data-subject-id');
+            const subName = subMap[subjectId]?.name;
+            const v = valMap[subName];
+            const actualCell = row.querySelector('.sh-actual');
+            const statusCell = row.querySelector('.sh-status-cell');
+
+            if (v) {
+                actualCell.textContent = v.actual || 0;
+                const status = v.status || 'ok';
+                let statusLabel = 'OK';
+                let statusClass = 'ok';
+                if (status === 'under' || status === 'below') { statusLabel = 'Under'; statusClass = 'under'; }
+                else if (status === 'over' || status === 'above') { statusLabel = 'Over'; statusClass = 'over'; }
+                statusCell.innerHTML = `<span class="sh-status ${statusClass}">${statusLabel}</span>`;
+            }
+        });
+
+        showToast('info', 'Validation Complete', 'Check the status column for mismatches');
+    } catch(e) {
+        showToast('error', 'Error', e.message);
+    }
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> Validate';
+}
+
+// ═══════════════════════════════════════════════════════════
+// TAB 6: FREE TEACHERS
+// ═══════════════════════════════════════════════════════════
+
 function populateFPPeriods() {
     const sel = document.getElementById('fpPeriod');
     sel.innerHTML = '<option value="">Select Period</option>';
     periodsData.filter(p => p.type === 'regular').forEach(p => {
-        sel.innerHTML += `<option value="${p.id}">${p.label} (${p.start}-${p.end})</option>`;
+        sel.innerHTML += `<option value="${p.id}">${p.label} (${p.start || ''}-${p.end || ''})</option>`;
     });
 }
 
 async function loadFreeTeachers() {
     const day = document.getElementById('fpDay').value;
     const periodId = document.getElementById('fpPeriod').value;
-    if (!periodId) { showToast('warning', 'Select Period', ''); return; }
+    if (!periodId) { showToast('warning', 'Select Period', 'Please select a period'); return; }
 
     const area = document.getElementById('freeTeachersArea');
     area.innerHTML = '<div class="card"><div class="card-body" style="text-align:center; padding: 30px;"><i class="fas fa-spinner fa-spin" style="font-size: 1.5rem; color: var(--primary);"></i></div></div>';
@@ -518,18 +1504,42 @@ async function loadFreeTeachers() {
                 <div class="card">
                     <div class="card-header"><h2 style="color: var(--success);"><i class="fas fa-check-circle"></i> Available (${result.free.length})</h2></div>
                     <div class="card-body">
-                        <div class="free-panel">${result.free.length === 0 ? '<span class="text-muted">No free teachers</span>' : result.free.map(t => `<span class="teacher-chip free"><i class="fas fa-user"></i> ${t.name}</span>`).join('')}</div>
+                        <div class="free-panel">${result.free.length === 0 ? '<span class="text-muted">No free teachers</span>' : result.free.map(t => '<span class="teacher-chip free"><i class="fas fa-user"></i> ' + t.name + '</span>').join('')}</div>
                     </div>
                 </div>
                 <div class="card">
                     <div class="card-header"><h2 style="color: var(--danger);"><i class="fas fa-times-circle"></i> Busy (${result.busy.length})</h2></div>
                     <div class="card-body">
-                        <div class="free-panel">${result.busy.map(t => `<span class="teacher-chip busy"><i class="fas fa-user"></i> ${t.name}</span>`).join('')}</div>
+                        <div class="free-panel">${result.busy.length === 0 ? '<span class="text-muted">No busy teachers</span>' : result.busy.map(t => '<span class="teacher-chip busy"><i class="fas fa-user"></i> ' + t.name + '</span>').join('')}</div>
                     </div>
                 </div>
             </div>
         `;
-    } catch(e) {}
+    } catch(e) {
+        area.innerHTML = `<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-exclamation-circle" style="color: var(--danger);"></i><h3>Error</h3><p>${e.message}</p></div></div></div>`;
+    }
 }
+
+// ═══════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════
+(function init() {
+    // Set today's day as default in free teacher view
+    const dayMap = [null,'monday','tuesday','wednesday','thursday','friday','saturday','sunday'];
+    const today = dayMap[new Date().getDay()];
+    if (today) {
+        const opt = document.querySelector('#fpDay option[value="' + today + '"]');
+        if (opt) opt.selected = true;
+    }
+
+    // Set today's date for substitutions
+    const subDateInput = document.getElementById('subDate');
+    if (subDateInput) {
+        subDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Render template list on initial load
+    renderTemplateList();
+})();
 </script>
 {% endblock %}

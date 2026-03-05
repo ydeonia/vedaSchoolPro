@@ -111,8 +111,8 @@ function calcDays() {
 
 async function applyLeave() {
     const start = document.getElementById('leaveStart').value, end = document.getElementById('leaveEnd').value, reason = document.getElementById('leaveReason').value.trim();
-    if (!start || !end) { alert('Select dates'); return; }
-    if (!reason) { alert('Enter reason'); return; }
+    if (!start || !end) { showToast('warning','Select dates'); return; }
+    if (!reason) { showToast('warning','Enter reason'); return; }
     const btn = document.getElementById('applyBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     try {
@@ -147,7 +147,7 @@ async function loadHistory() {
     } catch(e) {}
 }
 
-async function cancelLeave(id) { if(!confirm('Cancel this leave?'))return; try{await apiCall(`/api/teacher/leave/cancel/${id}`,'DELETE');loadHistory();}catch(e){} }
+async function cancelLeave(id) { showConfirm('Cancel Leave','Cancel this leave?', async()=>{ try{await apiCall(`/api/teacher/leave/cancel/${id}`,'DELETE');loadHistory();}catch(e){} },{icon:'⚠️',danger:true,yesText:'Cancel'}); }
 function fmtDate(iso) { return new Date(iso).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}); }
 loadHistory();
 </script>

@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+{% block title %}Asset Management{% endblock %}
+{% block page_title %}Asset & Inventory Management{% endblock %}
+{% block page_subtitle %}Track school assets, maintenance logs, and inventory{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Stats row */
+.ast-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.ast-stat{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:16px;text-align:center;}
+.ast-stat .val{font-size:1.5rem;font-weight:800;}
+.ast-stat .lbl{font-size:0.72rem;color:var(--text-light);margin-top:2px;}
+/* Filter bar */
+.ast-filter{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.ast-filter input,.ast-filter select{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
+.ast-filter input{flex:1;min-width:180px;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;font-size:0.82rem;display:inline-flex;align-items:center;gap:6px;}
+.btn-sm{padding:6px 12px;border-radius:8px;font-size:0.72rem;}
+.btn-outline{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:white;display:inline-flex;align-items:center;gap:4px;}
+.btn-outline:hover{background:var(--primary-50,#EEF2FF);border-color:var(--primary);color:var(--primary);}
+.btn-outline.danger{color:#DC2626;border-color:#FCA5A5;}.btn-outline.danger:hover{background:#FEE2E2;}
+/* Asset table */
+.ast-table-wrap{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;}
+.ast-table{width:100%;border-collapse:collapse;}
+.ast-table th{text-align:left;padding:10px 14px;font-size:0.65rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;background:var(--bg);border-bottom:1px solid var(--border);}
+.ast-table td{padding:10px 14px;font-size:0.82rem;border-bottom:1px solid var(--border-light);}
+.ast-table tr:hover td{background:var(--bg);}
+.ast-code{font-weight:800;color:var(--primary);font-size:0.78rem;}
+.ast-name{font-weight:700;}
+/* Condition badges */
+.cond-badge{padding:3px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;display:inline-block;}
+.cond-good{background:#D1FAE5;color:#059669;}
+.cond-fair{background:#FEF3C7;color:#92400E;}
+.cond-poor{background:#FFEDD5;color:#9A3412;}
+.cond-damaged{background:#FEE2E2;color:#DC2626;}
+.cond-disposed{background:#F3F4F6;color:#6B7280;}
+/* Modals */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal-box{background:var(--bg-card, white);border-radius:16px;padding:24px;width:92%;max-width:700px;max-height:85vh;overflow-y:auto;}
+.modal-box h3{margin-bottom:14px;font-size:0.95rem;display:flex;align-items:center;gap:8px;}
+.modal-box h3 .close-btn{margin-left:auto;background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text-secondary);}
+/* Form grid */
+.f-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.f-row.cols-2{grid-template-columns:1fr 1fr;}
+.f-row.cols-4{grid-template-columns:repeat(4,1fr);}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select,.f-grp textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;font-family:inherit;}
+.f-grp textarea{resize:vertical;min-height:60px;}
+/* Detail modal - log list */
+.log-list{margin-top:12px;}
+.log-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light);align-items:flex-start;}
+.log-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0;}
+.log-icon.purchase{background:#D1FAE5;}.log-icon.transfer{background:#DBEAFE;}.log-icon.maintenance{background:#FEF3C7;}
+.log-icon.repair{background:#FFEDD5;}.log-icon.dispose{background:#F3F4F6;}.log-icon.audit{background:#EDE9FE;}.log-icon.damage{background:#FEE2E2;}
+.log-body{flex:1;}.log-type{font-weight:700;font-size:0.78rem;text-transform:capitalize;}.log-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;}
+.log-meta{font-size:0.68rem;color:var(--text-light);margin-top:2px;}
+/* Detail info grid */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
+.dg-item .dg-label{font-size:0.62rem;font-weight:700;color:var(--text-light);text-transform:uppercase;}
+.dg-item .dg-val{font-size:0.82rem;font-weight:700;margin-top:1px;}
+/* Category mini modal */
+.cat-modal-box{max-width:420px;}
+/* Empty state */
+.empty-state{padding:60px 20px;text-align:center;color:var(--text-light);}
+.empty-state i{font-size:2rem;opacity:0.15;display:block;margin-bottom:8px;}
+@media(max-width:768px){
+    .ast-stats{grid-template-columns:1fr 1fr;}
+    .f-row,.f-row.cols-4{grid-template-columns:1fr 1fr;}
+    .detail-grid{grid-template-columns:1fr 1fr;}
+    .ast-filter{flex-direction:column;}
+    .ast-table-wrap{overflow-x:auto;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="ast-stats">
+    <div class="ast-stat"><div class="val" style="color:var(--primary);" id="statTotal">0</div><div class="lbl">Total Assets</div></div>
+    <div class="ast-stat"><div class="val" style="color:#059669;" id="statValue">&#8377;0</div><div class="lbl">Total Value</div></div>
+    <div class="ast-stat"><div class="val" style="color:#10B981;" id="statGood">0</div><div class="lbl">Good Condition</div></div>
+    <div class="ast-stat"><div class="val" style="color:#F59E0B;" id="statAttention">0</div><div class="lbl">Needs Attention</div></div>
+</div>
+
+<!-- Filter Bar -->
+<div class="ast-filter">
+    <input type="text" id="fSearch" placeholder="Search assets..." oninput="debounceLoad()">
+    <select id="fCategory" onchange="loadAssets()"><option value="">All Categories</option></select>
+    <select id="fCondition" onchange="loadAssets()">
+        <option value="">All Conditions</option>
+        <option value="good">Good</option>
+        <option value="fair">Fair</option>
+        <option value="poor">Poor</option>
+        <option value="damaged">Damaged</option>
+        <option value="disposed">Disposed</option>
+    </select>
+    <button class="btn-outline btn-sm" onclick="openCategoryModal()"><i class="fas fa-tags"></i> Categories</button>
+    <button class="btn-primary btn-sm" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Asset</button>
+</div>
+
+<!-- Asset Table -->
+<div class="ast-table-wrap">
+    <table class="ast-table">
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Location</th>
+                <th>Qty</th>
+                <th>Condition</th>
+                <th>Value</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="assetBody">
+            <tr><td colspan="8" class="empty-state"><i class="fas fa-boxes-stacked"></i>Loading assets...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- ═══ Add / Edit Asset Modal ═══ -->
+<div class="modal-bg" id="addModal" onclick="if(event.target===this)closeAddModal()">
+    <div class="modal-box">
+        <h3><i class="fas fa-box"></i> <span id="addModalTitle">Add Asset</span><button class="close-btn" onclick="closeAddModal()">&times;</button></h3>
+        <input type="hidden" id="editAssetId">
+        <div class="f-row">
+            <div class="f-grp"><label>Asset Name *</label><input id="aName" placeholder="Projector, Chair, Laptop..."></div>
+            <div class="f-grp"><label>Category</label><select id="aCat"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Condition</label>
+                <select id="aCondition">
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                    <option value="damaged">Damaged</option>
+                </select>
+            </div>
+        </div>
+        <div class="f-row cols-2">
+            <div class="f-grp"><label>Description</label><textarea id="aDesc" rows="2" placeholder="Brief description..."></textarea></div>
+            <div class="f-grp"><label>Notes</label><textarea id="aNotes" rows="2" placeholder="Additional notes..."></textarea></div>
+        </div>
+        <div class="f-row cols-4">
+            <div class="f-grp"><label>Location</label><input id="aLocation" placeholder="Room 101, Lab..."></div>
+            <div class="f-grp"><label>Quantity</label><input type="number" id="aQty" value="1" min="1"></div>
+            <div class="f-grp"><label>Unit Price (&#8377;)</label><input type="number" id="aPrice" step="0.01" placeholder="0.00"></div>
+            <div class="f-grp"><label>Serial Number</label><input id="aSerial" placeholder="Optional"></div>
+        </div>
+        <div class="f-row cols-4">
+            <div class="f-grp"><label>Purchase Date</label><input type="date" id="aPurchaseDate"></div>
+            <div class="f-grp"><label>Warranty Expiry</label><input type="date" id="aWarranty"></div>
+            <div class="f-grp"><label>Vendor Name</label><input id="aVendor" placeholder="Vendor"></div>
+            <div class="f-grp"><label>Vendor Contact</label><input id="aVendorPhone" placeholder="Phone/Email"></div>
+        </div>
+        <div class="f-row cols-2">
+            <div class="f-grp"><label>Assigned To</label><input id="aAssigned" placeholder="Room/Dept/Person"></div>
+            <div class="f-grp" style="justify-content:flex-end;"><button class="btn-primary" id="addSaveBtn" onclick="saveAsset()"><i class="fas fa-save"></i> Save Asset</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Asset Detail / Log Modal ═══ -->
+<div class="modal-bg" id="detailModal" onclick="if(event.target===this)closeDetailModal()">
+    <div class="modal-box">
+        <h3><i class="fas fa-info-circle"></i> <span id="detailTitle">Asset Details</span><button class="close-btn" onclick="closeDetailModal()">&times;</button></h3>
+        <div class="detail-grid" id="detailGrid"></div>
+        <div style="display:flex;align-items:center;margin-bottom:10px;">
+            <h4 style="flex:1;font-size:0.85rem;margin:0;">Maintenance / Activity Log</h4>
+            <button class="btn-outline btn-sm" onclick="toggleLogForm()"><i class="fas fa-plus"></i> Add Log</button>
+        </div>
+        <!-- Add Log Form (hidden by default) -->
+        <div id="logFormWrap" style="display:none;background:var(--bg);border-radius:10px;padding:14px;margin-bottom:12px;">
+            <input type="hidden" id="logAssetId">
+            <div class="f-row cols-2">
+                <div class="f-grp"><label>Log Type *</label>
+                    <select id="logType">
+                        <option value="maintenance">Maintenance</option>
+                        <option value="repair">Repair</option>
+                        <option value="transfer">Transfer</option>
+                        <option value="audit">Audit</option>
+                        <option value="damage">Damage</option>
+                        <option value="dispose">Dispose</option>
+                        <option value="purchase">Purchase</option>
+                    </select>
+                </div>
+                <div class="f-grp"><label>Performed By</label><input id="logBy" placeholder="Name"></div>
+            </div>
+            <div class="f-row cols-2">
+                <div class="f-grp"><label>Date</label><input type="date" id="logDate"></div>
+                <div class="f-grp"><label>Cost (&#8377;)</label><input type="number" id="logCost" step="0.01" placeholder="0"></div>
+            </div>
+            <div class="f-grp" style="margin-bottom:10px;"><label>Description *</label><textarea id="logDesc" rows="2" placeholder="What was done..."></textarea></div>
+            <button class="btn-primary btn-sm" onclick="saveLog()"><i class="fas fa-save"></i> Save Log</button>
+        </div>
+        <div class="log-list" id="logList"><div style="padding:20px;text-align:center;color:var(--text-light);">Loading logs...</div></div>
+    </div>
+</div>
+
+<!-- ═══ Category Modal ═══ -->
+<div class="modal-bg" id="catModal" onclick="if(event.target===this)closeCategoryModal()">
+    <div class="modal-box cat-modal-box">
+        <h3><i class="fas fa-tags"></i> Asset Categories <button class="close-btn" onclick="closeCategoryModal()">&times;</button></h3>
+        <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input id="catName" placeholder="New category name" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;">
+            <button class="btn-primary btn-sm" onclick="addCategory()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <div id="catList"><div style="padding:20px;text-align:center;color:var(--text-light);">Loading...</div></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let ALL_ASSETS = [];
+let ALL_CATEGORIES = [];
+let searchTimer = null;
+
+// ═══ Initialization ═══
+async function init() {
+    await loadCategories();
+    await loadSummary();
+    await loadAssets();
+}
+
+// ═══ Summary ═══
+async function loadSummary() {
+    const d = await apiCall('/api/school/assets/summary');
+    if (d.error) return;
+    document.getElementById('statTotal').textContent = d.total || 0;
+    document.getElementById('statValue').innerHTML = '&#8377;' + Number(d.total_value || 0).toLocaleString('en-IN');
+    const bc = d.by_condition || {};
+    document.getElementById('statGood').textContent = bc.good || 0;
+    const attention = (bc.fair || 0) + (bc.poor || 0) + (bc.damaged || 0);
+    document.getElementById('statAttention').textContent = attention;
+}
+
+// ═══ Categories ═══
+async function loadCategories() {
+    const d = await apiCall('/api/school/assets/categories');
+    ALL_CATEGORIES = d.categories || [];
+    const opts = '<option value="">All Categories</option>' + ALL_CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    document.getElementById('fCategory').innerHTML = opts;
+    const opts2 = '<option value="">Select</option>' + ALL_CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    document.getElementById('aCat').innerHTML = opts2;
+    renderCatList();
+}
+
+function renderCatList() {
+    const el = document.getElementById('catList');
+    if (!ALL_CATEGORIES.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-light);">No categories yet.</div>'; return; }
+    el.innerHTML = ALL_CATEGORIES.map(c => `<div style="display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border-light);">
+        <span style="flex:1;font-weight:700;font-size:0.85rem;">${c.name}</span>
+        <span style="font-size:0.72rem;color:var(--text-light);margin-right:10px;">${c.description || ''}</span>
+        <button class="btn-outline danger btn-sm" onclick="deleteCategory('${c.id}','${c.name}')"><i class="fas fa-trash"></i></button>
+    </div>`).join('');
+}
+
+async function addCategory() {
+    const name = document.getElementById('catName').value.trim();
+    if (!name) { showToast('warning', 'Enter category name'); return; }
+    await apiCall('/api/school/assets/categories/create', 'POST', { name });
+    document.getElementById('catName').value = '';
+    showToast('success', 'Category added');
+    await loadCategories();
+}
+
+function deleteCategory(id, name) {
+    showConfirm('Delete Category', `Remove "${name}"?`, async () => {
+        await apiCall('/api/school/assets/categories/' + id, 'DELETE');
+        showToast('success', 'Category removed');
+        await loadCategories();
+        await loadAssets();
+    }, { icon: 'fas fa-trash', danger: true, yesText: 'Delete' });
+}
+
+// ═══ Load Assets ═══
+function debounceLoad() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadAssets, 300);
+}
+
+async function loadAssets() {
+    const search = document.getElementById('fSearch').value.trim();
+    const category = document.getElementById('fCategory').value;
+    const condition = document.getElementById('fCondition').value;
+    let url = '/api/school/assets/list?';
+    if (search) url += 'search=' + encodeURIComponent(search) + '&';
+    if (category) url += 'category=' + category + '&';
+    if (condition) url += 'condition=' + condition + '&';
+
+    const d = await apiCall(url);
+    ALL_ASSETS = d.assets || [];
+    renderAssets();
+}
+
+function condBadge(c) {
+    const cls = { good: 'cond-good', fair: 'cond-fair', poor: 'cond-poor', damaged: 'cond-damaged', disposed: 'cond-disposed' }[c] || 'cond-fair';
+    return `<span class="cond-badge ${cls}">${(c || 'unknown').charAt(0).toUpperCase() + (c || 'unknown').slice(1)}</span>`;
+}
+
+function renderAssets() {
+    const tbody = document.getElementById('assetBody');
+    if (!ALL_ASSETS.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-boxes-stacked"></i>No assets found.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = ALL_ASSETS.map(a => `<tr>
+        <td><span class="ast-code">${a.asset_code}</span></td>
+        <td><span class="ast-name">${a.name}</span></td>
+        <td>${a.category_name || '—'}</td>
+        <td>${a.location || '—'}</td>
+        <td>${a.quantity}</td>
+        <td>${condBadge(a.condition)}</td>
+        <td style="font-weight:700;">&#8377;${Number(a.total_value || 0).toLocaleString('en-IN')}</td>
+        <td>
+            <button class="btn-outline btn-sm" onclick="openDetail('${a.id}')" title="View Details"><i class="fas fa-eye"></i></button>
+            <button class="btn-outline btn-sm" onclick="openEditModal('${a.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+            <button class="btn-outline danger btn-sm" onclick="confirmDelete('${a.id}','${a.name}')" title="Delete"><i class="fas fa-trash"></i></button>
+        </td>
+    </tr>`).join('');
+}
+
+// ═══ Add / Edit Modal ═══
+function openAddModal() {
+    document.getElementById('editAssetId').value = '';
+    document.getElementById('addModalTitle').textContent = 'Add Asset';
+    document.getElementById('addSaveBtn').innerHTML = '<i class="fas fa-save"></i> Save Asset';
+    ['aName','aDesc','aNotes','aLocation','aSerial','aPurchaseDate','aWarranty','aVendor','aVendorPhone','aAssigned'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('aQty').value = '1';
+    document.getElementById('aPrice').value = '';
+    document.getElementById('aCat').value = '';
+    document.getElementById('aCondition').value = 'good';
+    document.getElementById('addModal').classList.add('show');
+}
+
+function openEditModal(assetId) {
+    const a = ALL_ASSETS.find(x => x.id === assetId);
+    if (!a) return;
+    document.getElementById('editAssetId').value = assetId;
+    document.getElementById('addModalTitle').textContent = 'Edit Asset';
+    document.getElementById('addSaveBtn').innerHTML = '<i class="fas fa-save"></i> Update Asset';
+    document.getElementById('aName').value = a.name || '';
+    document.getElementById('aCat').value = a.category_id || '';
+    document.getElementById('aCondition').value = a.condition || 'good';
+    document.getElementById('aDesc').value = a.description || '';
+    document.getElementById('aNotes').value = a.notes || '';
+    document.getElementById('aLocation').value = a.location || '';
+    document.getElementById('aQty').value = a.quantity || 1;
+    document.getElementById('aPrice').value = a.unit_price || '';
+    document.getElementById('aSerial').value = a.serial_number || '';
+    document.getElementById('aPurchaseDate').value = a.purchase_date || '';
+    document.getElementById('aWarranty').value = a.warranty_expiry || '';
+    document.getElementById('aVendor').value = a.vendor_name || '';
+    document.getElementById('aVendorPhone').value = a.vendor_contact || '';
+    document.getElementById('aAssigned').value = a.assigned_to || '';
+    document.getElementById('addModal').classList.add('show');
+}
+
+function closeAddModal() { document.getElementById('addModal').classList.remove('show'); }
+
+async function saveAsset() {
+    const name = document.getElementById('aName').value.trim();
+    if (!name) { showToast('warning', 'Asset name is required'); return; }
+
+    const payload = {
+        name: name,
+        category_id: document.getElementById('aCat').value || null,
+        condition: document.getElementById('aCondition').value,
+        description: document.getElementById('aDesc').value.trim() || null,
+        notes: document.getElementById('aNotes').value.trim() || null,
+        location: document.getElementById('aLocation').value.trim() || null,
+        quantity: parseInt(document.getElementById('aQty').value) || 1,
+        unit_price: parseFloat(document.getElementById('aPrice').value) || null,
+        serial_number: document.getElementById('aSerial').value.trim() || null,
+        purchase_date: document.getElementById('aPurchaseDate').value || null,
+        warranty_expiry: document.getElementById('aWarranty').value || null,
+        vendor_name: document.getElementById('aVendor').value.trim() || null,
+        vendor_contact: document.getElementById('aVendorPhone').value.trim() || null,
+        assigned_to: document.getElementById('aAssigned').value.trim() || null,
+    };
+
+    const editId = document.getElementById('editAssetId').value;
+    if (editId) {
+        await apiCall('/api/school/assets/' + editId, 'PUT', payload);
+        showToast('success', 'Asset updated');
+    } else {
+        await apiCall('/api/school/assets/create', 'POST', payload);
+        showToast('success', 'Asset created');
+    }
+    closeAddModal();
+    await loadAssets();
+    await loadSummary();
+}
+
+// ═══ Delete ═══
+function confirmDelete(id, name) {
+    showConfirm('Delete Asset', `Remove "${name}"? This action cannot be undone.`, async () => {
+        await apiCall('/api/school/assets/' + id, 'DELETE');
+        showToast('success', 'Asset deleted');
+        await loadAssets();
+        await loadSummary();
+    }, { icon: 'fas fa-trash', danger: true, yesText: 'Delete' });
+}
+
+// ═══ Detail / Log Modal ═══
+let currentDetailId = null;
+
+async function openDetail(assetId) {
+    currentDetailId = assetId;
+    const a = ALL_ASSETS.find(x => x.id === assetId);
+    if (!a) return;
+
+    document.getElementById('detailTitle').textContent = a.asset_code + ' — ' + a.name;
+    document.getElementById('logAssetId').value = assetId;
+    document.getElementById('logFormWrap').style.display = 'none';
+
+    // Render detail grid
+    document.getElementById('detailGrid').innerHTML = `
+        <div class="dg-item"><div class="dg-label">Category</div><div class="dg-val">${a.category_name || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Location</div><div class="dg-val">${a.location || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Condition</div><div class="dg-val">${condBadge(a.condition)}</div></div>
+        <div class="dg-item"><div class="dg-label">Quantity</div><div class="dg-val">${a.quantity}</div></div>
+        <div class="dg-item"><div class="dg-label">Unit Price</div><div class="dg-val">&#8377;${Number(a.unit_price || 0).toLocaleString('en-IN')}</div></div>
+        <div class="dg-item"><div class="dg-label">Total Value</div><div class="dg-val">&#8377;${Number(a.total_value || 0).toLocaleString('en-IN')}</div></div>
+        <div class="dg-item"><div class="dg-label">Purchase Date</div><div class="dg-val">${a.purchase_date || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Warranty Expiry</div><div class="dg-val">${a.warranty_expiry || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Serial Number</div><div class="dg-val">${a.serial_number || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Vendor</div><div class="dg-val">${a.vendor_name || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Vendor Contact</div><div class="dg-val">${a.vendor_contact || '—'}</div></div>
+        <div class="dg-item"><div class="dg-label">Assigned To</div><div class="dg-val">${a.assigned_to || '—'}</div></div>
+    `;
+
+    // Load logs
+    await loadLogs(assetId);
+    document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetailModal() { document.getElementById('detailModal').classList.remove('show'); currentDetailId = null; }
+
+const LOG_ICONS = { purchase: '<i class="fas fa-shopping-cart"></i>', transfer: '<i class="fas fa-exchange-alt"></i>', maintenance: '<i class="fas fa-wrench"></i>', repair: '<i class="fas fa-tools"></i>', dispose: '<i class="fas fa-trash-alt"></i>', audit: '<i class="fas fa-clipboard-check"></i>', damage: '<i class="fas fa-exclamation-triangle"></i>' };
+
+async function loadLogs(assetId) {
+    const d = await apiCall('/api/school/assets/' + assetId + '/logs');
+    const logs = d.logs || [];
+    const el = document.getElementById('logList');
+    if (!logs.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-light);font-size:0.82rem;">No log entries yet.</div>'; return; }
+    el.innerHTML = logs.map(l => `<div class="log-item">
+        <div class="log-icon ${l.log_type}">${LOG_ICONS[l.log_type] || '<i class="fas fa-file-alt"></i>'}</div>
+        <div class="log-body">
+            <div class="log-type">${l.log_type}</div>
+            <div class="log-desc">${l.description}</div>
+            <div class="log-meta">${l.log_date || '—'} ${l.performed_by ? '&middot; ' + l.performed_by : ''} ${l.cost ? '&middot; &#8377;' + Number(l.cost).toLocaleString('en-IN') : ''}</div>
+        </div>
+    </div>`).join('');
+}
+
+function toggleLogForm() {
+    const w = document.getElementById('logFormWrap');
+    w.style.display = w.style.display === 'none' ? 'block' : 'none';
+    if (w.style.display === 'block') {
+        document.getElementById('logType').value = 'maintenance';
+        document.getElementById('logBy').value = '';
+        document.getElementById('logDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('logCost').value = '';
+        document.getElementById('logDesc').value = '';
+    }
+}
+
+async function saveLog() {
+    const assetId = document.getElementById('logAssetId').value;
+    const desc = document.getElementById('logDesc').value.trim();
+    if (!desc) { showToast('warning', 'Description is required'); return; }
+    const payload = {
+        log_type: document.getElementById('logType').value,
+        description: desc,
+        performed_by: document.getElementById('logBy').value.trim() || null,
+        log_date: document.getElementById('logDate').value || null,
+        cost: parseFloat(document.getElementById('logCost').value) || null,
+    };
+    await apiCall('/api/school/assets/' + assetId + '/log', 'POST', payload);
+    showToast('success', 'Log entry added');
+    document.getElementById('logFormWrap').style.display = 'none';
+    await loadLogs(assetId);
+    // Refresh assets in case condition changed (dispose/damage)
+    await loadAssets();
+    await loadSummary();
+}
+
+// ═══ Category Modal ═══
+function openCategoryModal() { document.getElementById('catModal').classList.add('show'); }
+function closeCategoryModal() { document.getElementById('catModal').classList.remove('show'); }
+
+// ═══ Init ═══
+init();
+</script>
+{% endblock %}

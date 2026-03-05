@@ -1,0 +1,469 @@
+{% extends "base.html" %}
+{% block title %}Online Classes{% endblock %}
+{% block page_title %}Online Classes{% endblock %}
+{% block page_subtitle %}Schedule &amp; manage virtual classes — Google Meet, Zoom, Teams{% endblock %}
+{% block extra_css %}
+<style>
+.oc-tabs{display:flex;gap:4px;background:var(--bg-card,white);border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:16px;}
+.oc-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
+.oc-tab.active{background:var(--primary);color:white;}
+.card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:18px;margin-bottom:16px;}
+.f-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:.60rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select,.f-grp textarea{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:.82rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
+.btn-sm{padding:5px 10px;border-radius:8px;font-size:.70rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+.btn-sm:hover{background:var(--primary-50);border-color:var(--primary);color:var(--primary);}
+.class-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.class-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:16px;border-left:4px solid var(--primary);}
+.class-card.completed{border-left-color:#059669;} .class-card.cancelled{border-left-color:#DC2626;opacity:.7;}
+.cc-head{display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;}
+.cc-title{font-weight:900;font-size:.88rem;} .cc-badge{font-size:.55rem;font-weight:700;padding:2px 8px;border-radius:20px;text-transform:uppercase;}
+.badge-scheduled{background:#DBEAFE;color:#2563EB;} .badge-live{background:#FEE2E2;color:#DC2626;} .badge-completed{background:#D1FAE5;color:#059669;} .badge-cancelled{background:#F3F4F6;color:#6B7280;}
+.cc-meta{font-size:.72rem;color:var(--text-light);margin-bottom:6px;}
+.cc-link{font-size:.68rem;color:var(--primary);word-break:break-all;}
+.cc-actions{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;}
+.platform-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.p-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:20px;text-align:center;border:2px solid var(--border);}
+.p-card.connected{border-color:#059669;}
+.p-icon{font-size:2rem;margin-bottom:8px;} .p-name{font-weight:900;font-size:.92rem;margin-bottom:4px;}
+.p-status{font-size:.68rem;margin-bottom:12px;}
+.p-status.on{color:#059669;} .p-status.off{color:#9CA3AF;}
+.p-teacher-info{font-size:.62rem;color:var(--primary);margin-bottom:8px;font-weight:600;}
+.btn-connect{padding:8px 16px;border-radius:8px;border:none;font-weight:700;font-size:.75rem;cursor:pointer;}
+.btn-connect.connect{background:var(--primary);color:white;} .btn-connect.disconnect{background:#FEE2E2;color:#DC2626;}
+.zoom-form{text-align:left;margin-top:12px;}
+.zoom-form input{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:.75rem;margin-bottom:6px;}
+.section-title{font-weight:900;font-size:1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.info-box{background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px 14px;font-size:.72rem;color:#1E40AF;margin-bottom:12px;line-height:1.5;}
+.info-box i{margin-right:4px;}
+.empty-state{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem;}
+@media(max-width:768px){.f-grid,.platform-cards{grid-template-columns:1fr;}.class-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="oc-tabs">
+    <div class="oc-tab active" onclick="showTab('schedule',this)">Schedule Class</div>
+    <div class="oc-tab" onclick="showTab('all',this)">All Classes</div>
+    <div class="oc-tab" onclick="showTab('settings',this)">Platform Settings</div>
+</div>
+
+<!-- TAB 1: Schedule Class -->
+<div id="tab-schedule">
+    <div class="card">
+        <div class="section-title"><i class="fas fa-plus-circle"></i> Schedule New Class</div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Title</label><input type="text" id="oc-title" placeholder="Math — Chapter 5 Revision"></div>
+            <div class="f-grp"><label>Class</label><select id="oc-class" onchange="loadSections(this.value)"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="oc-section"><option value="">All Sections</option></select></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>Subject</label><select id="oc-subject"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Date</label><input type="date" id="oc-date"></div>
+            <div class="f-grp"><label>Start Time</label><input type="time" id="oc-start" value="10:00"></div>
+        </div>
+        <div class="f-grid">
+            <div class="f-grp"><label>End Time</label><input type="time" id="oc-end" value="10:45"></div>
+            <div class="f-grp"><label>Platform</label>
+                <select id="oc-platform">
+                    <option value="google_meet">Google Meet</option>
+                    <option value="zoom">Zoom</option>
+                    <option value="teams">Microsoft Teams</option>
+                </select>
+            </div>
+            <div class="f-grp"><label>Manual Link (optional)</label><input type="text" id="oc-link" placeholder="Paste link if not auto-generating"></div>
+        </div>
+        <div class="f-grp" style="margin-bottom:12px"><label>Description</label><textarea id="oc-desc" rows="2" placeholder="Optional notes for students..."></textarea></div>
+        <button class="btn-primary" onclick="createClass()"><i class="fas fa-video"></i> Create &amp; Generate Link</button>
+        <span id="create-status" style="margin-left:12px;font-size:.75rem;"></span>
+    </div>
+</div>
+
+<!-- TAB 2: All Classes -->
+<div id="tab-all" style="display:none;">
+    <div class="card" style="padding:12px;">
+        <div class="f-grid" style="margin-bottom:0;">
+            <div class="f-grp"><label>Filter Class</label><select id="filter-class" onchange="loadAllClasses()"><option value="">All</option></select></div>
+            <div class="f-grp"><label>Status</label>
+                <select id="filter-status" onchange="loadAllClasses()">
+                    <option value="">All</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="live">Live</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+            </div>
+            <div class="f-grp"><label>From Date</label><input type="date" id="filter-from" onchange="loadAllClasses()"></div>
+        </div>
+    </div>
+    <div class="class-grid" id="all-classes-grid">
+        <div class="empty-state">Loading...</div>
+    </div>
+</div>
+
+<!-- TAB 3: Platform Settings -->
+<div id="tab-settings" style="display:none;">
+    <div class="section-title"><i class="fas fa-cog"></i> Video Platform Configuration</div>
+
+    <div class="info-box">
+        <i class="fas fa-info-circle"></i>
+        <strong>Per-Teacher Authentication:</strong> Teachers connect their own Google Meet / Teams accounts from their Online Classes page.
+        Meeting links are created in each teacher's own calendar. You configure the App credentials below and manage Zoom (school-level).
+    </div>
+
+    <div class="platform-cards" id="platform-cards">
+        <!-- Google Meet -->
+        <div class="p-card" id="card-google">
+            <div class="p-icon"><i class="fab fa-google" style="color:#4285F4;"></i></div>
+            <div class="p-name">Google Meet</div>
+            <div class="p-status off" id="google-status">Not Connected</div>
+            <div class="p-teacher-info" id="google-teacher-count"></div>
+            <button class="btn-connect connect" id="btn-google" onclick="connectGoogle()">Connect (Admin Fallback)</button>
+        </div>
+        <!-- Zoom -->
+        <div class="p-card" id="card-zoom">
+            <div class="p-icon"><i class="fas fa-video" style="color:#2D8CFF;"></i></div>
+            <div class="p-name">Zoom</div>
+            <div class="p-status off" id="zoom-status">Not Connected</div>
+            <div class="zoom-form" id="zoom-form">
+                <input type="text" id="zoom-account" placeholder="Account ID">
+                <input type="text" id="zoom-client" placeholder="Client ID">
+                <input type="password" id="zoom-secret" placeholder="Client Secret">
+                <button class="btn-connect connect" onclick="saveZoom()">Save Zoom Credentials</button>
+            </div>
+        </div>
+        <!-- Teams -->
+        <div class="p-card" id="card-teams">
+            <div class="p-icon"><i class="fab fa-microsoft" style="color:#00A4EF;"></i></div>
+            <div class="p-name">MS Teams</div>
+            <div class="p-status off" id="teams-status">Not Connected</div>
+            <div class="p-teacher-info" id="teams-teacher-count"></div>
+            <button class="btn-connect connect" id="btn-teams" onclick="connectTeams()">Connect (Admin Fallback)</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="f-grp" style="margin-bottom:12px;">
+            <label>Default Platform</label>
+            <select id="default-platform" onchange="saveDefaultPlatform()">
+                <option value="google_meet">Google Meet</option>
+                <option value="zoom">Zoom</option>
+                <option value="teams">Microsoft Teams</option>
+            </select>
+        </div>
+        <button class="btn-sm" onclick="runHealthCheck()" id="btn-health"><i class="fas fa-heartbeat"></i> Test All Connections</button>
+        <span id="health-status" style="margin-left:8px;font-size:.72rem;"></span>
+    </div>
+
+    <!-- Health alert banner -->
+    <div id="health-alert" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:10px;padding:12px 16px;margin-top:12px;">
+        <div style="font-weight:900;font-size:.82rem;color:#92400E;margin-bottom:4px;"><i class="fas fa-exclamation-triangle"></i> Platform Connection Issue</div>
+        <div id="health-alert-text" style="font-size:.72rem;color:#78350F;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function showTab(tab, el){
+    document.querySelectorAll('.oc-tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-schedule').style.display = tab==='schedule'?'':'none';
+    document.getElementById('tab-all').style.display = tab==='all'?'':'none';
+    document.getElementById('tab-settings').style.display = tab==='settings'?'':'none';
+    if(tab==='all') loadAllClasses();
+    if(tab==='settings') loadConfig();
+}
+
+// Load classes, sections, subjects for the form
+async function loadFormData(){
+    try{
+        const r = await fetch('/api/school-admin/classes-sections-subjects', {headers:{'X-CSRF-Token':CSRF}});
+        if(!r.ok) return;
+        const d = await r.json();
+        const cs = document.getElementById('oc-class');
+        const fc = document.getElementById('filter-class');
+        (d.classes||[]).forEach(c=>{
+            cs.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+            fc.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+        window._formData = d;
+        const ss = document.getElementById('oc-subject');
+        (d.subjects||[]).forEach(s=>{
+            ss.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+        });
+    }catch(e){}
+}
+
+function loadSections(classId){
+    const sel = document.getElementById('oc-section');
+    sel.innerHTML = '<option value="">All Sections</option>';
+    if(!window._formData) return;
+    (window._formData.sections||[]).filter(s=>s.class_id===classId).forEach(s=>{
+        sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    });
+}
+
+// Create class
+async function createClass(){
+    const title = document.getElementById('oc-title').value;
+    const classId = document.getElementById('oc-class').value;
+    if(!title||!classId){alert('Title and Class are required');return;}
+    const st = document.getElementById('create-status');
+    st.textContent = 'Creating...';
+    try{
+        const r = await fetch('/api/online-class/create',{
+            method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+            body:JSON.stringify({
+                title,
+                class_id: classId,
+                section_id: document.getElementById('oc-section').value||null,
+                subject_id: document.getElementById('oc-subject').value||null,
+                date: document.getElementById('oc-date').value,
+                start_time: document.getElementById('oc-start').value,
+                end_time: document.getElementById('oc-end').value,
+                platform: document.getElementById('oc-platform').value,
+                meeting_link: document.getElementById('oc-link').value,
+                description: document.getElementById('oc-desc').value,
+            })
+        });
+        const d = await r.json();
+        if(d.status==='ok'){
+            let msg = `<span style="color:#059669;">Created!</span>`;
+            if(d.meeting_link) msg += ` Link: ${d.meeting_link.substring(0,40)}...`;
+            if(d.link_error) msg += `<br><span style="color:#D97706;font-size:.70rem;"><i class="fas fa-exclamation-triangle"></i> ${d.link_error}</span>`;
+            st.innerHTML = msg;
+            document.getElementById('oc-title').value='';
+            document.getElementById('oc-desc').value='';
+        }else{
+            st.innerHTML = `<span style="color:#DC2626;">${d.detail||'Error'}</span>`;
+        }
+    }catch(e){st.innerHTML='<span style="color:#DC2626;">Network error</span>';}
+}
+
+// Load all classes
+async function loadAllClasses(){
+    const g = document.getElementById('all-classes-grid');
+    g.innerHTML='<div class="empty-state">Loading...</div>';
+    const params = new URLSearchParams();
+    const cid = document.getElementById('filter-class')?.value;
+    const status = document.getElementById('filter-status')?.value;
+    const from = document.getElementById('filter-from')?.value;
+    if(cid) params.set('class_id',cid);
+    if(status) params.set('status',status);
+    if(from) params.set('date_from',from);
+    try{
+        const r = await fetch(`/api/online-class/all?${params}`,{headers:{'X-CSRF-Token':CSRF}});
+        const classes = await r.json();
+        if(!classes.length){g.innerHTML='<div class="empty-state">No classes found</div>';return;}
+        g.innerHTML = classes.map(c=>`
+            <div class="class-card ${c.status}">
+                <div class="cc-head">
+                    <div class="cc-title">${c.title}</div>
+                    <span class="cc-badge badge-${c.status}">${c.status}</span>
+                </div>
+                <div class="cc-meta">
+                    <i class="fas fa-calendar"></i> ${c.date} &nbsp;
+                    <i class="fas fa-clock"></i> ${c.start_time}${c.end_time?' - '+c.end_time:''} &nbsp;
+                    <i class="fas fa-chalkboard"></i> ${c.class_name} ${c.section_name} &nbsp;
+                    <i class="fas fa-book"></i> ${c.subject_name||'—'}
+                </div>
+                <div class="cc-meta"><i class="fas fa-user-tie"></i> ${c.teacher_name} &nbsp; <i class="fas fa-users"></i> ${c.attended_count} attended</div>
+                ${c.meeting_link?`<div class="cc-link"><a href="${c.meeting_link}" target="_blank">${c.meeting_link.substring(0,50)}...</a></div>`:''}
+                <div class="cc-actions">
+                    ${c.status==='scheduled'?`<button class="btn-sm" onclick="cancelClass('${c.id}')"><i class="fas fa-times"></i> Cancel</button>`:''}
+                    ${!c.recording_url&&c.status!=='cancelled'?`<button class="btn-sm" onclick="addRecording('${c.id}')"><i class="fas fa-film"></i> Add Recording</button>`:''}
+                    ${c.recording_url?`<a href="${c.recording_url}" target="_blank" class="btn-sm"><i class="fas fa-play"></i> Recording</a>`:''}
+                    <button class="btn-sm" onclick="viewAttendance('${c.id}','${c.title}')"><i class="fas fa-list"></i> Attendance</button>
+                </div>
+            </div>
+        `).join('');
+    }catch(e){g.innerHTML='<div class="empty-state">Error loading classes</div>';}
+}
+
+async function cancelClass(id){
+    if(!confirm('Cancel this class?')) return;
+    await fetch(`/api/online-class/${id}`,{method:'DELETE',headers:{'X-CSRF-Token':CSRF}});
+    loadAllClasses();
+}
+
+async function addRecording(id){
+    const url = prompt('Enter recording URL (YouTube / Google Drive):');
+    if(!url) return;
+    await fetch(`/api/online-class/${id}/recording`,{
+        method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+        body:JSON.stringify({recording_url:url})
+    });
+    loadAllClasses();
+}
+
+async function viewAttendance(id,title){
+    try{
+        const r = await fetch(`/api/online-class/${id}/attendance`,{headers:{'X-CSRF-Token':CSRF}});
+        const data = await r.json();
+        let html = `<h3>${title} — Attendance</h3><table style="width:100%;font-size:.8rem;"><tr><th>Student</th><th>Type</th><th>Time</th></tr>`;
+        data.forEach(a=>{
+            html += `<tr><td>${a.student_name}</td><td>${a.type}</td><td>${a.joined_at||'—'}</td></tr>`;
+        });
+        html += '</table>';
+        if(!data.length) html += '<p style="text-align:center;color:var(--text-light);">No attendance records</p>';
+        // Simple modal
+        const modal = document.createElement('div');
+        modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;';
+        modal.innerHTML=`<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:90%;max-width:500px;max-height:80vh;overflow-y:auto;">${html}<br><button class="btn-primary" onclick="this.closest('div[style]').parentElement.remove()">Close</button></div>`;
+        document.body.appendChild(modal);
+    }catch(e){}
+}
+
+// Platform config
+async function loadConfig(){
+    try{
+        const r = await fetch('/api/online-class/config',{headers:{'X-CSRF-Token':CSRF}});
+        const c = await r.json();
+        let alerts = [];
+
+        // Google
+        const gCount = document.getElementById('google-teacher-count');
+        gCount.textContent = (c.teacher_google_count||0) > 0
+            ? `${c.teacher_google_count} teacher(s) connected their own Google account`
+            : 'No teachers connected yet';
+
+        if(c.google_enabled){
+            document.getElementById('card-google').classList.add('connected');
+            const gStat = document.getElementById('google-status');
+            if(c.google_healthy){
+                gStat.className='p-status on';
+                gStat.textContent='Admin Fallback: '+c.google_email;
+            } else {
+                gStat.className='p-status';
+                gStat.style.color='#DC2626';
+                gStat.innerHTML='<i class="fas fa-exclamation-circle"></i> Admin Session Expired';
+                document.getElementById('card-google').style.borderColor='#DC2626';
+                alerts.push('Google Meet (admin fallback): Session expired. Click "Connect" to reconnect.');
+            }
+            document.getElementById('btn-google').textContent= c.google_healthy ? 'Disconnect Admin' : 'Reconnect Admin';
+            document.getElementById('btn-google').className= c.google_healthy ? 'btn-connect disconnect' : 'btn-connect connect';
+            document.getElementById('btn-google').onclick= c.google_healthy ? ()=>disconnectPlatform('google') : connectGoogle;
+        }
+        // Zoom
+        if(c.zoom_enabled){
+            document.getElementById('card-zoom').classList.add('connected');
+            const zStat = document.getElementById('zoom-status');
+            if(c.zoom_healthy){
+                zStat.className='p-status on';
+                zStat.textContent='Connected (School-level S2S)';
+            } else {
+                zStat.className='p-status';
+                zStat.style.color='#DC2626';
+                zStat.innerHTML='<i class="fas fa-exclamation-circle"></i> Credentials Invalid';
+                document.getElementById('card-zoom').style.borderColor='#DC2626';
+                alerts.push('Zoom: Credentials invalid. Re-enter Account ID, Client ID, and Secret.');
+            }
+            document.getElementById('zoom-form').innerHTML= c.zoom_healthy
+                ? '<button class="btn-connect disconnect" onclick="disconnectPlatform(\'zoom\')">Disconnect Zoom</button>'
+                : `<input type="text" id="zoom-account" placeholder="Account ID"><input type="text" id="zoom-client" placeholder="Client ID"><input type="password" id="zoom-secret" placeholder="Client Secret"><button class="btn-connect connect" onclick="saveZoom()">Update Zoom Credentials</button>`;
+        }
+        // Teams
+        const tCount = document.getElementById('teams-teacher-count');
+        tCount.textContent = (c.teacher_teams_count||0) > 0
+            ? `${c.teacher_teams_count} teacher(s) connected their own Teams account`
+            : 'No teachers connected yet';
+
+        if(c.teams_enabled){
+            document.getElementById('card-teams').classList.add('connected');
+            const tStat = document.getElementById('teams-status');
+            if(c.teams_healthy){
+                tStat.className='p-status on';
+                tStat.textContent='Admin Fallback: Connected';
+            } else {
+                tStat.className='p-status';
+                tStat.style.color='#DC2626';
+                tStat.innerHTML='<i class="fas fa-exclamation-circle"></i> Admin Session Expired';
+                document.getElementById('card-teams').style.borderColor='#DC2626';
+                alerts.push('Teams (admin fallback): Session expired. Click "Reconnect" to fix.');
+            }
+            document.getElementById('btn-teams').textContent= c.teams_healthy ? 'Disconnect Admin' : 'Reconnect Admin';
+            document.getElementById('btn-teams').className= c.teams_healthy ? 'btn-connect disconnect' : 'btn-connect connect';
+            document.getElementById('btn-teams').onclick= c.teams_healthy ? ()=>disconnectPlatform('teams') : connectTeams;
+        }
+        document.getElementById('default-platform').value = c.default_platform||'google_meet';
+
+        // Show health alert banner
+        const alertDiv = document.getElementById('health-alert');
+        if(alerts.length){
+            document.getElementById('health-alert-text').innerHTML = alerts.join('<br>');
+            alertDiv.style.display='block';
+        } else {
+            alertDiv.style.display='none';
+        }
+    }catch(e){}
+}
+
+async function runHealthCheck(){
+    const st = document.getElementById('health-status');
+    st.innerHTML='<i class="fas fa-spinner fa-spin"></i> Testing connections...';
+    try{
+        const r = await fetch('/api/online-class/config/health-check',{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+        let ok=0, fail=0;
+        ['google','zoom','teams'].forEach(p=>{
+            if(d[p]){ d[p].healthy ? ok++ : fail++; }
+        });
+        if(fail>0){
+            st.innerHTML=`<span style="color:#DC2626;"><i class="fas fa-times-circle"></i> ${fail} platform(s) have issues</span>`;
+        } else if(ok>0){
+            st.innerHTML=`<span style="color:#059669;"><i class="fas fa-check-circle"></i> All ${ok} platform(s) healthy</span>`;
+        } else {
+            st.innerHTML=`<span style="color:var(--text-light);">No platforms connected</span>`;
+        }
+        loadConfig(); // refresh cards
+    }catch(e){ st.innerHTML='<span style="color:#DC2626;">Check failed</span>'; }
+}
+
+function connectGoogle(){ window.location.href='/api/online-class/oauth/google/start'; }
+function connectTeams(){ window.location.href='/api/online-class/oauth/teams/start'; }
+
+async function saveZoom(){
+    const data = {
+        zoom_account_id: document.getElementById('zoom-account').value,
+        zoom_client_id: document.getElementById('zoom-client').value,
+        zoom_client_secret: document.getElementById('zoom-secret').value,
+    };
+    if(!data.zoom_account_id){alert('Account ID required');return;}
+    await fetch('/api/online-class/config',{
+        method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+        body:JSON.stringify(data)
+    });
+    loadConfig();
+}
+
+async function disconnectPlatform(p){
+    if(!confirm(`Disconnect ${p}?`)) return;
+    await fetch(`/api/online-class/config/disconnect/${p}`,{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+    location.reload();
+}
+
+async function saveDefaultPlatform(){
+    await fetch('/api/online-class/config',{
+        method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+        body:JSON.stringify({default_platform:document.getElementById('default-platform').value})
+    });
+}
+
+// Check URL params for OAuth success/error
+const urlP = new URLSearchParams(window.location.search);
+if(urlP.get('success')){
+    showTab('settings', document.querySelectorAll('.oc-tab')[2]);
+}
+if(urlP.get('error')){
+    alert('OAuth error: '+urlP.get('error'));
+}
+
+// Set today as default date
+document.getElementById('oc-date').value = new Date().toISOString().split('T')[0];
+loadFormData();
+</script>
+{% endblock %}

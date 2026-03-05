@@ -210,6 +210,25 @@ async def verify_payment(request: Request, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
 
+    # ── AUTO-RECEIPT: Send notification + generate PDF after successful payment ──
+    if result["verified"] and txn.student_id:
+        try:
+            student = await db.scalar(select(Student).where(Student.id == txn.student_id))
+            if student:
+                from utils.notifier import notify_payment_received
+                parent_phone = getattr(student, 'father_phone', '') or getattr(student, 'mother_phone', '') or ''
+                parent_email = getattr(student, 'father_email', '') or getattr(student, 'mother_email', '') or ''
+                student_name = f"{student.first_name} {getattr(student, 'last_name', '') or ''}".strip()
+                await notify_payment_received(
+                    db, str(txn.branch_id),
+                    parent_phone, parent_email,
+                    student_name, txn.amount,
+                    txn.receipt_number or "",
+                )
+                logger.info(f"Auto-receipt sent for {txn.receipt_number} to {parent_phone or parent_email}")
+        except Exception as e:
+            logger.error(f"Auto-receipt notification failed: {e}")
+
     return {
         "success": result["verified"],
         "status": txn.status,

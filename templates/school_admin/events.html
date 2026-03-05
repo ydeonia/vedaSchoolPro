@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+{% block title %}Events & Calendar{% endblock %}
+{% block page_title %}Events & Calendar{% endblock %}
+{% block page_subtitle %}Manage school events, holidays, and important dates{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Stats row */
+.ev-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+.ev-stat { background:var(--bg-card, white); border-radius:14px; border:1px solid var(--border); padding:20px; display:flex; align-items:center; gap:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); transition:all 0.2s; }
+.ev-stat:hover { transform:translateY(-2px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.ev-stat-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.15rem; flex-shrink:0; }
+.ev-stat-val { font-size:1.5rem; font-weight:800; line-height:1.2; color:var(--text); }
+.ev-stat-lbl { font-size:0.75rem; color:var(--text-secondary); font-weight:500; margin-top:1px; }
+
+/* Filter bar */
+.ev-filter { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:16px 20px; margin-bottom:20px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.ev-filter .search-bar { flex:1; min-width:200px; }
+.ev-filter select { padding:9px 14px; border-radius:10px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; font-weight:600; background:var(--bg-card, white); }
+
+/* Event grid */
+.ev-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+.ev-card { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; transition:all 0.2s; position:relative; }
+.ev-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.1); }
+.ev-card-stripe { height:5px; }
+.ev-card-body { padding:18px 20px 16px; }
+.ev-card-top { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.ev-card-title { font-weight:800; font-size:0.95rem; flex:1; line-height:1.3; color:var(--text); }
+.ev-type-badge { padding:3px 10px; border-radius:8px; font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; color:white; white-space:nowrap; }
+.ev-card-meta { display:flex; flex-direction:column; gap:6px; margin-bottom:12px; }
+.ev-meta-row { display:flex; align-items:center; gap:8px; font-size:0.78rem; color:var(--text-secondary); }
+.ev-meta-row i { width:16px; text-align:center; color:var(--text-light); font-size:0.75rem; }
+.ev-holiday-flag { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:8px; font-size:0.68rem; font-weight:700; background:#FEF2F2; color:#DC2626; }
+.ev-allday-flag { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:8px; font-size:0.68rem; font-weight:700; background:#EFF6FF; color:#2563EB; }
+.ev-card-flags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.ev-card-actions { display:flex; gap:8px; align-items:center; }
+.ev-btn { padding:7px 14px; border-radius:8px; font-size:0.72rem; font-weight:700; cursor:pointer; border:1px solid var(--border); background:var(--bg-card, white); color:var(--text-secondary); transition:all 0.15s; }
+.ev-btn:hover { background:var(--primary-50); border-color:var(--primary); color:var(--primary); }
+.ev-btn.danger:hover { background:#FEF2F2; border-color:#EF4444; color:#EF4444; }
+
+/* Add Event modal form */
+.ev-form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.ev-form-grp { display:flex; flex-direction:column; gap:4px; }
+.ev-form-grp label { font-size:0.68rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.3px; }
+.ev-form-grp input,
+.ev-form-grp select,
+.ev-form-grp textarea { padding:10px 14px; border-radius:10px; border:1px solid var(--border); font-size:0.82rem; font-family:inherit; background:var(--bg-card, white); }
+.ev-form-grp textarea { resize:vertical; min-height:70px; }
+.ev-form-grp input:focus,
+.ev-form-grp select:focus,
+.ev-form-grp textarea:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(79,70,229,0.1); }
+.ev-check-row { display:flex; gap:20px; align-items:center; margin-bottom:12px; }
+.ev-check-row label { display:flex; align-items:center; gap:6px; font-size:0.82rem; font-weight:600; cursor:pointer; color:var(--text-secondary); }
+.ev-check-row input[type="checkbox"] { width:16px; height:16px; accent-color:var(--primary); }
+
+/* Empty state */
+.ev-empty { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-light); }
+.ev-empty i { font-size:2.5rem; opacity:0.15; display:block; margin-bottom:10px; }
+.ev-empty p { font-size:0.85rem; margin-top:6px; }
+
+@media(max-width:768px) {
+    .ev-stats { grid-template-columns:1fr 1fr; gap:10px; }
+    .ev-grid { grid-template-columns:1fr; }
+    .ev-filter { flex-direction:column; align-items:stretch; }
+    .ev-form-row { grid-template-columns:1fr; }
+}
+@media(max-width:480px) {
+    .ev-stats { grid-template-columns:1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Row -->
+<div class="ev-stats">
+    <div class="ev-stat">
+        <div class="ev-stat-icon" style="background:var(--primary-50); color:var(--primary);"><i class="fas fa-calendar-alt"></i></div>
+        <div><div class="ev-stat-val" id="statTotal">{{ events|length }}</div><div class="ev-stat-lbl">Total Events</div></div>
+    </div>
+    <div class="ev-stat">
+        <div class="ev-stat-icon" style="background:#FEF2F2; color:#EF4444;"><i class="fas fa-umbrella-beach"></i></div>
+        <div><div class="ev-stat-val" id="statHolidays">{{ events|selectattr('is_holiday')|list|length }}</div><div class="ev-stat-lbl">Holidays</div></div>
+    </div>
+    <div class="ev-stat">
+        <div class="ev-stat-icon" style="background:#ECFDF5; color:#10B981;"><i class="fas fa-clock"></i></div>
+        <div><div class="ev-stat-val" id="statUpcoming">{{ events|selectattr('is_active')|list|length }}</div><div class="ev-stat-lbl">Upcoming</div></div>
+    </div>
+    <div class="ev-stat">
+        <div class="ev-stat-icon" style="background:#EFF6FF; color:#3B82F6;"><i class="fas fa-calendar-day"></i></div>
+        <div><div class="ev-stat-val" id="statThisMonth">0</div><div class="ev-stat-lbl">This Month</div></div>
+    </div>
+</div>
+
+<!-- Filter Bar -->
+<div class="ev-filter">
+    <div class="search-bar" style="flex:1; min-width:200px;">
+        <i class="fas fa-search"></i>
+        <input type="text" id="evSearch" placeholder="Search events..." oninput="filterEvents()">
+    </div>
+    <select id="evTypeFilter" onchange="filterEvents()">
+        <option value="">All Types</option>
+        <option value="holiday">Holiday</option>
+        <option value="exam">Exam</option>
+        <option value="event">Event</option>
+        <option value="ptm">PTM</option>
+        <option value="sports">Sports</option>
+        <option value="cultural">Cultural</option>
+        <option value="deadline">Deadline</option>
+        <option value="other">Other</option>
+    </select>
+    <button class="btn btn-primary" onclick="openModal('addEventModal')"><i class="fas fa-plus"></i> Add Event</button>
+</div>
+
+<!-- Events Grid -->
+<div class="ev-grid" id="evGrid">
+    {% if events %}
+    {% for e in events %}
+    <div class="ev-card" data-id="{{ e.id }}" data-type="{{ e.event_type.value if e.event_type else 'event' }}" data-title="{{ e.title|lower }}" data-start="{{ e.start_date }}">
+        {% set type_val = e.event_type.value if e.event_type else 'event' %}
+        {% set type_colors = {'holiday':'#EF4444','exam':'#F59E0B','event':'#10B981','ptm':'#3B82F6','sports':'#8B5CF6','cultural':'#EC4899','deadline':'#F97316','other':'#6B7280'} %}
+        {% set badge_color = type_colors.get(type_val, '#6B7280') %}
+        <div class="ev-card-stripe" style="background:{{ badge_color }};"></div>
+        <div class="ev-card-body">
+            <div class="ev-card-top">
+                <div class="ev-card-title">{{ e.title }}</div>
+                <span class="ev-type-badge" style="background:{{ badge_color }};">{{ type_val|upper }}</span>
+            </div>
+            {% if e.description %}
+            <div style="font-size:0.78rem; color:var(--text-secondary); margin-bottom:10px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">{{ e.description }}</div>
+            {% endif %}
+            <div class="ev-card-meta">
+                <div class="ev-meta-row">
+                    <i class="fas fa-calendar"></i>
+                    <span>
+                        {{ e.start_date.strftime('%d %b %Y') if e.start_date else 'TBD' }}
+                        {% if e.end_date and e.end_date != e.start_date %}
+                            &mdash; {{ e.end_date.strftime('%d %b %Y') }}
+                        {% endif %}
+                    </span>
+                </div>
+                {% if not e.is_all_day and e.start_time %}
+                <div class="ev-meta-row">
+                    <i class="fas fa-clock"></i>
+                    <span>
+                        {{ e.start_time.strftime('%I:%M %p') if e.start_time else '' }}
+                        {% if e.end_time %} &mdash; {{ e.end_time.strftime('%I:%M %p') }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+                {% if e.location %}
+                <div class="ev-meta-row">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>{{ e.location }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="ev-card-flags">
+                {% if e.is_holiday %}
+                <span class="ev-holiday-flag"><i class="fas fa-umbrella-beach"></i> Holiday</span>
+                {% endif %}
+                {% if e.is_all_day %}
+                <span class="ev-allday-flag"><i class="fas fa-sun"></i> All Day</span>
+                {% endif %}
+            </div>
+            <div class="ev-card-actions">
+                <button class="ev-btn danger" onclick="deleteEvent('{{ e.id }}', '{{ e.title|replace("'", "\\'") }}')" title="Delete event"><i class="fas fa-trash-alt"></i></button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="ev-empty">
+        <i class="fas fa-calendar-plus"></i>
+        <h3 style="font-weight:700; font-size:1rem; margin-bottom:4px;">No Events Yet</h3>
+        <p>Create your first event to get started</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Event Modal -->
+<div class="modal-overlay" id="addEventModal" style="display:none;">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-calendar-plus" style="color:var(--primary); margin-right:8px;"></i>Add New Event</h2>
+            <button class="modal-close" onclick="closeModal('addEventModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="ev-form-row">
+                <div class="ev-form-grp" style="grid-column:1/-1;">
+                    <label>Event Title</label>
+                    <input type="text" id="fTitle" placeholder="e.g., Annual Day, Diwali Holiday, Parent-Teacher Meeting">
+                </div>
+            </div>
+            <div class="ev-form-row">
+                <div class="ev-form-grp" style="grid-column:1/-1;">
+                    <label>Description</label>
+                    <textarea id="fDesc" placeholder="Event details, instructions, notes..."></textarea>
+                </div>
+            </div>
+            <div class="ev-form-row">
+                <div class="ev-form-grp">
+                    <label>Event Type</label>
+                    <select id="fType">
+                        <option value="event">Event</option>
+                        <option value="holiday">Holiday</option>
+                        <option value="exam">Exam</option>
+                        <option value="ptm">PTM</option>
+                        <option value="sports">Sports</option>
+                        <option value="cultural">Cultural</option>
+                        <option value="deadline">Deadline</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="ev-form-grp">
+                    <label>Location</label>
+                    <input type="text" id="fLocation" placeholder="e.g., Main Auditorium, Playground">
+                </div>
+            </div>
+            <div class="ev-form-row">
+                <div class="ev-form-grp">
+                    <label>Start Date</label>
+                    <input type="date" id="fStartDate">
+                </div>
+                <div class="ev-form-grp">
+                    <label>End Date</label>
+                    <input type="date" id="fEndDate">
+                </div>
+            </div>
+            <div class="ev-check-row">
+                <label><input type="checkbox" id="fIsAllDay" checked onchange="toggleTimeFields()"> All Day Event</label>
+                <label><input type="checkbox" id="fIsHoliday"> Mark as Holiday</label>
+            </div>
+            <div class="ev-form-row" id="timeFieldsRow" style="display:none;">
+                <div class="ev-form-grp">
+                    <label>Start Time</label>
+                    <input type="time" id="fStartTime">
+                </div>
+                <div class="ev-form-grp">
+                    <label>End Time</label>
+                    <input type="time" id="fEndTime">
+                </div>
+            </div>
+            <div class="ev-form-row">
+                <div class="ev-form-grp">
+                    <label>Color</label>
+                    <input type="color" id="fColor" value="#3B82F6" style="height:42px; padding:4px; cursor:pointer;">
+                </div>
+                <div class="ev-form-grp">
+                    <label>&nbsp;</label>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; padding-top:2px;">
+                        <span onclick="setColor('#EF4444')" style="width:28px;height:28px;border-radius:8px;background:#EF4444;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Holiday"></span>
+                        <span onclick="setColor('#F59E0B')" style="width:28px;height:28px;border-radius:8px;background:#F59E0B;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Exam"></span>
+                        <span onclick="setColor('#10B981')" style="width:28px;height:28px;border-radius:8px;background:#10B981;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Event"></span>
+                        <span onclick="setColor('#3B82F6')" style="width:28px;height:28px;border-radius:8px;background:#3B82F6;cursor:pointer;display:inline-block;border:2px solid transparent;" title="PTM"></span>
+                        <span onclick="setColor('#8B5CF6')" style="width:28px;height:28px;border-radius:8px;background:#8B5CF6;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Sports"></span>
+                        <span onclick="setColor('#EC4899')" style="width:28px;height:28px;border-radius:8px;background:#EC4899;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Cultural"></span>
+                        <span onclick="setColor('#F97316')" style="width:28px;height:28px;border-radius:8px;background:#F97316;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Deadline"></span>
+                        <span onclick="setColor('#6B7280')" style="width:28px;height:28px;border-radius:8px;background:#6B7280;cursor:pointer;display:inline-block;border:2px solid transparent;" title="Other"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('addEventModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createEvent()" id="createEventBtn"><i class="fas fa-plus"></i> Create Event</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TYPE_COLORS = {
+    holiday: '#EF4444', exam: '#F59E0B', event: '#10B981', ptm: '#3B82F6',
+    sports: '#8B5CF6', cultural: '#EC4899', deadline: '#F97316', other: '#6B7280'
+};
+const TYPE_LABELS = {
+    holiday: 'Holiday', exam: 'Exam', event: 'Event', ptm: 'PTM',
+    sports: 'Sports', cultural: 'Cultural', deadline: 'Deadline', other: 'Other'
+};
+
+// Compute "This Month" stat on page load
+(function() {
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    let count = 0;
+    document.querySelectorAll('.ev-card[data-start]').forEach(card => {
+        const d = new Date(card.dataset.start);
+        if (d.getFullYear() === y && d.getMonth() === m) count++;
+    });
+    const el = document.getElementById('statThisMonth');
+    if (el) el.textContent = count;
+})();
+
+// Toggle time fields based on All Day checkbox
+function toggleTimeFields() {
+    const isAllDay = document.getElementById('fIsAllDay').checked;
+    document.getElementById('timeFieldsRow').style.display = isAllDay ? 'none' : 'grid';
+}
+
+// Quick color preset
+function setColor(hex) {
+    document.getElementById('fColor').value = hex;
+}
+
+// Auto-set color when type changes
+document.getElementById('fType').addEventListener('change', function() {
+    const c = TYPE_COLORS[this.value];
+    if (c) document.getElementById('fColor').value = c;
+    if (this.value === 'holiday') {
+        document.getElementById('fIsHoliday').checked = true;
+    }
+});
+
+// Client-side filter
+function filterEvents() {
+    const q = document.getElementById('evSearch').value.toLowerCase().trim();
+    const typeFilter = document.getElementById('evTypeFilter').value;
+    let visible = 0;
+    document.querySelectorAll('.ev-card').forEach(card => {
+        const title = card.dataset.title || '';
+        const type = card.dataset.type || '';
+        const matchQ = !q || title.includes(q);
+        const matchType = !typeFilter || type === typeFilter;
+        const show = matchQ && matchType;
+        card.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    // Show/hide empty state
+    let emptyEl = document.querySelector('.ev-empty');
+    if (visible === 0 && !emptyEl) {
+        const grid = document.getElementById('evGrid');
+        const div = document.createElement('div');
+        div.className = 'ev-empty';
+        div.id = 'filterEmpty';
+        div.innerHTML = '<i class="fas fa-search"></i><h3 style="font-weight:700;font-size:1rem;margin-bottom:4px;">No matching events</h3><p>Try a different search or filter</p>';
+        grid.appendChild(div);
+    } else {
+        const fe = document.getElementById('filterEmpty');
+        if (fe && visible > 0) fe.remove();
+    }
+}
+
+// Create event via API
+async function createEvent() {
+    const title = document.getElementById('fTitle').value.trim();
+    const startDate = document.getElementById('fStartDate').value;
+    if (!title) { showToast('warning', 'Please enter an event title'); return; }
+    if (!startDate) { showToast('warning', 'Please select a start date'); return; }
+
+    const btn = document.getElementById('createEventBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+
+    const data = {
+        title: title,
+        description: document.getElementById('fDesc').value.trim() || null,
+        event_type: document.getElementById('fType').value,
+        start_date: startDate,
+        end_date: document.getElementById('fEndDate').value || startDate,
+        is_all_day: document.getElementById('fIsAllDay').checked,
+        is_holiday: document.getElementById('fIsHoliday').checked,
+        location: document.getElementById('fLocation').value.trim() || null,
+        color: document.getElementById('fColor').value,
+    };
+
+    if (!data.is_all_day) {
+        data.start_time = document.getElementById('fStartTime').value || null;
+        data.end_time = document.getElementById('fEndTime').value || null;
+    }
+
+    try {
+        const result = await apiCall('/api/sprint21/events', 'POST', data);
+        if (result.error) {
+            showToast('error', result.error);
+        } else {
+            showToast('success', 'Event created successfully');
+            closeModal('addEventModal');
+            setTimeout(() => location.reload(), 800);
+        }
+    } catch(e) {
+        showToast('error', 'Failed to create event');
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-plus"></i> Create Event';
+}
+
+// Delete event
+function deleteEvent(eventId, eventTitle) {
+    showConfirm(
+        'Delete Event',
+        'Are you sure you want to delete <strong>' + eventTitle + '</strong>?<br>This action cannot be undone.',
+        async function() {
+            try {
+                const result = await apiCall('/api/sprint21/events/' + eventId, 'PUT', { is_active: false });
+                if (result.error) {
+                    showToast('error', result.error);
+                } else {
+                    showToast('success', 'Event deleted');
+                    const card = document.querySelector('.ev-card[data-id="' + eventId + '"]');
+                    if (card) {
+                        card.style.opacity = '0';
+                        card.style.transform = 'scale(0.95)';
+                        card.style.transition = 'all 0.3s';
+                        setTimeout(() => { card.remove(); updateStats(); }, 300);
+                    }
+                }
+            } catch(e) {
+                showToast('error', 'Failed to delete event');
+            }
+        },
+        { icon: '🗑️', danger: true, yesText: 'Delete' }
+    );
+}
+
+// Update stat counts after deletion
+function updateStats() {
+    const cards = document.querySelectorAll('.ev-card');
+    const totalEl = document.getElementById('statTotal');
+    if (totalEl) totalEl.textContent = cards.length;
+
+    let holidays = 0;
+    cards.forEach(c => { if (c.dataset.type === 'holiday') holidays++; });
+    const holEl = document.getElementById('statHolidays');
+    if (holEl) holEl.textContent = holidays;
+
+    const now = new Date();
+    const y = now.getFullYear(), m = now.getMonth();
+    let thisMonth = 0;
+    cards.forEach(c => {
+        const d = new Date(c.dataset.start);
+        if (d.getFullYear() === y && d.getMonth() === m) thisMonth++;
+    });
+    const tmEl = document.getElementById('statThisMonth');
+    if (tmEl) tmEl.textContent = thisMonth;
+
+    const upEl = document.getElementById('statUpcoming');
+    if (upEl) upEl.textContent = cards.length;
+
+    // Show empty state if no cards remain
+    if (cards.length === 0) {
+        document.getElementById('evGrid').innerHTML = '<div class="ev-empty"><i class="fas fa-calendar-plus"></i><h3 style="font-weight:700;font-size:1rem;margin-bottom:4px;">No Events Yet</h3><p>Create your first event to get started</p></div>';
+    }
+}
+</script>
+{% endblock %}

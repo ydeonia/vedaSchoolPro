@@ -231,6 +231,12 @@ async def separate_teacher(request: Request, tid: str, db: AsyncSession = Depend
     if not t:
         raise HTTPException(404, "Teacher not found")
     t.is_active = False
+    # Disable linked User account login
+    if t.user_id:
+        from models.user import User
+        linked_user = await db.scalar(select(User).where(User.id == t.user_id))
+        if linked_user:
+            linked_user.is_active = False
     await db.commit()
     return {"success": True, "message": f"{t.first_name} has been separated"}
 
@@ -244,6 +250,12 @@ async def rehire_teacher(request: Request, tid: str, db: AsyncSession = Depends(
     if not t:
         raise HTTPException(404, "Teacher not found")
     t.is_active = True
+    # Re-enable linked User account login
+    if t.user_id:
+        from models.user import User
+        linked_user = await db.scalar(select(User).where(User.id == t.user_id))
+        if linked_user:
+            linked_user.is_active = True
     await db.commit()
     return {"success": True, "message": f"{t.first_name} has been rehired"}
 
@@ -295,6 +307,32 @@ async def update_separation_request(req_id: str, request: Request, db: AsyncSess
         text("UPDATE separation_requests SET status = :status, reviewed_by = :by, reviewed_at = NOW() WHERE id = :id"),
         {"status": status, "by": request.state.user.get("user_id"), "id": req_id}
     )
+
+    # ── AUTO-DEACTIVATE on approval ──
+    if status == "approved":
+        try:
+            ref_row = (await db.execute(
+                text("SELECT employee_ref_id, employee_type FROM separation_requests WHERE id = :id"),
+                {"id": req_id}
+            )).mappings().first()
+            if ref_row and ref_row.get("employee_type") == "teacher":
+                from models.teacher import Teacher
+                from models.user import User
+                teacher = (await db.execute(
+                    select(Teacher).where(Teacher.id == uuid.UUID(ref_row["employee_ref_id"]))
+                )).scalar_one_or_none()
+                if teacher:
+                    teacher.is_active = False
+                    teacher.work_status = "resigned"
+                    if teacher.user_id:
+                        user_obj = (await db.execute(
+                            select(User).where(User.id == teacher.user_id)
+                        )).scalar_one_or_none()
+                        if user_obj:
+                            user_obj.is_active = False
+        except Exception as e:
+            print(f"[WARN] Separation auto-deactivation failed: {e}")
+
     await db.commit()
     return {"success": True, "message": f"Request {status}"}
 
@@ -383,7 +421,7 @@ async def generate_payroll(request: Request, data: PayrollGenData, db: AsyncSess
 
 @router.get("/salary-slip-pdf/{slip_id}")
 @require_role(UserRole.SCHOOL_ADMIN)
-async def salary_slip_pdf(slip_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+async def salary_slip_pdf(request: Request, slip_id: str, db: AsyncSession = Depends(get_db)):
     from models.mega_modules import SalarySlip, Employee
     from models.branch import Branch
     from utils.id_card_generator import generate_salary_slip_pdf
@@ -483,6 +521,62 @@ async def employee_id_card(request: Request, emp_id: str, db: AsyncSession = Dep
     pdf_bytes = generate_employee_id_card_pdf(school_data, employee_data)
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f"inline; filename=id_{emp.employee_code}.pdf"})
+
+
+@router.get("/teacher-id-card/{teacher_id}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def teacher_id_card(request: Request, teacher_id: str, db: AsyncSession = Depends(get_db)):
+    from models.teacher import Teacher
+    from models.branch import Branch
+    from utils.id_card_generator import generate_teacher_id_card_pdf
+
+    teacher = (await db.execute(select(Teacher).where(Teacher.id == uuid.UUID(teacher_id)))).scalar_one_or_none()
+    if not teacher: raise HTTPException(404)
+    branch = (await db.execute(select(Branch).where(Branch.id == teacher.branch_id))).scalar_one_or_none()
+
+    school_data = {
+        "name": branch.name if branch else "", "logo_url": branch.logo_url if branch else "",
+        "motto": branch.motto if branch else "", "address": branch.address if branch else "",
+        "phone": branch.phone if branch else "",
+    }
+    teacher_data = {
+        "name": teacher.full_name, "employee_code": teacher.employee_code or "",
+        "designation": teacher.designation or "Teacher",
+        "department": teacher.department or teacher.specialization or "",
+        "dob": teacher.date_of_birth.strftime('%d %b %Y') if teacher.date_of_birth else "",
+        "blood_group": teacher.blood_group or "", "photo_url": teacher.photo_url or "",
+        "emergency_contact_phone": teacher.emergency_contact or "",
+        "valid_from": "Apr 2025", "valid_to": "Mar 2026",
+    }
+    pdf_bytes = generate_teacher_id_card_pdf(school_data, teacher_data)
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f"inline; filename=teacher_id_{teacher.employee_code or teacher.id}.pdf"})
+
+
+@router.post("/visitor-card")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def visitor_card(request: Request, db: AsyncSession = Depends(get_db)):
+    from models.branch import Branch
+    from utils.id_card_generator import generate_visitor_card_pdf
+    from datetime import datetime
+
+    user = request.state.user
+    branch_id = uuid.UUID(user["branch_id"])
+    data = await request.json()
+
+    branch = (await db.execute(select(Branch).where(Branch.id == branch_id))).scalar_one_or_none()
+    school_data = {"name": branch.name if branch else "", "address": branch.address if branch else ""}
+    visitor_data = {
+        "name": data.get("name", "Guest"),
+        "purpose": data.get("purpose", ""),
+        "visiting_whom": data.get("visiting_whom", ""),
+        "phone": data.get("phone", ""),
+        "date": datetime.now().strftime("%d %b %Y"),
+        "valid_until": data.get("valid_until", "Today Only"),
+    }
+    pdf_bytes = generate_visitor_card_pdf(school_data, visitor_data)
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": f"inline; filename=visitor_pass.pdf"})
 
 
 @router.get("/verify-card/{qr_data}")

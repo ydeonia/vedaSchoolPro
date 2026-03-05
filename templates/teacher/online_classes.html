@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Online Classes{% endblock %}
+{% block page_title %}Online Classes{% endblock %}
+{% block page_subtitle %}Schedule, manage &amp; track your virtual classes{% endblock %}
+{% block extra_css %}
+<style>
+/* My Connections bar */
+.conn-bar{background:var(--bg-card,white);border-radius:12px;padding:14px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:12px;}
+.conn-title{font-weight:900;font-size:.82rem;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.conn-items{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.conn-item{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;border:1px solid var(--border);font-size:.72rem;font-weight:600;}
+.conn-item.ok{border-color:#059669;background:#ECFDF5;} .conn-item.err{border-color:#DC2626;background:#FEF2F2;}
+.conn-item .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.conn-item .dot.green{background:#059669;} .conn-item .dot.red{background:#DC2626;} .conn-item .dot.gray{background:#9CA3AF;}
+.conn-email{color:var(--text-light);font-size:.65rem;margin-left:4px;}
+.conn-btn{padding:4px 10px;border-radius:6px;font-size:.62rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+.conn-btn.connect{background:var(--primary);color:white;border-color:var(--primary);}
+.conn-btn.disconnect{background:#FEE2E2;color:#DC2626;border-color:#FECACA;}
+.conn-note{font-size:.62rem;color:var(--text-light);margin-top:6px;}
+
+.cal-nav{display:flex;align-items:center;justify-content:space-between;background:var(--bg-card,white);border-radius:12px;padding:10px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:12px;}
+.cal-title{font-weight:900;font-size:.92rem;}
+.cal-btns{display:flex;gap:6px;}
+.cal-btn{padding:6px 12px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+.cal-btn:hover,.cal-btn.active{background:var(--primary);color:white;border-color:var(--primary);}
+
+/* Calendar grid */
+.cal-grid{display:grid;grid-template-columns:60px repeat(6,1fr);background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:16px;}
+.cal-header{background:var(--primary-50);padding:8px 4px;text-align:center;font-size:.68rem;font-weight:900;border-bottom:1px solid var(--border-light);}
+.cal-header.time-col{background:transparent;}
+.cal-time{padding:4px;text-align:right;font-size:.60rem;color:var(--text-light);font-weight:700;border-right:1px solid var(--border-light);height:40px;line-height:40px;}
+.cal-cell{border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);min-height:40px;position:relative;cursor:pointer;transition:background .1s;}
+.cal-cell:hover{background:var(--primary-50);}
+.cal-event{position:absolute;left:2px;right:2px;background:var(--primary);color:white;border-radius:6px;padding:2px 4px;font-size:.55rem;font-weight:700;cursor:pointer;overflow:hidden;z-index:2;line-height:1.2;}
+.cal-event:hover{opacity:.9;}
+.cal-event .ev-sub{font-size:.50rem;font-weight:500;opacity:.85;}
+
+/* Quick create modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal-box{background:var(--bg-card,white);border-radius:16px;padding:24px;width:90%;max-width:420px;max-height:85vh;overflow-y:auto;}
+.modal-title{font-weight:900;font-size:1rem;margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.f-grp{display:flex;flex-direction:column;gap:3px;}
+.f-grp label{font-size:.58rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
+.f-grp input,.f-grp select,.f-grp textarea{padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:.80rem;}
+.btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;width:100%;}
+.btn-sm{padding:5px 10px;border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+.btn-sm:hover{background:var(--primary-50);color:var(--primary);border-color:var(--primary);}
+
+/* Meeting detail popup */
+.detail-popup{background:var(--bg-card,white);border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.15);position:fixed;z-index:1001;width:280px;display:none;}
+.dp-title{font-weight:900;font-size:.88rem;margin-bottom:6px;}
+.dp-meta{font-size:.72rem;color:var(--text-light);margin-bottom:4px;}
+.dp-link{font-size:.68rem;color:var(--primary);word-break:break-all;margin:6px 0;}
+.dp-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+
+/* Past classes */
+.past-section{margin-top:20px;}
+.section-title{font-weight:900;font-size:1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.past-list{display:flex;flex-direction:column;gap:8px;}
+.past-row{display:flex;align-items:center;gap:12px;background:var(--bg-card,white);border-radius:10px;padding:12px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+.past-date{font-size:.65rem;color:var(--text-light);font-weight:700;min-width:70px;}
+.past-title{flex:1;font-weight:700;font-size:.82rem;}
+.past-badge{font-size:.55rem;padding:2px 6px;border-radius:10px;font-weight:700;background:#D1FAE5;color:#059669;}
+.past-count{font-size:.68rem;color:var(--text-light);}
+.empty-state{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem;}
+@media(max-width:768px){.cal-grid{grid-template-columns:40px repeat(6,1fr);}.f-row{grid-template-columns:1fr;}.conn-items{flex-direction:column;align-items:stretch;}}
+</style>
+{% endblock %}
+{% block content %}
+<!-- My Connections — per-teacher OAuth -->
+<div class="conn-bar" id="conn-bar">
+    <div class="conn-title"><i class="fas fa-link" style="color:var(--primary);"></i> My Connections</div>
+    <div class="conn-items" id="conn-items">
+        <!-- Google Meet -->
+        <div class="conn-item" id="conn-google">
+            <div class="dot gray" id="dot-google"></div>
+            <i class="fab fa-google" style="color:#4285F4;font-size:.85rem;"></i>
+            <span>Google Meet</span>
+            <span class="conn-email" id="google-email"></span>
+            <button class="conn-btn connect" id="btn-conn-google" onclick="connectMyGoogle()">Connect</button>
+        </div>
+        <!-- Teams -->
+        <div class="conn-item" id="conn-teams">
+            <div class="dot gray" id="dot-teams"></div>
+            <i class="fab fa-microsoft" style="color:#00A4EF;font-size:.85rem;"></i>
+            <span>MS Teams</span>
+            <span class="conn-email" id="teams-email"></span>
+            <button class="conn-btn connect" id="btn-conn-teams" onclick="connectMyTeams()">Connect</button>
+        </div>
+        <!-- Zoom (school-level, info only) -->
+        <div class="conn-item" id="conn-zoom">
+            <div class="dot gray" id="dot-zoom"></div>
+            <i class="fas fa-video" style="color:#2D8CFF;font-size:.85rem;"></i>
+            <span>Zoom</span>
+            <span class="conn-email" id="zoom-info" style="font-style:italic;">School account</span>
+        </div>
+    </div>
+    <div class="conn-note">Connect your own Google or Teams account so meeting links are created in YOUR calendar. Zoom uses the school's shared account.</div>
+</div>
+
+<!-- Calendar Navigation -->
+<div class="cal-nav">
+    <button class="cal-btn" onclick="changeWeek(-1)"><i class="fas fa-chevron-left"></i></button>
+    <div class="cal-title" id="week-label">This Week</div>
+    <div style="display:flex;gap:6px;">
+        <button class="cal-btn" onclick="goToday()">Today</button>
+        <button class="cal-btn active" id="btn-new" onclick="openCreateModal()"><i class="fas fa-plus"></i> New Class</button>
+        <button class="cal-btn" onclick="changeWeek(1)"><i class="fas fa-chevron-right"></i></button>
+    </div>
+</div>
+
+<!-- Platform status banner (shows if broken) -->
+<div id="platform-alert" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:10px;padding:10px 16px;margin-bottom:12px;font-size:.75rem;color:#92400E;">
+    <i class="fas fa-exclamation-triangle"></i> <span id="platform-alert-text"></span>
+</div>
+
+<!-- Calendar Grid -->
+<div class="cal-grid" id="cal-grid"></div>
+
+<!-- Past Classes -->
+<div class="past-section">
+    <div class="section-title"><i class="fas fa-history"></i> Past Classes</div>
+    <div class="past-list" id="past-list"><div class="empty-state">Loading...</div></div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal-bg" id="create-modal">
+    <div class="modal-box">
+        <div class="modal-title"><i class="fas fa-video" style="color:var(--primary);"></i> Schedule Online Class</div>
+        <div class="f-grp" style="margin-bottom:8px;"><label>Title</label><input type="text" id="m-title" placeholder="Math — Chapter 5"></div>
+        <div class="f-row">
+            <div class="f-grp"><label>Class</label><select id="m-class" onchange="mLoadSections(this.value)"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Section</label><select id="m-section"><option value="">All</option></select></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Subject</label><select id="m-subject"><option value="">Select</option></select></div>
+            <div class="f-grp"><label>Platform</label>
+                <select id="m-platform"><option value="google_meet">Google Meet</option><option value="zoom">Zoom</option><option value="teams">MS Teams</option></select>
+            </div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>Date</label><input type="date" id="m-date"></div>
+            <div class="f-grp"><label>Start</label><input type="time" id="m-start" value="10:00"></div>
+        </div>
+        <div class="f-row">
+            <div class="f-grp"><label>End</label><input type="time" id="m-end" value="10:45"></div>
+            <div class="f-grp"><label>Manual Link</label><input type="text" id="m-link" placeholder="Optional"></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="btn-primary" onclick="submitCreate()" style="flex:1;">Create Class</button>
+            <button class="btn-sm" onclick="closeCreateModal()" style="padding:10px 16px;">Cancel</button>
+        </div>
+        <div id="m-status" style="margin-top:8px;font-size:.75rem;text-align:center;"></div>
+    </div>
+</div>
+
+<!-- Detail Popup -->
+<div class="detail-popup" id="detail-popup"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+let currentWeekStart = getMonday(new Date());
+let calendarData = [];
+const HOURS = [8,9,10,11,12,13,14,15,16,17];
+const SUBJECT_COLORS = ['#2563EB','#DC2626','#059669','#7C3AED','#D97706','#0891B2','#BE185D','#4338CA'];
+let subjectColorMap = {};
+let colorIndex = 0;
+
+function getMonday(d){ const dt=new Date(d); const day=dt.getDay(); const diff=dt.getDate()-day+(day===0?-6:1); dt.setDate(diff); dt.setHours(0,0,0,0); return dt; }
+function fmtDate(d){ return d.toISOString().split('T')[0]; }
+function getSubjectColor(name){ if(!name) return '#6B7280'; if(!subjectColorMap[name]){ subjectColorMap[name]=SUBJECT_COLORS[colorIndex%SUBJECT_COLORS.length]; colorIndex++; } return subjectColorMap[name]; }
+
+// ─── My Connections ───
+function connectMyGoogle(){ window.location.href='/api/online-class/teacher/oauth/google/start'; }
+function connectMyTeams(){ window.location.href='/api/online-class/teacher/oauth/teams/start'; }
+
+async function disconnectMy(platform){
+    if(!confirm(`Disconnect your ${platform==='google'?'Google':'Teams'} account?`)) return;
+    await fetch(`/api/online-class/teacher/disconnect/${platform}`,{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+    location.reload();
+}
+
+async function loadMyConnections(){
+    try{
+        const r = await fetch('/api/online-class/teacher/platform-tokens',{headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+
+        // Google
+        const gTok = d.tokens.find(t=>t.platform==='google_meet');
+        const dotG = document.getElementById('dot-google');
+        const btnG = document.getElementById('btn-conn-google');
+        const emailG = document.getElementById('google-email');
+        const connG = document.getElementById('conn-google');
+        if(gTok){
+            dotG.className = gTok.healthy ? 'dot green' : 'dot red';
+            connG.className = gTok.healthy ? 'conn-item ok' : 'conn-item err';
+            emailG.textContent = gTok.account_email || '';
+            if(gTok.healthy){
+                btnG.textContent='Disconnect'; btnG.className='conn-btn disconnect';
+                btnG.onclick=()=>disconnectMy('google');
+            } else {
+                btnG.textContent='Reconnect'; btnG.className='conn-btn connect';
+                btnG.onclick=connectMyGoogle;
+            }
+        }
+
+        // Teams
+        const tTok = d.tokens.find(t=>t.platform==='teams');
+        const dotT = document.getElementById('dot-teams');
+        const btnT = document.getElementById('btn-conn-teams');
+        const emailT = document.getElementById('teams-email');
+        const connT = document.getElementById('conn-teams');
+        if(tTok){
+            dotT.className = tTok.healthy ? 'dot green' : 'dot red';
+            connT.className = tTok.healthy ? 'conn-item ok' : 'conn-item err';
+            emailT.textContent = tTok.account_email || '';
+            if(tTok.healthy){
+                btnT.textContent='Disconnect'; btnT.className='conn-btn disconnect';
+                btnT.onclick=()=>disconnectMy('teams');
+            } else {
+                btnT.textContent='Reconnect'; btnT.className='conn-btn connect';
+                btnT.onclick=connectMyTeams;
+            }
+        }
+
+        // Zoom (school-level)
+        const dotZ = document.getElementById('dot-zoom');
+        const zInfo = document.getElementById('zoom-info');
+        const connZ = document.getElementById('conn-zoom');
+        if(d.zoom_available){
+            dotZ.className='dot green'; connZ.className='conn-item ok';
+            zInfo.textContent='School account active';
+        } else if(d.zoom_error){
+            dotZ.className='dot red'; connZ.className='conn-item err';
+            zInfo.textContent='School account issue';
+        } else {
+            zInfo.textContent='Not configured by admin';
+        }
+    }catch(e){}
+}
+
+// ─── Calendar ───
+function renderCalendar(){
+    const grid = document.getElementById('cal-grid');
+    const ws = currentWeekStart;
+    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+
+    // Update label
+    const we = new Date(ws); we.setDate(we.getDate()+5);
+    document.getElementById('week-label').textContent = `${ws.getDate()} ${ws.toLocaleString('en',{month:'short'})} — ${we.getDate()} ${we.toLocaleString('en',{month:'short'})} ${we.getFullYear()}`;
+
+    let html = '<div class="cal-header time-col"></div>';
+    for(let i=0;i<6;i++){
+        const d = new Date(ws); d.setDate(d.getDate()+i);
+        const isToday = fmtDate(d)===fmtDate(new Date());
+        html += `<div class="cal-header" style="${isToday?'background:var(--primary);color:white;':''}"> ${dayNames[i]} ${d.getDate()}</div>`;
+    }
+
+    for(const h of HOURS){
+        html += `<div class="cal-time">${h>12?h-12:h}${h>=12?'PM':'AM'}</div>`;
+        for(let i=0;i<6;i++){
+            const d = new Date(ws); d.setDate(d.getDate()+i);
+            const dateStr = fmtDate(d);
+            const dayData = calendarData.find(dd=>dd.date===dateStr);
+            let eventsHtml = '';
+            if(dayData){
+                dayData.classes.forEach(c=>{
+                    const startH = parseInt(c.start_time.split(':')[0]);
+                    const startM = parseInt(c.start_time.split(':')[1]);
+                    if(startH===h){
+                        const endH = c.end_time? parseInt(c.end_time.split(':')[0]):startH;
+                        const endM = c.end_time? parseInt(c.end_time.split(':')[1]):startM+45;
+                        const durSlots = Math.max(1, endH - startH + (endM>startM?1:0));
+                        const topPx = Math.round(startM/60*40);
+                        const heightPx = Math.max(30, durSlots*40 - 4);
+                        const bg = getSubjectColor(c.subject);
+                        eventsHtml += `<div class="cal-event" style="top:${topPx}px;height:${heightPx}px;background:${bg};" onclick="showDetail(event,'${c.id}')">
+                            ${c.subject||c.title}<br><span class="ev-sub">${c.class_name}</span>
+                        </div>`;
+                    }
+                });
+            }
+            html += `<div class="cal-cell" data-date="${dateStr}" data-hour="${h}" onclick="cellClick(event,'${dateStr}','${h}')">${eventsHtml}</div>`;
+        }
+    }
+    grid.innerHTML = html;
+}
+
+async function loadCalendar(){
+    try{
+        const r = await fetch(`/api/online-class/calendar?week_start=${fmtDate(currentWeekStart)}`,{headers:{'X-CSRF-Token':CSRF}});
+        const data = await r.json();
+        calendarData = data.days||[];
+        renderCalendar();
+    }catch(e){ renderCalendar(); }
+}
+
+function changeWeek(dir){ currentWeekStart.setDate(currentWeekStart.getDate()+dir*7); loadCalendar(); }
+function goToday(){ currentWeekStart=getMonday(new Date()); loadCalendar(); }
+
+function cellClick(e, dateStr, hour){
+    if(e.target.classList.contains('cal-event')) return;
+    document.getElementById('m-date').value = dateStr;
+    document.getElementById('m-start').value = `${String(hour).padStart(2,'0')}:00`;
+    const endH = parseInt(hour)+1;
+    document.getElementById('m-end').value = `${String(endH).padStart(2,'0')}:00`;
+    openCreateModal();
+}
+
+function showDetail(e, classId){
+    e.stopPropagation();
+    let cls = null;
+    for(const day of calendarData){ cls = day.classes.find(c=>c.id===classId); if(cls) break; }
+    if(!cls) return;
+
+    const popup = document.getElementById('detail-popup');
+    popup.innerHTML = `
+        <div class="dp-title">${cls.title}</div>
+        <div class="dp-meta">${cls.class_name} | ${cls.start_time}${cls.end_time?' - '+cls.end_time:''}</div>
+        <div class="dp-meta">Platform: ${cls.platform.replace('_',' ')}</div>
+        ${cls.meeting_link?`<div class="dp-link"><a href="${cls.meeting_link}" target="_blank">${cls.meeting_link.substring(0,40)}...</a></div>`:''}
+        ${cls.meeting_password?`<div class="dp-meta">Password: ${cls.meeting_password}</div>`:''}
+        <div class="dp-actions">
+            ${cls.meeting_link?`<button class="btn-sm" onclick="copyLink('${cls.meeting_link}')"><i class="fas fa-copy"></i> Copy</button>`:''}
+            <button class="btn-sm" onclick="reshareClass('${cls.id}')"><i class="fas fa-share"></i> Reshare</button>
+            ${cls.status==='scheduled'?`<button class="btn-sm" onclick="cancelClass('${cls.id}')"><i class="fas fa-times"></i> Cancel</button>`:''}
+            <button class="btn-sm" onclick="closeDetail()"><i class="fas fa-times-circle"></i></button>
+        </div>
+    `;
+    popup.style.display = 'block';
+    const rect = e.target.getBoundingClientRect();
+    popup.style.top = Math.min(rect.bottom+4, window.innerHeight-300)+'px';
+    popup.style.left = Math.min(rect.left, window.innerWidth-290)+'px';
+}
+function closeDetail(){ document.getElementById('detail-popup').style.display='none'; }
+document.addEventListener('click',e=>{ if(!e.target.closest('.detail-popup')&&!e.target.closest('.cal-event')) closeDetail(); });
+
+function copyLink(link){ navigator.clipboard.writeText(link); }
+
+async function reshareClass(id){
+    await fetch(`/api/online-class/${id}/reshare`,{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+    closeDetail();
+    alert('Notification sent to students!');
+}
+
+async function cancelClass(id){
+    if(!confirm('Cancel this class?')) return;
+    await fetch(`/api/online-class/${id}`,{method:'DELETE',headers:{'X-CSRF-Token':CSRF}});
+    closeDetail(); loadCalendar();
+}
+
+// Create modal
+function openCreateModal(){ document.getElementById('create-modal').classList.add('show'); }
+function closeCreateModal(){ document.getElementById('create-modal').classList.remove('show'); document.getElementById('m-status').textContent=''; }
+
+async function loadFormData(){
+    try{
+        const r = await fetch('/api/school-admin/classes-sections-subjects',{headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+        window._fd = d;
+        const mc = document.getElementById('m-class');
+        (d.classes||[]).forEach(c=>{ mc.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+        const ms = document.getElementById('m-subject');
+        (d.subjects||[]).forEach(s=>{ ms.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    }catch(e){}
+}
+
+function mLoadSections(cid){
+    const sel = document.getElementById('m-section');
+    sel.innerHTML = '<option value="">All</option>';
+    if(!window._fd) return;
+    (window._fd.sections||[]).filter(s=>s.class_id===cid).forEach(s=>{
+        sel.innerHTML += `<option value="${s.id}">${s.name}</option>`;
+    });
+}
+
+async function submitCreate(){
+    const title = document.getElementById('m-title').value;
+    const classId = document.getElementById('m-class').value;
+    if(!title||!classId){alert('Title and Class are required');return;}
+    const st = document.getElementById('m-status');
+    st.textContent='Creating...';
+    try{
+        const r = await fetch('/api/online-class/create',{
+            method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+            body:JSON.stringify({
+                title,
+                class_id: classId,
+                section_id: document.getElementById('m-section').value||null,
+                subject_id: document.getElementById('m-subject').value||null,
+                date: document.getElementById('m-date').value,
+                start_time: document.getElementById('m-start').value,
+                end_time: document.getElementById('m-end').value,
+                platform: document.getElementById('m-platform').value,
+                meeting_link: document.getElementById('m-link').value,
+            })
+        });
+        const d = await r.json();
+        if(d.status==='ok'){
+            let msg = `<span style="color:#059669;">Class created!</span>`;
+            if(d.meeting_link) msg += ` Link generated.`;
+            if(d.link_error) msg += `<br><span style="color:#D97706;font-size:.68rem;"><i class="fas fa-exclamation-triangle"></i> ${d.link_error}</span>`;
+            st.innerHTML = msg;
+            document.getElementById('m-title').value='';
+            loadCalendar(); loadPast();
+            if(!d.link_error) setTimeout(closeCreateModal, 1500);
+        }else{
+            st.innerHTML=`<span style="color:#DC2626;">${d.detail||'Error'}</span>`;
+        }
+    }catch(e){st.innerHTML='<span style="color:#DC2626;">Network error</span>';}
+}
+
+// Past classes
+async function loadPast(){
+    const list = document.getElementById('past-list');
+    try{
+        const r = await fetch('/api/online-class/my-classes?filter=past',{headers:{'X-CSRF-Token':CSRF}});
+        const classes = await r.json();
+        if(!classes.length){list.innerHTML='<div class="empty-state">No past classes yet</div>';return;}
+        list.innerHTML = classes.map(c=>`
+            <div class="past-row">
+                <div class="past-date">${c.date}<br>${c.start_time}</div>
+                <div class="past-title">${c.title}<br><span style="font-size:.65rem;color:var(--text-light);">${c.class_name} ${c.section_name} — ${c.subject_name||'—'}</span></div>
+                <div class="past-count"><i class="fas fa-users"></i> ${c.attended_count}</div>
+                ${c.recording_url?`<a href="${c.recording_url}" target="_blank" class="btn-sm"><i class="fas fa-play"></i></a>`:
+                `<button class="btn-sm" onclick="addRec('${c.id}')"><i class="fas fa-film"></i></button>`}
+            </div>
+        `).join('');
+    }catch(e){list.innerHTML='<div class="empty-state">Error</div>';}
+}
+
+async function addRec(id){
+    const url = prompt('Enter recording URL (YouTube/Drive):');
+    if(!url) return;
+    await fetch(`/api/online-class/${id}/recording`,{
+        method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':CSRF},
+        body:JSON.stringify({recording_url:url})
+    });
+    loadPast();
+}
+
+// Check platform status — populate the create form dropdown
+async function checkPlatformStatus(){
+    try{
+        const r = await fetch('/api/online-class/platform-status',{headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+        if(!d.configured){
+            document.getElementById('platform-alert').style.display='block';
+            document.getElementById('platform-alert-text').textContent='No video platform connected. Use "My Connections" above to connect your Google or Teams account, or ask admin to set up Zoom.';
+            return;
+        }
+        const broken = d.platforms.filter(p=>!p.healthy);
+        if(broken.length>0){
+            document.getElementById('platform-alert').style.display='block';
+            document.getElementById('platform-alert-text').innerHTML = broken.map(p=>p.error_msg).join('<br>');
+        }
+        // Populate platform dropdown — show source info
+        const sel = document.getElementById('m-platform');
+        sel.innerHTML='';
+        d.platforms.forEach(p=>{
+            const opt = document.createElement('option');
+            opt.value = p.key;
+            let label = p.name;
+            if(p.source==='your_account' && p.email) label += ` (${p.email})`;
+            else if(p.source==='school_admin') label += ' (school)';
+            if(!p.healthy) label += ' [offline]';
+            opt.textContent = label;
+            opt.disabled = !p.healthy;
+            sel.appendChild(opt);
+        });
+        // Select default
+        if(d.default_platform) sel.value = d.default_platform;
+    }catch(e){}
+}
+
+// Handle URL params for OAuth success/error
+const urlP = new URLSearchParams(window.location.search);
+if(urlP.get('success')){
+    // Show a small toast
+    const t = document.createElement('div');
+    t.style.cssText='position:fixed;top:80px;right:20px;background:#059669;color:white;padding:12px 20px;border-radius:10px;font-weight:700;font-size:.82rem;z-index:9999;';
+    t.textContent = urlP.get('success').includes('google') ? 'Google Account Connected!' : 'Teams Account Connected!';
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(), 3000);
+    history.replaceState(null,'','/teacher/online-classes');
+}
+if(urlP.get('error')){
+    alert('Connection error: '+urlP.get('error').replace(/_/g,' '));
+    history.replaceState(null,'','/teacher/online-classes');
+}
+
+// Set default date
+document.getElementById('m-date').value = new Date().toISOString().split('T')[0];
+loadMyConnections();
+loadFormData();
+loadCalendar();
+loadPast();
+checkPlatformStatus();
+</script>
+{% endblock %}

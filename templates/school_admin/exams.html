@@ -5,16 +5,18 @@
 
 {% block extra_css %}
 <style>
-    .exam-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 12px; overflow: hidden; transition: all 0.2s; }
+    .exam-card { background: var(--bg-card, white); border-radius: var(--radius); box-shadow: var(--shadow-sm); margin-bottom: 12px; overflow: hidden; transition: all 0.2s; }
     .exam-card:hover { box-shadow: var(--shadow); }
-    .exam-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; }
+    .exam-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; gap: 12px; }
     .exam-name { font-weight: 700; font-size: 1rem; }
     .exam-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; }
     .exam-badges { display: flex; gap: 6px; }
     .exam-body { display: none; border-top: 1px solid var(--border-light); padding: 16px 20px; }
     .exam-body.open { display: block; }
-    .sub-row { display: grid; grid-template-columns: 1fr 90px 90px 60px; gap: 8px; padding: 8px 0; align-items: center; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
+    .sub-row { display: grid; grid-template-columns: 1fr 1fr 80px 80px 40px; gap: 8px; padding: 8px 0; align-items: center; border-bottom: 1px solid var(--border-light); font-size: 0.85rem; }
     .sub-row.header { font-weight: 700; font-size: 0.72rem; text-transform: uppercase; color: var(--text-secondary); }
+    .class-pills { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+    .class-pill { background: var(--primary-light, #e0e7ff); color: var(--primary, #4f46e5); font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
 </style>
 {% endblock %}
 
@@ -28,12 +30,20 @@
         <h2>Create New Exam</h2>
     </div>
     <div class="card-body">
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: end;">
-            <div class="form-group" style="margin:0;"><label class="form-label">Exam Name</label><input type="text" id="examName" class="form-input" placeholder="e.g. Mid-Term Exam"></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; align-items: end;">
+            <div class="form-group" style="margin:0;"><label class="form-label">Exam Name</label><input type="text" id="examName" class="form-input" placeholder="e.g. Mid-Term Exam, Cycle Test 1"></div>
             <div class="form-group" style="margin:0;"><label class="form-label">Start Date</label><input type="date" id="examStart" class="form-input"></div>
             <div class="form-group" style="margin:0;"><label class="form-label">End Date</label><input type="date" id="examEnd" class="form-input"></div>
-            <button class="btn btn-primary" onclick="createExam()"><i class="fas fa-plus"></i> Create</button>
         </div>
+        <div class="form-group" style="margin-top:10px;">
+            <label class="form-label">Applicable Classes (which classes is this exam for?)</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;padding:8px 0;" id="examClassCheckboxes">
+                {% for c in classes %}
+                <label style="display:flex;align-items:center;gap:4px;font-size:0.82rem;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:8px;"><input type="checkbox" class="exam-class-cb" value="{{ c.id }}" data-name="{{ c.name }}"> {{ c.name }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <button class="btn btn-primary" onclick="createExam()" style="margin-top:6px;"><i class="fas fa-plus"></i> Create Exam</button>
     </div>
 </div>
 
@@ -42,13 +52,22 @@
     {% for exam in exams %}
     <div class="exam-card" id="exam-{{ exam.id }}">
         <div class="exam-header" onclick="toggleExam('{{ exam.id }}')">
-            <div>
+            <div style="min-width:0;">
                 <div class="exam-name">{{ exam.name }}</div>
                 <div class="exam-meta">
                     {% if exam.start_date %}{{ exam.start_date.strftime('%d %b') }}{% endif %}
                     {% if exam.end_date %} — {{ exam.end_date.strftime('%d %b %Y') }}{% endif %}
                     · {{ exam.exam_subjects|length }} subjects configured
                 </div>
+            </div>
+            <div class="class-pills" style="flex:1;">
+                {% if exam.applicable_classes %}
+                    {% for ac in exam.applicable_classes %}
+                    <span class="class-pill">{{ ac.name }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="class-pill" style="background:#f0fdf4;color:#16a34a;">All Classes</span>
+                {% endif %}
             </div>
             <div class="exam-badges">
                 {% if exam.is_published %}
@@ -94,10 +113,16 @@
 async function createExam() {
     const name = document.getElementById('examName').value.trim();
     if (!name) { showToast('warning', 'Enter exam name', ''); return; }
+    const checkedBoxes = document.querySelectorAll('.exam-class-cb:checked');
+    const applicable_classes = Array.from(checkedBoxes).map(cb => ({
+        id: cb.value, name: cb.dataset.name
+    }));
+    if (applicable_classes.length === 0) { showToast('warning', 'Select at least one class', ''); return; }
     try {
         const result = await apiCall('/api/school/exams/create', 'POST', {
             name, start_date: document.getElementById('examStart').value || null,
             end_date: document.getElementById('examEnd').value || null,
+            applicable_classes,
         });
         showToast('success', 'Exam Created! 🎓', result.message);
         setTimeout(() => location.reload(), 800);
@@ -118,8 +143,8 @@ async function loadExamSubjects(examId) {
             area.innerHTML = '<div style="color: var(--text-light); font-size: 0.82rem;">No subjects added yet</div>';
             return;
         }
-        area.innerHTML = `<div class="sub-row header"><div>Subject</div><div>Max</div><div>Pass</div><div></div></div>` +
-            result.subjects.map(s => `<div class="sub-row"><div style="font-weight:600;">${s.subject_name}</div><div>${s.max_marks}</div><div>${s.passing_marks}</div><div></div></div>`).join('');
+        area.innerHTML = `<div class="sub-row header"><div>Subject</div><div>Class</div><div>Max</div><div>Pass</div><div></div></div>` +
+            result.subjects.map(s => `<div class="sub-row"><div style="font-weight:600;">${s.subject_name}</div><div>${s.class_name || '-'}</div><div>${s.max_marks}</div><div>${s.passing_marks}</div><div><button class="btn btn-ghost btn-sm" onclick="removeSubject('${examId}','${s.id}')" style="color:var(--danger);padding:2px;"><i class="fas fa-times"></i></button></div></div>`).join('');
     } catch(e) {}
 }
 
@@ -136,19 +161,31 @@ async function addSubject(examId) {
     } catch(e) { showToast('error', 'Error', e.message); }
 }
 
+async function removeSubject(examId, esId) {
+    showConfirm('Remove Subject', 'Remove this subject from the exam?', async () => {
+        try {
+            await apiCall(`/api/school/exams/subject/${esId}`, 'DELETE');
+            showToast('success', 'Subject Removed', '');
+            loadExamSubjects(examId);
+        } catch(e) { showToast('error', 'Error', e.message); }
+    }, {icon:'🗑️', danger:true, yesText:'Remove'});
+}
+
 async function deleteExam(id) {
-    if (!confirm('Delete this exam and all marks?')) return;
-    try { await apiCall(`/api/school/exams/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+    showConfirm('Delete Exam', 'Delete this exam and all marks?', async () => {
+        try { await apiCall(`/api/school/exams/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+    }, {icon:'🗑️', danger:true, yesText:'Delete'});
 }
 
 async function publishExam(id, current) {
     const action = current ? 'unpublish (hide from students)' : 'publish (make visible to students)';
-    if (!confirm(`Are you sure you want to ${action} this exam's results?`)) return;
-    try {
-        const result = await apiCall(`/api/school/exams/${id}/publish`, 'POST');
-        showToast('success', result.message, '');
-        setTimeout(() => location.reload(), 500);
-    } catch(e) {}
+    showConfirm('Confirm', `Are you sure you want to ${action} this exam's results?`, async () => {
+        try {
+            const result = await apiCall(`/api/school/exams/${id}/publish`, 'POST');
+            showToast('success', result.message, '');
+            setTimeout(() => location.reload(), 500);
+        } catch(e) {}
+    }, {icon:'⚠️'});
 }
 </script>
 {% endblock %}

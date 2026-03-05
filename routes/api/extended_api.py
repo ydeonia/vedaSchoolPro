@@ -174,6 +174,59 @@ async def return_book(issue_id: str, request: Request, db: AsyncSession = Depend
     return {"message": "Book returned", "fine": float(issue.fine_amount)}
 
 
+class BookUpdateData(BaseModel):
+    title: Optional[str] = None
+    author: Optional[str] = None
+    isbn: Optional[str] = None
+    publisher: Optional[str] = None
+    category: Optional[str] = None
+    rack_number: Optional[str] = None
+    total_copies: Optional[int] = None
+    price: Optional[float] = None
+
+
+@router.put("/library/books/{book_id}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def update_book(book_id: str, data: BookUpdateData, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.mega_modules import Book
+    book = (await db.execute(select(Book).where(Book.id == uuid.UUID(book_id)))).scalar_one_or_none()
+    if not book: raise HTTPException(404, "Book not found")
+    for field in ["title", "author", "isbn", "publisher", "category", "rack_number", "price"]:
+        val = getattr(data, field)
+        if val is not None:
+            setattr(book, field, val)
+    if data.total_copies is not None:
+        diff = data.total_copies - book.total_copies
+        book.total_copies = data.total_copies
+        book.available_copies = max(0, book.available_copies + diff)
+    await db.commit()
+    return {"id": str(book.id), "message": f"Book '{book.title}' updated"}
+
+
+@router.delete("/library/books/{book_id}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def delete_book(book_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.mega_modules import Book
+    book = (await db.execute(select(Book).where(Book.id == uuid.UUID(book_id)))).scalar_one_or_none()
+    if not book: raise HTTPException(404, "Book not found")
+    book.is_active = False
+    await db.commit()
+    return {"message": f"Book '{book.title}' deleted"}
+
+
+@router.post("/library/fine/{issue_id}/pay")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def pay_fine(issue_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.mega_modules import BookIssue
+    issue = (await db.execute(select(BookIssue).where(BookIssue.id == uuid.UUID(issue_id)))).scalar_one_or_none()
+    if not issue: raise HTTPException(404, "Issue record not found")
+    if issue.fine_amount <= 0: raise HTTPException(400, "No fine to pay")
+    if issue.fine_paid: raise HTTPException(400, "Fine already paid")
+    issue.fine_paid = True
+    await db.commit()
+    return {"message": "Fine marked as paid", "fine_amount": float(issue.fine_amount)}
+
+
 # ─── CERTIFICATES API ─────────────────────────────────────
 class CertificateData(BaseModel):
     student_id: str
@@ -238,3 +291,214 @@ async def certificate_pdf(cert_id: str, request: Request, db: AsyncSession = Dep
     pdf_bytes = generate_certificate_pdf(school_data, cert_data)
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f"inline; filename=certificate_{cert.certificate_number}.pdf"})
+
+
+# ─── ACTIVITIES API ──────────────────────────────────────
+class ActivityData(BaseModel):
+    name: str
+    title: Optional[str] = None
+    activity_type: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    event_date: Optional[str] = None
+    registration_deadline: Optional[str] = None
+    venue: Optional[str] = None
+    max_participants: Optional[int] = None
+    eligible_classes: Optional[list] = None
+    status: Optional[str] = "upcoming"
+
+
+class ActivityUpdateData(BaseModel):
+    name: Optional[str] = None
+    title: Optional[str] = None
+    activity_type: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    event_date: Optional[str] = None
+    registration_deadline: Optional[str] = None
+    venue: Optional[str] = None
+    max_participants: Optional[int] = None
+    eligible_classes: Optional[list] = None
+    status: Optional[str] = None
+
+
+class EnrollStudentData(BaseModel):
+    student_ids: list[str]
+    nomination_type: Optional[str] = "self"
+    team_name: Optional[str] = None
+
+
+class StudentParticipationData(BaseModel):
+    participation: Optional[str] = None
+    achievement: Optional[str] = None
+    remarks: Optional[str] = None
+    position: Optional[str] = None
+    score: Optional[float] = None
+    status: Optional[str] = None
+
+
+@router.post("/activities/create")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def create_activity(data: ActivityData, request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    from models.activity import Activity
+    activity = Activity(
+        branch_id=uuid.UUID(user["branch_id"]),
+        name=data.name, title=data.title or data.name,
+        activity_type=data.activity_type, category=data.category,
+        description=data.description, venue=data.venue,
+        max_participants=data.max_participants,
+        eligible_classes=data.eligible_classes,
+        status=data.status or "upcoming",
+        created_by=uuid.UUID(user["user_id"]),
+    )
+    if data.event_date:
+        try: activity.event_date = date.fromisoformat(data.event_date)
+        except: pass
+    if data.registration_deadline:
+        try: activity.registration_deadline = date.fromisoformat(data.registration_deadline)
+        except: pass
+    db.add(activity)
+    await log_audit(db, user["branch_id"], user, AuditAction.CREATE, "activity", str(activity.id),
+                    f"Created activity: {data.name}")
+    await db.commit()
+    return {"id": str(activity.id), "message": "Activity created"}
+
+
+@router.put("/activities/{aid}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def update_activity(aid: str, data: ActivityUpdateData, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import Activity
+    activity = (await db.execute(select(Activity).where(Activity.id == uuid.UUID(aid)))).scalar_one_or_none()
+    if not activity: raise HTTPException(404, "Activity not found")
+    for field in ["name", "title", "activity_type", "category", "description",
+                  "venue", "max_participants", "eligible_classes", "status"]:
+        val = getattr(data, field, None)
+        if val is not None:
+            setattr(activity, field, val)
+    if data.event_date:
+        try: activity.event_date = date.fromisoformat(data.event_date)
+        except: pass
+    if data.registration_deadline:
+        try: activity.registration_deadline = date.fromisoformat(data.registration_deadline)
+        except: pass
+    await db.commit()
+    return {"message": "Activity updated"}
+
+
+@router.delete("/activities/{aid}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def delete_activity(aid: str, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import Activity
+    activity = (await db.execute(select(Activity).where(Activity.id == uuid.UUID(aid)))).scalar_one_or_none()
+    if not activity: raise HTTPException(404, "Activity not found")
+    activity.is_active = False
+    user = request.state.user
+    await log_audit(db, user["branch_id"], user, AuditAction.DELETE, "activity", str(activity.id),
+                    f"Soft-deleted activity: {activity.name}")
+    await db.commit()
+    return {"message": "Activity deleted"}
+
+
+@router.get("/activities/{aid}/participants")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def get_activity_participants(aid: str, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import Activity, StudentActivity
+    from models.student import Student
+    from sqlalchemy.orm import selectinload
+    activity = (await db.execute(select(Activity).where(Activity.id == uuid.UUID(aid)))).scalar_one_or_none()
+    if not activity: raise HTTPException(404, "Activity not found")
+    rows = (await db.execute(
+        select(StudentActivity).where(StudentActivity.activity_id == uuid.UUID(aid))
+        .options(selectinload(StudentActivity.student))
+    )).scalars().all()
+    participants = []
+    for sa in rows:
+        participants.append({
+            "id": str(sa.id),
+            "student_id": str(sa.student_id),
+            "student_name": sa.student.full_name if sa.student else "",
+            "participation": sa.participation,
+            "achievement": sa.achievement,
+            "remarks": sa.remarks,
+            "team_name": sa.team_name,
+            "position": sa.position,
+            "score": sa.score,
+            "status": sa.status,
+        })
+    return {"activity_id": str(activity.id), "activity_name": activity.name, "participants": participants}
+
+
+@router.post("/activities/{aid}/enroll")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def enroll_students(aid: str, data: EnrollStudentData, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import Activity, StudentActivity
+    user = request.state.user
+    activity = (await db.execute(select(Activity).where(Activity.id == uuid.UUID(aid)))).scalar_one_or_none()
+    if not activity: raise HTTPException(404, "Activity not found")
+    if not activity.is_active: raise HTTPException(400, "Activity is not active")
+    enrolled = []
+    for sid in data.student_ids:
+        # Check if already enrolled
+        existing = (await db.execute(
+            select(StudentActivity).where(
+                StudentActivity.activity_id == uuid.UUID(aid),
+                StudentActivity.student_id == uuid.UUID(sid),
+            )
+        )).scalar_one_or_none()
+        if existing:
+            continue
+        sa = StudentActivity(
+            student_id=uuid.UUID(sid),
+            activity_id=uuid.UUID(aid),
+            nomination_type=data.nomination_type or "self",
+            team_name=data.team_name,
+            nominated_by=uuid.UUID(user["user_id"]),
+            date=date.today(),
+        )
+        db.add(sa)
+        enrolled.append(sid)
+    await log_audit(db, user["branch_id"], user, AuditAction.CREATE, "student_activity", aid,
+                    f"Enrolled {len(enrolled)} student(s) in activity {activity.name}")
+    await db.commit()
+    return {"enrolled": len(enrolled), "skipped_duplicates": len(data.student_ids) - len(enrolled),
+            "message": f"{len(enrolled)} student(s) enrolled"}
+
+
+@router.put("/activities/{aid}/student/{sid}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def update_student_participation(aid: str, sid: str, data: StudentParticipationData,
+                                       request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import StudentActivity
+    sa = (await db.execute(
+        select(StudentActivity).where(
+            StudentActivity.activity_id == uuid.UUID(aid),
+            StudentActivity.student_id == uuid.UUID(sid),
+        )
+    )).scalar_one_or_none()
+    if not sa: raise HTTPException(404, "Student not enrolled in this activity")
+    for field in ["participation", "achievement", "remarks", "position", "score", "status"]:
+        val = getattr(data, field, None)
+        if val is not None:
+            setattr(sa, field, val)
+    await db.commit()
+    return {"message": "Participation updated"}
+
+
+@router.delete("/activities/{aid}/student/{sid}")
+@require_role(UserRole.SCHOOL_ADMIN)
+async def remove_student_from_activity(aid: str, sid: str, request: Request, db: AsyncSession = Depends(get_db)):
+    from models.activity import StudentActivity
+    sa = (await db.execute(
+        select(StudentActivity).where(
+            StudentActivity.activity_id == uuid.UUID(aid),
+            StudentActivity.student_id == uuid.UUID(sid),
+        )
+    )).scalar_one_or_none()
+    if not sa: raise HTTPException(404, "Student not enrolled in this activity")
+    user = request.state.user
+    await log_audit(db, user["branch_id"], user, AuditAction.DELETE, "student_activity", str(sa.id),
+                    f"Removed student {sid[:8]} from activity {aid[:8]}")
+    await db.delete(sa)
+    await db.commit()
+    return {"message": "Student removed from activity"}

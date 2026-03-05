@@ -1,96 +1,421 @@
 {% extends "base.html" %}
 {% block title %}My Dashboard{% endblock %}
-{% block page_title %}Welcome, {{ student.first_name }}! 👋{% endblock %}
-{% block page_subtitle %}Here's your personal school overview — only you can see this.{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Welcome back, {{ student.first_name }}!{% endblock %}
 
 {% block extra_css %}
 <style>
-    .profile-bar { display: flex; align-items: center; gap: 16px; padding: 20px; background: linear-gradient(135deg, #667EEA, #764BA2); border-radius: var(--radius); color: white; margin-bottom: 20px; }
-    .profile-avatar { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; font-weight: 800; }
-    .profile-info { flex: 1; }
-    .profile-name { font-size: 1.1rem; font-weight: 800; }
-    .profile-meta { font-size: 0.78rem; opacity: 0.8; }
-    .dash-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
-    .dash-card { background: white; border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 20px; text-align: center; }
-    .dash-icon { font-size: 2rem; margin-bottom: 8px; }
-    .dash-value { font-size: 1.8rem; font-weight: 800; }
-    .dash-label { font-size: 0.75rem; color: var(--text-light); margin-top: 4px; }
-    .today-status { display: inline-block; padding: 6px 16px; border-radius: 20px; font-weight: 700; font-size: 0.82rem; }
-    .today-status.present { background: #D1FAE5; color: #059669; }
-    .today-status.absent { background: #FEE2E2; color: #DC2626; }
-    .today-status.none { background: var(--bg-secondary); color: var(--text-light); }
-    .ann-item { padding: 12px 16px; border-left: 3px solid var(--primary); margin-bottom: 6px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: white; }
-    .ann-item.pinned { border-left-color: #F59E0B; background: #FFFBEB; }
-    .privacy-note { font-size: 0.72rem; color: var(--text-light); text-align: center; padding: 8px; }
-    .privacy-note i { margin-right: 4px; }
-    @media (max-width: 640px) { .dash-grid { grid-template-columns: 1fr; } .profile-bar { flex-direction: column; text-align: center; } }
+    /* ── Dashboard 3-Panel Layout ── */
+    .db-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+    .db-main { min-width: 0; }
+    .db-side { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Section Cards ── */
+    .db-section { background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
+    .db-section-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-light); }
+    .db-section-header h3 { font-size: 0.92rem; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text); }
+    .db-section-header .view-all { font-size: 0.78rem; color: var(--primary); font-weight: 600; text-decoration: none; }
+    .db-section-header .view-all:hover { text-decoration: underline; }
+    .db-section-body { padding: 16px 20px; }
+
+    /* ── Profile Card (Right Panel) ── */
+    .profile-card { background: var(--bg-card); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
+    .profile-card-top { display: flex; align-items: center; gap: 14px; padding: 20px; }
+    .profile-avatar { width: 52px; height: 52px; border-radius: var(--radius); background: linear-gradient(135deg, var(--primary), var(--primary-light)); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 800; color: white; flex-shrink: 0; }
+    .profile-name { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+    .profile-meta { font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px; }
+    .profile-links { display: flex; border-top: 1px solid var(--border-light); }
+    .profile-links a { flex: 1; text-align: center; padding: 10px; font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); text-decoration: none; transition: all 0.2s; }
+    .profile-links a:hover { color: var(--primary); background: var(--primary-50); }
+    .profile-links a:not(:last-child) { border-right: 1px solid var(--border-light); }
+    .profile-links a i { margin-right: 4px; }
+
+    /* ── Attendance Status Card ── */
+    .att-card { display: flex; gap: 12px; }
+    .att-stat { flex: 1; text-align: center; padding: 12px 8px; background: var(--bg); border-radius: var(--radius-sm); }
+    .att-stat-label { font-size: 0.68rem; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 600; }
+    .att-stat-value { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
+
+    /* ── Mini Calendar ── */
+    .mini-cal { width: 100%; }
+    .mini-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .mini-cal-header span { font-size: 0.85rem; font-weight: 700; }
+    .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+    .mini-cal-day { font-size: 0.65rem; color: var(--text-light); font-weight: 600; padding: 4px 0; text-transform: uppercase; }
+    .mini-cal-date { font-size: 0.75rem; padding: 6px 2px; border-radius: 6px; color: var(--text-secondary); cursor: default; }
+    .mini-cal-date.today { background: var(--primary); color: white; font-weight: 700; border-radius: 50%; }
+    .mini-cal-date.empty { visibility: hidden; }
+
+    /* ── Quick Links Grid ── */
+    .quick-links { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .ql-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg); text-decoration: none; transition: all 0.2s; }
+    .ql-item:hover { background: var(--primary-50); transform: translateX(2px); }
+    .ql-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; }
+    .ql-icon.blue { background: #DBEAFE; color: #3B82F6; }
+    .ql-icon.green { background: #D1FAE5; color: #10B981; }
+    .ql-icon.purple { background: #EDE9FE; color: #8B5CF6; }
+    .ql-icon.orange { background: #FEF3C7; color: #F59E0B; }
+    .ql-icon.red { background: #FEE2E2; color: #EF4444; }
+    .ql-icon.indigo { background: #E0E7FF; color: #4F46E5; }
+    .ql-label { font-size: 0.78rem; font-weight: 600; color: var(--text); }
+
+    /* ── Timetable Pills ── */
+    .tt-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
+    .tt-pill { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg); border-radius: var(--radius); min-width: 180px; flex-shrink: 0; border: 1px solid var(--border-light); transition: all 0.2s; }
+    .tt-pill:hover { border-color: var(--primary); background: var(--primary-50); }
+    .tt-pill-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+    .tt-pill-info { min-width: 0; }
+    .tt-pill-subject { font-size: 0.82rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tt-pill-time { font-size: 0.7rem; color: var(--text-light); margin-top: 2px; }
+    .tt-pill-teacher { font-size: 0.7rem; color: var(--text-secondary); }
+
+    /* Subject colors for timetable */
+    .subj-math { background: #FEE2E2; color: #EF4444; }
+    .subj-science { background: #D1FAE5; color: #10B981; }
+    .subj-english { background: #DBEAFE; color: #3B82F6; }
+    .subj-hindi { background: #FEF3C7; color: #F59E0B; }
+    .subj-social { background: #EDE9FE; color: #8B5CF6; }
+    .subj-computer { background: #E0E7FF; color: #4F46E5; }
+    .subj-default { background: #F1F5F9; color: #64748B; }
+    .subj-break { background: #ECFDF5; color: #059669; }
+
+    /* ── Notice Board ── */
+    .notice-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-light); }
+    .notice-item:last-child { border-bottom: none; }
+    .notice-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+    .notice-dot.pinned { background: #F59E0B; }
+    .notice-dot.emergency { background: #EF4444; }
+    .notice-dot.normal { background: var(--primary); }
+    .notice-title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+    .notice-meta { font-size: 0.72rem; color: var(--text-light); margin-top: 3px; }
+    .notice-content { font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+
+    /* ── Homework Table ── */
+    .hw-table { width: 100%; border-collapse: collapse; }
+    .hw-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); font-weight: 600; text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .hw-table td { font-size: 0.82rem; padding: 10px 12px; border-bottom: 1px solid var(--border-light); color: var(--text); }
+    .hw-table tr:last-child td { border-bottom: none; }
+    .hw-table tr:hover td { background: var(--bg); }
+    .hw-status { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.72rem; font-weight: 700; }
+    .hw-status.pending { background: #FEF3C7; color: #D97706; }
+    .hw-status.submitted { background: #D1FAE5; color: #059669; }
+    .hw-status.overdue { background: #FEE2E2; color: #DC2626; }
+
+    /* ── Today Status Badge ── */
+    .today-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+    .today-badge.present { background: #D1FAE5; color: #059669; }
+    .today-badge.absent { background: #FEE2E2; color: #DC2626; }
+    .today-badge.late { background: #FEF3C7; color: #D97706; }
+    .today-badge.none { background: var(--bg); color: var(--text-light); }
+
+    /* ── Empty State ── */
+    .empty-state { text-align: center; padding: 24px 16px; color: var(--text-light); font-size: 0.82rem; }
+    .empty-state i { font-size: 1.6rem; margin-bottom: 8px; display: block; opacity: 0.4; }
+
+    /* ── Responsive ── */
+    @media (max-width: 1024px) {
+        .db-layout { grid-template-columns: 1fr; }
+        .db-side { order: -1; }
+        .tt-row { flex-wrap: nowrap; }
+    }
+    @media (max-width: 640px) {
+        .quick-links { grid-template-columns: 1fr; }
+        .att-card { flex-direction: column; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="profile-bar">
-    <div class="profile-avatar">{{ student.first_name[0] }}</div>
-    <div class="profile-info">
-        <div class="profile-name">{{ student.full_name }}</div>
-        <div class="profile-meta">{{ student.class_.name if student.class_ else '' }} {{ student.section.name if student.section else '' }} · Roll: {{ student.roll_number or '—' }} · Adm: {{ student.admission_number or '—' }}</div>
-    </div>
-    <div>
-        <span class="today-status {{ today_status or 'none' }}">
-            {% if today_status == 'present' %}✅ Present Today
-            {% elif today_status == 'absent' %}❌ Absent Today
-            {% elif today_status == 'late' %}⏰ Late Today
-            {% else %}📋 Not Marked Yet
-            {% endif %}
-        </span>
-    </div>
-</div>
+<div class="db-layout">
+    <!-- ═══════════ MAIN CONTENT ═══════════ -->
+    <div class="db-main">
 
-<div class="dash-grid">
-    <div class="dash-card">
-        <div class="dash-icon">📊</div>
-        <div class="dash-value" style="color:{% if att_pct >= 85 %}var(--success){% elif att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ att_pct }}%</div>
-        <div class="dash-label">Attendance</div>
-        <div style="font-size:0.72rem; color:var(--text-light); margin-top:4px;">{{ present_days }} of {{ total_days }} days present</div>
-        {% if att_pct >= 95 %}<div class="achievement-badge gold" style="margin-top:6px;">🏆 Star Attender</div>
-        {% elif att_pct >= 90 %}<div class="achievement-badge green" style="margin-top:6px;">🌟 Excellent!</div>
-        {% elif att_pct >= 75 %}<div style="font-size:0.72rem; color:var(--primary); margin-top:4px;">👍 Good, keep it up!</div>
-        {% elif att_pct > 0 %}<div style="font-size:0.72rem; color:var(--warning); margin-top:4px;">💪 Let's improve together</div>{% endif %}
-    </div>
-    <div class="dash-card">
-        <div class="dash-icon">💰</div>
-        <div class="dash-value" style="color:{% if pending_fees > 0 %}var(--danger){% else %}var(--success){% endif %};">
-            {% if pending_fees > 0 %}₹{{ "{:,.0f}".format(pending_fees) }}{% else %}All Clear{% endif %}
-        </div>
-        <div class="dash-label">{% if pending_fees > 0 %}Fee Pending{% else %}No Pending Fees{% endif %}</div>
-        {% if pending_fees > 0 %}<a href="/student/fees" style="font-size:0.72rem; color:var(--primary); font-weight:600;">View Details →</a>{% endif %}
-    </div>
-    <div class="dash-card">
-        <div class="dash-icon">📢</div>
-        <div class="dash-value" style="color:var(--primary);">{{ announcements|length }}</div>
-        <div class="dash-label">Recent Announcements</div>
-    </div>
-</div>
-
-<!-- Recent Announcements -->
-{% if announcements %}
-<div class="card">
-    <div class="card-header"><h2><i class="fas fa-bullhorn" style="color:var(--primary);"></i> Recent Announcements</h2></div>
-    <div class="card-body">
-        {% for a in announcements %}
-        <div class="ann-item {{ 'pinned' if a.is_pinned }}">
-            <div style="display:flex; align-items:center; gap:8px;">
-                {% if a.is_pinned %}<span>📌</span>{% endif %}
-                {% if a.is_emergency %}<span>🚨</span>{% endif %}
-                <strong style="font-size:0.88rem;">{{ a.title }}</strong>
-                <span style="margin-left:auto; font-size:0.68rem; color:var(--text-light);">{{ a.created_at.strftime('%d %b') if a.created_at else '' }}</span>
+        <!-- Today's Time Table -->
+        <div class="db-section" style="margin-bottom:20px;">
+            <div class="db-section-header">
+                <h3><i class="fas fa-calendar-day" style="color:var(--primary);"></i> Time Table</h3>
+                <a href="/student/timetable" class="view-all">View All <i class="fas fa-chevron-right" style="font-size:0.6rem;"></i></a>
             </div>
-            <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:4px;">{{ a.content[:200] }}{% if a.content|length > 200 %}...{% endif %}</div>
+            <div class="db-section-body">
+                {% if today_timetable %}
+                <div class="tt-row">
+                    {% for p in today_timetable %}
+                    {% set subj_lower = p.subject|lower %}
+                    {% set subj_class = 'subj-break' if p.type == 'break' or p.type == 'lunch' else ('subj-math' if 'math' in subj_lower else ('subj-science' if 'science' in subj_lower or 'physics' in subj_lower or 'chemistry' in subj_lower or 'biology' in subj_lower else ('subj-english' if 'english' in subj_lower else ('subj-hindi' if 'hindi' in subj_lower or 'sanskrit' in subj_lower else ('subj-social' if 'social' in subj_lower or 'history' in subj_lower or 'geography' in subj_lower else ('subj-computer' if 'computer' in subj_lower or 'it' == subj_lower else 'subj-default')))))) %}
+                    <div class="tt-pill">
+                        <div class="tt-pill-icon {{ subj_class }}">
+                            {% if p.type == 'break' or p.type == 'lunch' %}<i class="fas fa-coffee"></i>
+                            {% elif 'math' in subj_lower %}<i class="fas fa-calculator"></i>
+                            {% elif 'science' in subj_lower or 'physics' in subj_lower %}<i class="fas fa-flask"></i>
+                            {% elif 'english' in subj_lower %}<i class="fas fa-book-open"></i>
+                            {% elif 'computer' in subj_lower %}<i class="fas fa-laptop-code"></i>
+                            {% elif 'social' in subj_lower or 'history' in subj_lower %}<i class="fas fa-globe-asia"></i>
+                            {% else %}<i class="fas fa-book"></i>{% endif %}
+                        </div>
+                        <div class="tt-pill-info">
+                            <div class="tt-pill-subject">{{ p.subject }}</div>
+                            <div class="tt-pill-time">{{ p.start }} – {{ p.end }}</div>
+                            {% if p.teacher %}<div class="tt-pill-teacher"><i class="fas fa-user" style="font-size:0.6rem;"></i> {{ p.teacher }}</div>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state"><i class="fas fa-calendar-times"></i> No timetable for today</div>
+                {% endif %}
+            </div>
         </div>
-        {% endfor %}
-        <div style="text-align:center; margin-top:8px;"><a href="/student/announcements" style="font-size:0.82rem; color:var(--primary); font-weight:600;">View All →</a></div>
+
+        <!-- Notice Board -->
+        <div class="db-section" style="margin-bottom:20px;">
+            <div class="db-section-header">
+                <h3><i class="fas fa-bullhorn" style="color:#F59E0B;"></i> Notice Board</h3>
+                <a href="/student/announcements" class="view-all">View All <i class="fas fa-chevron-right" style="font-size:0.6rem;"></i></a>
+            </div>
+            <div class="db-section-body">
+                {% if announcements %}
+                {% for a in announcements %}
+                <div class="notice-item">
+                    <div class="notice-dot {% if a.is_emergency %}emergency{% elif a.is_pinned %}pinned{% else %}normal{% endif %}"></div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="notice-title">{{ a.title }}</div>
+                        <div class="notice-meta">
+                            {% if a.is_pinned %}<span style="color:#F59E0B;"><i class="fas fa-thumbtack"></i> Pinned</span> &middot; {% endif %}
+                            {{ a.created_at.strftime('%d %b %Y') if a.created_at else '' }}
+                        </div>
+                        <div class="notice-content">{{ a.content[:150] }}{% if a.content|length > 150 %}...{% endif %}</div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="empty-state"><i class="fas fa-bell-slash"></i> No announcements yet</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Upcoming Online Classes -->
+        {% if upcoming_online %}
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-video" style="color:#2563EB;"></i> Upcoming Online Classes</h3>
+                <a href="/student/online-classes" class="view-all">View All <i class="fas fa-chevron-right" style="font-size:0.6rem;"></i></a>
+            </div>
+            <div class="db-section-body" style="padding:12px;">
+                {% for oc in upcoming_online %}
+                <div style="display:flex;align-items:center;gap:12px;padding:8px 0;{% if not loop.last %}border-bottom:1px solid var(--border-light);{% endif %}">
+                    <div style="width:42px;height:42px;border-radius:10px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-video" style="color:#2563EB;"></i>
+                    </div>
+                    <div style="flex:1;">
+                        <div style="font-weight:700;font-size:.82rem;">{{ oc.title }}</div>
+                        <div style="font-size:.65rem;color:var(--text-light);">{{ oc.scheduled_date.strftime('%d %b') }} at {{ oc.start_time.strftime('%I:%M %p') }}</div>
+                    </div>
+                    {% if oc.meeting_link %}
+                    <a href="{{ oc.meeting_link }}" target="_blank" style="padding:6px 12px;border-radius:8px;background:#059669;color:white;font-size:.68rem;font-weight:700;text-decoration:none;" onclick="fetch('/api/online-class/{{ oc.id }}/join',{method:'POST',headers:{'X-CSRF-Token':'{{ csrf_token }}'}})">Join</a>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Homework / Assignments -->
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-tasks" style="color:#8B5CF6;"></i> Homework/Assignments</h3>
+                <a href="/student/homework" class="view-all">View All <i class="fas fa-chevron-right" style="font-size:0.6rem;"></i></a>
+            </div>
+            <div class="db-section-body" style="padding:0;">
+                {% if pending_homework %}
+                <table class="hw-table">
+                    <thead>
+                        <tr>
+                            <th>Subject</th>
+                            <th>Title</th>
+                            <th>Due Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hw in pending_homework %}
+                        <tr>
+                            <td style="font-weight:600;">{{ hw._subject_name if hw._subject_name else '—' }}</td>
+                            <td>{{ hw.title }}</td>
+                            <td>{{ hw.due_date.strftime('%d %b %Y') if hw.due_date else '—' }}</td>
+                            <td>
+                                {% if hw.due_date and today > hw.due_date %}
+                                <span class="hw-status overdue">Overdue</span>
+                                {% else %}
+                                <span class="hw-status pending">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="empty-state" style="padding:24px;"><i class="fas fa-check-circle"></i> No pending homework</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ═══════════ RIGHT PANEL ═══════════ -->
+    <div class="db-side">
+
+        <!-- Profile Card -->
+        <div class="profile-card">
+            <div class="profile-card-top">
+                <div class="profile-avatar">{{ student.first_name[0] }}</div>
+                <div>
+                    <div class="profile-name">{{ student.full_name }}</div>
+                    <div class="profile-meta">{{ student.class_.name if student.class_ else '' }} {{ student.section.name if student.section else '' }} &middot; Roll: {{ student.roll_number or '—' }}</div>
+                </div>
+            </div>
+            <div class="profile-links">
+                <a href="/student/my-profile"><i class="fas fa-user"></i> My Profile</a>
+                <a href="/student/messages"><i class="fas fa-comments"></i> Messages</a>
+            </div>
+        </div>
+
+        <!-- Today's Attendance -->
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-clipboard-check" style="color:var(--success);"></i> Attendance</h3>
+            </div>
+            <div class="db-section-body">
+                <div style="text-align:center; margin-bottom:14px;">
+                    <span class="today-badge {{ today_status or 'none' }}">
+                        {% if today_status == 'present' %}<i class="fas fa-check-circle"></i> Present Today
+                        {% elif today_status == 'absent' %}<i class="fas fa-times-circle"></i> Absent Today
+                        {% elif today_status == 'late' %}<i class="fas fa-clock"></i> Late Today
+                        {% else %}<i class="fas fa-minus-circle"></i> Not Marked Yet
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="att-card">
+                    <div class="att-stat">
+                        <div class="att-stat-label">This Session</div>
+                        <div class="att-stat-value" style="color:{% if att_pct >= 85 %}var(--success){% elif att_pct >= 75 %}var(--warning){% else %}var(--danger){% endif %};">{{ att_pct }}%</div>
+                    </div>
+                    <div class="att-stat">
+                        <div class="att-stat-label">Present</div>
+                        <div class="att-stat-value" style="color:var(--success);">{{ present_days }}</div>
+                    </div>
+                    <div class="att-stat">
+                        <div class="att-stat-label">Total Days</div>
+                        <div class="att-stat-value" style="color:var(--text-secondary);">{{ total_days }}</div>
+                    </div>
+                </div>
+                {% if att_pct >= 95 %}
+                <div style="text-align:center;margin-top:10px;padding:6px;background:rgba(245,158,11,0.1);border-radius:8px;font-size:0.78rem;font-weight:600;color:#D97706;">Star Attender</div>
+                {% elif att_pct >= 85 %}
+                <div style="text-align:center;margin-top:10px;padding:6px;background:rgba(16,185,129,0.1);border-radius:8px;font-size:0.78rem;font-weight:600;color:#059669;">Excellent Attendance</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Mini Calendar -->
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-calendar-alt" style="color:var(--info);"></i> Calendar</h3>
+            </div>
+            <div class="db-section-body">
+                <div class="mini-cal" id="miniCalendar"></div>
+            </div>
+        </div>
+
+        <!-- Fee Summary -->
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-wallet" style="color:{% if pending_fees > 0 %}var(--danger){% else %}var(--success){% endif %};"></i> Fees</h3>
+                <a href="/student/fees" class="view-all">Details <i class="fas fa-chevron-right" style="font-size:0.6rem;"></i></a>
+            </div>
+            <div class="db-section-body" style="text-align:center;">
+                {% if pending_fees > 0 %}
+                <div style="font-size:1.6rem;font-weight:800;color:var(--danger);">&#8377;{{ "{:,.0f}".format(pending_fees) }}</div>
+                <div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">Pending Balance</div>
+                <a href="/student/fees" style="display:inline-block;margin-top:10px;padding:8px 20px;background:var(--primary);color:white;border-radius:8px;font-size:0.78rem;font-weight:600;text-decoration:none;">Pay Now</a>
+                {% else %}
+                <div style="font-size:1.1rem;font-weight:700;color:var(--success);"><i class="fas fa-check-circle"></i> All Clear</div>
+                <div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">No pending fees</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="db-section">
+            <div class="db-section-header">
+                <h3><i class="fas fa-th-large" style="color:var(--primary);"></i> Quick Links</h3>
+            </div>
+            <div class="db-section-body">
+                <div class="quick-links">
+                    <a href="/student/results" class="ql-item">
+                        <div class="ql-icon blue"><i class="fas fa-trophy"></i></div>
+                        <span class="ql-label">Results</span>
+                    </a>
+                    <a href="/student/attendance" class="ql-item">
+                        <div class="ql-icon green"><i class="fas fa-calendar-check"></i></div>
+                        <span class="ql-label">Attendance</span>
+                    </a>
+                    <a href="/student/library" class="ql-item">
+                        <div class="ql-icon purple"><i class="fas fa-book"></i></div>
+                        <span class="ql-label">Library</span>
+                    </a>
+                    <a href="/student/transport" class="ql-item">
+                        <div class="ql-icon orange"><i class="fas fa-bus"></i></div>
+                        <span class="ql-label">Transport</span>
+                    </a>
+                    <a href="/student/leave" class="ql-item">
+                        <div class="ql-icon red"><i class="fas fa-calendar-minus"></i></div>
+                        <span class="ql-label">Leave</span>
+                    </a>
+                    <a href="/student/complaints" class="ql-item">
+                        <div class="ql-icon indigo"><i class="fas fa-comment-dots"></i></div>
+                        <span class="ql-label">Complaints</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
-{% endif %}
+{% endblock %}
 
-<div class="privacy-note"><i class="fas fa-lock"></i> Your data is private. Only you and your school admin can see your personal details.</div>
+{% block extra_js %}
+<script>
+// ── Mini Calendar ──
+(function() {
+    const cal = document.getElementById('miniCalendar');
+    if (!cal) return;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const today = now.getDate();
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dayNames = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    let html = `<div class="mini-cal-header"><span>${monthNames[month]} ${year}</span></div>`;
+    html += '<div class="mini-cal-grid">';
+
+    // Day headers
+    dayNames.forEach(d => { html += `<div class="mini-cal-day">${d}</div>`; });
+
+    // Empty cells
+    for (let i = 0; i < firstDay; i++) html += '<div class="mini-cal-date empty"></div>';
+
+    // Date cells
+    for (let d = 1; d <= daysInMonth; d++) {
+        const isToday = d === today;
+        html += `<div class="mini-cal-date${isToday ? ' today' : ''}">${d}</div>`;
+    }
+
+    html += '</div>';
+    cal.innerHTML = html;
+})();
+</script>
 {% endblock %}

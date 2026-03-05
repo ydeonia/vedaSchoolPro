@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Date, ForeignKey, Enum as SAEnum, Text, UniqueConstraint
+from sqlalchemy import Column, String, DateTime, Date, Time, ForeignKey, Enum as SAEnum, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database import Base
@@ -27,6 +27,8 @@ class Attendance(Base):
     academic_year_id = Column(UUID(as_uuid=True), ForeignKey("academic_years.id"), nullable=True)
     date = Column(Date, nullable=False, index=True)
     status = Column(SAEnum(AttendanceStatus), nullable=False)
+    check_in_time = Column(Time, nullable=True)
+    check_out_time = Column(Time, nullable=True)
     remarks = Column(Text, nullable=True)
     marked_by = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())

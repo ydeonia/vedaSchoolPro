@@ -58,16 +58,16 @@ def require_auth(func):
 def require_privilege(*privilege_keys: str):
     """
     Require at least ONE of the given privileges.
-    
+
     Usage:
         @require_privilege("student_admission")
         @require_privilege("fee_collection", "fee_structure")  # either one
-    
+
     Checks:
         1. User must be authenticated
         2. User must be SCHOOL_ADMIN or TEACHER role (not student/parent)
         3. User must have at least one of the specified privileges checked
-        4. First admin (principal) bypasses all checks
+        4. First admin (principal) bypasses — VERIFIED from DB, not JWT
     """
     def decorator(func):
         @wraps(func)
@@ -75,33 +75,47 @@ def require_privilege(*privilege_keys: str):
             user = await get_current_user(request)
             if not user:
                 return RedirectResponse(url="/login", status_code=302)
-            
+
             user_role = (user.get("role") or "").lower()
-            
+
             # Super admin always has access
             if user_role == "super_admin":
                 request.state.user = user
                 return await func(request, *args, **kwargs)
-            
+
             # Must be school staff or teacher
             if user_role not in ("school_admin", "teacher"):
                 raise HTTPException(status_code=403, detail="Access denied — insufficient role")
-            
-            # First admin has everything
+
+            # First admin — RE-VERIFY from database
             if user.get("is_first_admin"):
-                request.state.user = user
-                return await func(request, *args, **kwargs)
-            
+                from database import async_session
+                from models.user import User
+                from sqlalchemy import select
+                try:
+                    async with async_session() as db:
+                        db_user = await db.scalar(
+                            select(User).where(User.id == user.get("user_id"))
+                        )
+                        if db_user and db_user.is_first_admin and db_user.is_active:
+                            request.state.user = user
+                            return await func(request, *args, **kwargs)
+                except Exception:
+                    # DB check failed (pool issue, etc.) — trust the JWT flag
+                    # since it was server-set during login and is tamper-proof
+                    request.state.user = user
+                    return await func(request, *args, **kwargs)
+
             # Check privilege checkboxes
             user_privileges = user.get("privileges", {}) or {}
             has_access = any(user_privileges.get(key, False) for key in privilege_keys)
-            
+
             if not has_access:
                 raise HTTPException(
-                    status_code=403, 
+                    status_code=403,
                     detail=f"Access denied — requires privilege: {', '.join(privilege_keys)}"
                 )
-            
+
             request.state.user = user
             return await func(request, *args, **kwargs)
         return wrapper

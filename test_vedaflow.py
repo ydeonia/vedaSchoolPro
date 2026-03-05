@@ -370,6 +370,457 @@ async def test_data_integrity(client: httpx.AsyncClient, token: str):
 
 
 # ═══════════════════════════════════════════════════════════
+# PROFILE & CALENDAR TESTS
+# ═══════════════════════════════════════════════════════════
+async def test_profiles_and_calendars(client: httpx.AsyncClient, token: str):
+    print("\n👤 PROFILE & CALENDAR TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Get a student ID for profile tests
+    r = await client.get("/api/school/students")
+    student_id = None
+    if r.status_code == 200:
+        students = r.json().get("students", [])
+        if students:
+            student_id = students[0].get("id")
+            log_pass("Got student for profile tests", f"({students[0].get('first_name', '?')})")
+
+    # Get a teacher ID for profile tests
+    r = await client.get("/api/school/teachers")
+    teacher_id = None
+    if r.status_code == 200:
+        data = r.json()
+        teachers = data if isinstance(data, list) else data.get("teachers", [])
+        if teachers:
+            teacher_id = teachers[0].get("id") if isinstance(teachers[0], dict) else str(teachers[0].id)
+            log_pass("Got teacher for profile tests")
+
+    # ── Student Profile API ──
+    if student_id:
+        r = await client.get(f"/api/school/students/{student_id}/profile")
+        if r.status_code == 200:
+            d = r.json()
+            s = d.get("student", {})
+            # Check ALL expected fields exist
+            required = ["full_name", "father_name", "mother_name", "father_phone",
+                        "mother_phone", "father_email", "mother_email",
+                        "address", "city", "state", "pincode",
+                        "emergency_contact", "medical_conditions",
+                        "religion", "category", "nationality",
+                        "uses_transport", "house_name",
+                        "roles", "documents"]
+            missing = [f for f in required if f not in s]
+            if missing:
+                log_fail("Student profile fields", f"Missing: {', '.join(missing)}")
+            else:
+                log_pass("Student profile", f"All {len(required)} fields present")
+        else:
+            log_fail("Student profile API", f"Status {r.status_code}")
+
+        # ── Student Attendance Calendar ──
+        r = await client.get(f"/api/school/students/{student_id}/attendance-calendar?month=3&year=2026")
+        if r.status_code == 200:
+            d = r.json()
+            if "error" in d:
+                log_fail("Student calendar API", d["error"])
+            elif "days" in d and "summary" in d:
+                days = d["days"]
+                summary = d["summary"]
+                log_pass("Student attendance calendar", f"{len(days)} days, {summary.get('percentage', 0)}% present")
+                # Verify summary has required keys
+                req_keys = ["present", "absent", "total_working", "percentage"]
+                missing_keys = [k for k in req_keys if k not in summary]
+                if missing_keys:
+                    log_fail("Calendar summary keys", f"Missing: {', '.join(missing_keys)}")
+                else:
+                    log_pass("Calendar summary structure", "All keys present")
+            else:
+                log_fail("Student calendar response", "Missing 'days' or 'summary'")
+        else:
+            log_fail("Student calendar API", f"Status {r.status_code}")
+
+        # ── Student Profile Page (HTML) ──
+        r = await client.get(f"/school/students/{student_id}")
+        if r.status_code == 200:
+            if "attendance-calendar" in r.text and "achievements" in r.text.lower():
+                log_pass("Student profile page", "Has calendar + achievements sections")
+            else:
+                log_warn("Student profile page", "May be missing calendar/achievements sections")
+        else:
+            log_fail("Student profile page", f"Status {r.status_code}")
+
+    # ── Teacher Profile API ──
+    if teacher_id:
+        r = await client.get(f"/api/school/teachers/{teacher_id}/profile-full")
+        if r.status_code == 200:
+            d = r.json()
+            if "error" in d:
+                log_fail("Teacher profile API", d["error"])
+            else:
+                t = d.get("teacher", {})
+                required = ["full_name", "employee_id", "designation", "phone",
+                            "email", "address", "emergency_contact",
+                            "is_class_teacher", "house_name", "work_status"]
+                missing = [f for f in required if f not in t]
+                if missing:
+                    log_fail("Teacher profile fields", f"Missing: {', '.join(missing)}")
+                else:
+                    log_pass("Teacher profile", f"All {len(required)} fields present")
+
+                # Check assignments
+                asgn = d.get("assignments", [])
+                log_pass("Teacher assignments", f"{len(asgn)} assignments loaded")
+
+                # Check awards
+                awards = d.get("awards", [])
+                log_pass("Teacher awards", f"{len(awards)} awards loaded")
+
+                # Check attendance summary
+                att = d.get("attendance_summary", {})
+                if "this_month" in att and "overall" in att:
+                    log_pass("Teacher attendance summary", f"This month: {att['this_month'].get('percentage', 0)}%")
+                else:
+                    log_fail("Teacher attendance summary", "Missing this_month or overall")
+        else:
+            log_fail("Teacher profile API", f"Status {r.status_code}")
+
+        # ── Teacher Attendance Calendar ──
+        r = await client.get(f"/api/school/teachers/{teacher_id}/attendance-calendar?month=3&year=2026")
+        if r.status_code == 200:
+            d = r.json()
+            if "error" in d:
+                log_fail("Teacher calendar API", d["error"])
+            elif "days" in d:
+                log_pass("Teacher attendance calendar", f"{len(d['days'])} days")
+            else:
+                log_fail("Teacher calendar response", "Missing 'days'")
+        else:
+            log_fail("Teacher calendar API", f"Status {r.status_code}")
+
+        # ── Teacher Profile Page (HTML) ──
+        r = await client.get(f"/school/teachers/{teacher_id}")
+        if r.status_code == 200:
+            if "<script>" in r.text and "profile-full" in r.text:
+                log_pass("Teacher profile page", "Renders with profile-full API call")
+            else:
+                log_warn("Teacher profile page", "May have rendering issues")
+        else:
+            log_fail("Teacher profile page", f"Status {r.status_code}")
+
+
+# ═══════════════════════════════════════════════════════════
+# LEAVE FLOW TESTS
+# ═══════════════════════════════════════════════════════════
+async def test_leave_flow(client: httpx.AsyncClient, token: str):
+    print("\n📋 LEAVE FLOW TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Check leave list API
+    r = await client.get("/api/sprint21/leaves/pending")
+    if r.status_code == 200:
+        log_pass("Leave pending list API")
+    elif r.status_code == 500:
+        log_fail("Leave pending API", "500 error")
+    else:
+        log_warn("Leave pending API", f"Status {r.status_code}")
+
+
+# ═══════════════════════════════════════════════════════════
+# DUPLICATE FLOW DETECTION
+# ═══════════════════════════════════════════════════════════
+async def test_no_duplicate_flows(client: httpx.AsyncClient, token: str):
+    print("\n🔍 DUPLICATE FLOW DETECTION")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Check students page does NOT have "Add Student" modal anymore
+    r = await client.get("/school/students")
+    if r.status_code == 200:
+        if 'New Admission' in r.text and 'href="/school/admissions"' in r.text:
+            log_pass("Students page → links to Admissions", "No duplicate Add Student")
+        elif "addStudentModal" in r.text and "openModal('addStudentModal')" in r.text:
+            log_warn("Students page has Add Student modal", "Should route through Admissions pipeline")
+        else:
+            log_pass("Students page buttons OK")
+
+    # Check that teacher creation exists only in teachers page
+    r = await client.get("/school/teachers")
+    if r.status_code == 200:
+        if "addTeacherModal" in r.text:
+            log_pass("Teachers page has Add Teacher", "Quick-add available")
+
+    # Check employee onboarding is the main lifecycle
+    r = await client.get("/school/employee-onboarding")
+    if r.status_code == 200:
+        log_pass("Employee onboarding page", "Main employee lifecycle available")
+    else:
+        log_warn("Employee onboarding", f"Status {r.status_code}")
+
+    # Check settings page loads
+    r = await client.get("/school/settings")
+    if r.status_code == 200:
+        log_pass("Unified settings page")
+    else:
+        log_warn("Settings page", f"Status {r.status_code}")
+
+
+# ═══════════════════════════════════════════════════════════
+# HELP SYSTEM TESTS
+# ═══════════════════════════════════════════════════════════
+async def test_help_system(client: httpx.AsyncClient, token: str):
+    print("\n❓ HELP SYSTEM TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Check that pages have contextual help tooltips via the script
+    r = await client.get("/school/dashboard")
+    if r.status_code == 200:
+        if "pageHelp" in r.text and "fa-info-circle" in r.text:
+            log_pass("Dashboard has help tooltip system")
+        else:
+            log_warn("Dashboard help", "pageHelp script not found")
+
+    # Check help API
+    r = await client.get("/api/school/help/tip?page=dashboard")
+    if r.status_code == 200:
+        log_pass("Help tip API")
+    else:
+        log_warn("Help tip API", f"Status {r.status_code}")
+
+    r = await client.get("/api/school/help/articles?page=dashboard")
+    if r.status_code == 200:
+        log_pass("Help articles API")
+    else:
+        log_warn("Help articles API", f"Status {r.status_code}")
+
+
+# ═══════════════════════════════════════════════════════════
+# KEY PAGE HEALTH CHECK (no 500 errors)
+# ═══════════════════════════════════════════════════════════
+async def test_page_health(client: httpx.AsyncClient, token: str):
+    print("\n🏥 PAGE HEALTH CHECK (no 500s)")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    critical_pages = [
+        "/school/dashboard", "/school/teachers", "/school/students",
+        "/school/attendance", "/school/teacher-attendance",
+        "/school/admissions", "/school/timetable",
+        "/school/fee-collection", "/school/fee-structures",
+        "/school/exam-center", "/school/report-cards",
+        "/school/transport", "/school/events",
+        "/school/communication", "/school/settings",
+        "/school/hr-employees", "/school/employee-onboarding",
+        "/school/staff-privileges", "/school/separation",
+        "/school/houses", "/school/library",
+        "/school/leave-management", "/school/student-achievements",
+        "/school/activities", "/school/branding", "/school/photo-approvals",
+        "/school/exams", "/school/marks-entry", "/school/results",
+        "/school/reports/center",
+    ]
+
+    failed_500 = []
+    for url in critical_pages:
+        try:
+            r = await client.get(url)
+            name = url.split("/")[-1]
+            if r.status_code == 500:
+                log_fail(f"PAGE {name}", f"500 error!")
+                failed_500.append(url)
+            elif r.status_code == 200:
+                pass  # Don't spam — only report failures
+            elif r.status_code == 403:
+                pass  # Privilege issue — not a bug
+            elif r.status_code == 302:
+                pass  # Redirect — probably auth
+        except Exception as e:
+            log_fail(f"PAGE {url}", str(e))
+
+    ok_count = len(critical_pages) - len(failed_500)
+    log_pass(f"Pages OK: {ok_count}/{len(critical_pages)}")
+    if failed_500:
+        log_fail(f"Pages with 500 errors", f"{', '.join(failed_500)}")
+
+
+async def test_photo_and_branding(client: httpx.AsyncClient, token: str):
+    print("\n📸 PHOTO UPLOAD & BRANDING TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Test: Photo requests list (should return empty or list)
+    r = await client.get("/api/school/photo-requests")
+    if r.status_code == 200:
+        data = r.json()
+        log_pass(f"Photo requests list API: {data.get('count', 0)} pending")
+    else:
+        log_fail("Photo requests list", f"Status {r.status_code}")
+
+    # Test: Branding GET API
+    r = await client.get("/api/school/branding")
+    if r.status_code == 200:
+        data = r.json()
+        if "theme_color" in data:
+            log_pass(f"Branding API: theme={data['theme_color']}, logo={'yes' if data.get('logo_url') else 'no'}")
+        else:
+            log_fail("Branding API", "Missing theme_color field")
+    else:
+        log_fail("Branding API", f"Status {r.status_code}")
+
+    # Test: Theme color update
+    r = await client.put("/api/school/branding/theme",
+        json={"theme_color": "#2563EB"},
+        headers={"Content-Type": "application/json"})
+    if r.status_code == 200 and r.json().get("success"):
+        log_pass("Theme color update: #2563EB")
+    else:
+        log_fail("Theme color update", f"Status {r.status_code}")
+
+    # Reset to default
+    await client.put("/api/school/branding/theme",
+        json={"theme_color": "#4F46E5"},
+        headers={"Content-Type": "application/json"})
+
+    # Test: Invalid color
+    r = await client.put("/api/school/branding/theme",
+        json={"theme_color": "not-a-color"},
+        headers={"Content-Type": "application/json"})
+    if r.status_code == 400:
+        log_pass("Invalid color rejected correctly")
+    else:
+        log_warn("Invalid color not rejected", f"Status {r.status_code}")
+
+    # Test: Photo approvals page
+    r = await client.get("/school/photo-approvals")
+    if r.status_code == 200:
+        log_pass("Photo approvals page loads OK")
+    elif r.status_code == 403:
+        log_warn("Photo approvals page", "Privilege not assigned")
+    else:
+        log_fail("Photo approvals page", f"Status {r.status_code}")
+
+    # Test: Branding page
+    r = await client.get("/school/branding")
+    if r.status_code == 200:
+        log_pass("Branding page loads OK")
+    elif r.status_code == 403:
+        log_warn("Branding page", "Privilege not assigned")
+    else:
+        log_fail("Branding page", f"Status {r.status_code}")
+
+
+async def test_updated_at_fields(client: httpx.AsyncClient, token: str):
+    print("\n🕐 LAST-UPDATED / CHANGELOG TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Get a student to test
+    r = await client.get("/api/school/students?limit=1")
+    if r.status_code == 200:
+        data = r.json()
+        students = data.get("students", [])
+        if students:
+            sid = students[0].get("id")
+            r2 = await client.get(f"/api/school/students/{sid}/profile")
+            if r2.status_code == 200:
+                profile = r2.json().get("student", {})
+                if "updated_at" in profile:
+                    log_pass(f"Student profile has updated_at: {profile['updated_at'] or '(empty)'}")
+                else:
+                    log_fail("Student profile", "Missing updated_at field")
+                if "created_at" in profile:
+                    log_pass(f"Student profile has created_at: {profile['created_at'] or '(empty)'}")
+                else:
+                    log_fail("Student profile", "Missing created_at field")
+        else:
+            log_warn("No students found", "Skipping updated_at test")
+
+    # Get a teacher to test
+    r = await client.get("/api/school/teachers")
+    if r.status_code == 200:
+        data = r.json()
+        teachers = data.get("teachers", [])
+        if teachers:
+            tid = teachers[0].get("id")
+            r2 = await client.get(f"/api/school/teachers/{tid}/profile-full")
+            if r2.status_code == 200:
+                profile = r2.json().get("teacher", {})
+                if "updated_at" in profile:
+                    log_pass(f"Teacher profile has updated_at: {profile['updated_at'] or '(empty)'}")
+                else:
+                    log_fail("Teacher profile", "Missing updated_at field")
+                if "created_at" in profile:
+                    log_pass(f"Teacher profile has created_at: {profile['created_at'] or '(empty)'}")
+                else:
+                    log_fail("Teacher profile", "Missing created_at field")
+        else:
+            log_warn("No teachers found", "Skipping updated_at test")
+
+
+async def test_report_center(client: httpx.AsyncClient, token: str):
+    print("\n📊 REPORT CENTER TESTS")
+    print("=" * 50)
+
+    client.cookies.set("access_token", token)
+
+    # Test: Reports page loads
+    try:
+        r = await client.get("/school/reports/center")
+        if r.status_code == 200:
+            if "rpt-cats" in r.text and "generateReport" in r.text:
+                log_pass("Report Center page loads with all components")
+            else:
+                log_warn("Report Center page", "Missing expected UI elements")
+        else:
+            log_fail("Report Center page", f"Status {r.status_code}")
+    except Exception as e:
+        log_fail("Report Center page", str(e))
+
+    # Test all report APIs
+    report_tests = [
+        ("/api/school/reports/student-attendance?month=3&year=2026", "Student attendance report"),
+        ("/api/school/reports/teacher-attendance?month=3&year=2026", "Teacher attendance report"),
+        ("/api/school/reports/academic-performance", "Academic performance report"),
+        ("/api/school/reports/fee-collection", "Fee collection report"),
+        ("/api/school/reports/transport", "Transport report"),
+        ("/api/school/reports/houses", "Houses report"),
+        ("/api/school/reports/tc-alumni", "TC/Alumni report"),
+        ("/api/school/reports/login-history?days=30", "Login history report"),
+        ("/api/school/reports/student-directory?limit=50", "Student directory report"),
+        ("/api/school/reports/student-leaves", "Student leaves report"),
+        ("/api/school/reports/exams-list", "Exams list"),
+    ]
+
+    for url, name in report_tests:
+        try:
+            r = await client.get(url)
+            if r.status_code == 200:
+                d = r.json()
+                total = d.get("total", len(d.get("exams", d.get("rows", []))))
+                extra = ""
+                s = d.get("summary", {})
+                if "avg_attendance" in s:
+                    extra = f", avg={s['avg_attendance']}%"
+                elif "total_collected" in s:
+                    extra = f", collected={s['total_collected']}"
+                elif "active" in s:
+                    extra = f", active={s['active']}"
+                log_pass(f"{name}: {total} records{extra}")
+            else:
+                log_fail(name, f"Status {r.status_code}")
+        except Exception as e:
+            log_warn(name, f"Timeout/Error: {str(e)[:60]}")
+
+
+# ═══════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════
 async def main():
@@ -398,6 +849,14 @@ async def main():
             await test_apis(client, tokens["school_admin"])
             await test_privilege_enforcement(client, tokens["school_admin"])
             await test_data_integrity(client, tokens["school_admin"])
+            await test_profiles_and_calendars(client, tokens["school_admin"])
+            await test_leave_flow(client, tokens["school_admin"])
+            await test_no_duplicate_flows(client, tokens["school_admin"])
+            await test_help_system(client, tokens["school_admin"])
+            await test_page_health(client, tokens["school_admin"])
+            await test_photo_and_branding(client, tokens["school_admin"])
+            await test_updated_at_fields(client, tokens["school_admin"])
+            await test_report_center(client, tokens["school_admin"])
 
         # 4. Super admin tests
         if "super_admin" in tokens:

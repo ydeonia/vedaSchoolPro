@@ -5,15 +5,15 @@
 
 {% block extra_css %}
 <style>
-.res-tabs { display:flex; gap:4px; margin-bottom:16px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.res-tabs { display:flex; gap:4px; margin-bottom:16px; background:var(--bg-card, white); border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
 .res-tab { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-secondary); }
 .res-tab.active { background:var(--primary); color:white; }
 /* Summary cards */
 .res-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
-.rs-card { background:white; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.rs-card { background:var(--bg-card, white); border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
 .rs-val { font-size:1.6rem; font-weight:900; } .rs-lbl { font-size:0.65rem; color:var(--text-light); text-transform:uppercase; font-weight:700; margin-top:2px; }
 /* Entry form */
-.entry-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
+.entry-card { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
 .entry-card h3 { font-size:0.92rem; margin-bottom:14px; }
 .e-row { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:10px; }
 .e-grp { display:flex; flex-direction:column; gap:3px; }
@@ -31,7 +31,7 @@
 .topper-medal { font-size:2rem; }
 .topper-info h4 { font-size:0.92rem; font-weight:800; } .topper-info p { font-size:0.78rem; color:#92400E; }
 /* Result list */
-.result-list { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; }
+.result-list { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); overflow:hidden; }
 .rl-header { padding:14px 16px; border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center; }
 .rl-header h3 { font-size:0.92rem; font-weight:800; }
 .rl-item { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--border-light); }
@@ -106,9 +106,9 @@
             <h4 style="font-size:0.82rem;margin-bottom:8px;">📋 CSV Format Guide</h4>
             <div style="font-size:0.75rem;color:var(--text-secondary);line-height:1.6;">
                 Your CSV should have these columns (header names are flexible — we'll auto-detect):<br>
-                <code style="background:white;padding:2px 6px;border-radius:4px;">Student Name, Roll Number, Total Marks, Max Marks, Grade, Result (Pass/Fail)</code><br><br>
+                <code style="background:var(--bg-card, white);padding:2px 6px;border-radius:4px;">Student Name, Roll Number, Total Marks, Max Marks, Grade, Result (Pass/Fail)</code><br><br>
                 <strong>Example:</strong><br>
-                <code style="background:white;padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">
+                <code style="background:var(--bg-card, white);padding:4px 8px;border-radius:4px;display:inline-block;margin-top:4px;">
                 Rahul Kumar, 12345, 456, 500, A1, Pass<br>
                 Priya Singh, 12346, 389, 500, B2, Pass
                 </code><br><br>
@@ -142,7 +142,7 @@ function parseCSVFile(file) {
     reader.onload = function(e) {
         const text = e.target.result;
         const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length < 2) { alert('CSV has no data rows'); return; }
+        if (lines.length < 2) { showToast('warning', 'CSV has no data rows'); return; }
         const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,'').toLowerCase());
         // Auto-detect columns
         const nameCol = headers.findIndex(h => h.includes('name') || h.includes('student'));
@@ -152,7 +152,7 @@ function parseCSVFile(file) {
         const gradeCol = headers.findIndex(h => h.includes('grade'));
         const statusCol = headers.findIndex(h => h.includes('status') || h.includes('result') || h.includes('pass'));
 
-        if (nameCol === -1 || totalCol === -1) { alert('Could not find "Name" and "Total Marks" columns. Check your CSV headers.'); return; }
+        if (nameCol === -1 || totalCol === -1) { showToast('warning', 'Could not find "Name" and "Total Marks" columns. Check your CSV headers.'); return; }
 
         const rows = [];
         for (let i = 1; i < lines.length; i++) {
@@ -188,11 +188,11 @@ async function submitCSVResults(rows) {
             body:JSON.stringify({academic_year: document.getElementById('impYear').value, board: document.getElementById('impBoard').value, class_level: document.getElementById('impClass').value, entries})});
         if (!res.ok) throw new Error();
         const d = await res.json();
-        alert(`✅ ${d.count} results imported!`);
+        showToast('success', `${d.count} results imported!`);
         document.getElementById('csvPreview').innerHTML = '';
         loadResults();
         switchTab('overview', document.querySelectorAll('.res-tab')[0]);
-    } catch(e) { alert('Import failed'); }
+    } catch(e) { showToast('error', 'Import failed'); }
 }
 
 function downloadTemplate() {
@@ -250,7 +250,7 @@ async function loadStudentsForEntry() {
         const students = d.students || [];
         if (!students.length) { document.getElementById('entryTable').innerHTML = '<p style="color:var(--text-light);">No students found for this class.</p>'; return; }
         document.getElementById('entryTable').innerHTML = `<table class="bulk-table"><thead><tr><th>Student</th><th style="width:80px;">Total</th><th style="width:80px;">Max</th><th style="width:60px;">%</th><th style="width:80px;">Grade</th><th style="width:100px;">Status</th></tr></thead><tbody>${students.map(s=>`<tr data-sid="${s.id}"><td>${s.name} <span style="color:var(--text-light);font-size:0.68rem;">(${s.roll||'—'})</span></td><td><input type="number" class="br-total" onchange="calcPct(this)"></td><td><input type="number" class="br-max" value="500" onchange="calcPct(this)"></td><td class="br-pct">—</td><td><input class="br-grade" placeholder="A1"></td><td><select class="br-status"><option value="pass">Pass</option><option value="fail">Fail</option><option value="compartment">Compartment</option><option value="absent">Absent</option></select></td></tr>`).join('')}</tbody></table><div style="margin-top:12px;text-align:right;"><button class="btn-primary" onclick="saveResults()"><i class="fas fa-save"></i> Save All Results</button></div>`;
-    } catch(e) { alert('Failed to load students'); }
+    } catch(e) { showToast('error', 'Failed to load students'); }
 }
 
 function calcPct(el) {
@@ -278,7 +278,7 @@ async function saveResults() {
             result_status: row.querySelector('.br-status')?.value || 'pass',
         });
     });
-    if (!entries.length) { alert('Enter marks first'); return; }
+    if (!entries.length) { showToast('warning', 'Enter marks first'); return; }
     try {
         const res = await fetch('/api/school/board-results', {
             method: 'POST', credentials: 'same-origin',
@@ -286,10 +286,10 @@ async function saveResults() {
             body: JSON.stringify({academic_year: document.getElementById('brYear').value, board: document.getElementById('brBoard').value, class_level: document.getElementById('brClass').value, entries})
         });
         if (!res.ok) throw new Error();
-        alert('✅ Results saved!');
+        showToast('success', 'Results saved!');
         loadResults();
         switchTab('overview', document.querySelectorAll('.res-tab')[0]);
-    } catch(e) { alert('Save failed'); }
+    } catch(e) { showToast('error', 'Save failed'); }
 }
 
 function exportResults() {

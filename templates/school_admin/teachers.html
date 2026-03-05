@@ -4,32 +4,180 @@
 {% block page_title %}Teachers{% endblock %}
 {% block page_subtitle %}Manage your school's teaching staff{% endblock %}
 
+{% block extra_css %}
+<style>
+.class-pills{display:flex;flex-wrap:wrap;gap:4px;}
+.class-pill{font-size:0.62rem;font-weight:700;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+.class-pill.teaching{background:rgba(79,70,229,0.1);color:var(--primary);}
+.class-pill.class-teacher{background:rgba(5,150,105,0.12);color:#059669;border:1px solid rgba(5,150,105,0.25);}
+.assign-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;}
+.assign-card{padding:14px;border-radius:10px;border:1.5px solid var(--border-light);background:var(--bg);}
+.assign-card h4{font-size:0.72rem;font-weight:700;margin-bottom:8px;text-transform:uppercase;color:var(--text-light);}
+.assign-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border-light);}
+.assign-row:last-child{border:none;}
+.assign-row select{flex:1;font-size:0.8rem;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);}
+.assign-row .remove-btn{cursor:pointer;color:var(--danger);font-size:0.8rem;padding:4px;border:none;background:none;}
+.add-assign-btn{font-size:0.72rem;font-weight:700;color:var(--primary);cursor:pointer;border:1px dashed var(--primary);background:transparent;padding:6px 12px;border-radius:8px;margin-top:8px;width:100%;}
+.add-assign-btn:hover{background:rgba(79,70,229,0.06);}
+@media(max-width:768px){.assign-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
 {% block content %}
+<style>
+/* Inline editors for both columns */
+.inline-cell { position: relative; cursor: pointer; min-width: 170px; }
+.inline-cell:hover .inline-display { opacity: 0.85; }
+.inline-editor { padding: 4px 0; }
+.inline-bubbles { display: flex; flex-wrap: wrap; gap: 4px; }
+.inline-bubble {
+    display: inline-flex; align-items: center; gap: 3px;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 12px; white-space: nowrap;
+}
+.inline-bubble.ct-type {
+    background: linear-gradient(135deg, #F59E0B22, #F59E0B11);
+    border: 1px solid #F59E0B44; color: #92400E;
+}
+.inline-bubble.tc-type {
+    background: rgba(79,70,229,0.1);
+    border: 1px solid rgba(79,70,229,0.2); color: var(--primary);
+}
+.inline-bubble .bubble-remove {
+    cursor: pointer; font-size: 14px; color: #DC2626; opacity: 0.5;
+    margin-left: 2px; line-height: 1;
+}
+.inline-bubble .bubble-remove:hover { opacity: 1; }
+.inline-add-row { display: flex; gap: 4px; margin-top: 4px; flex-wrap: wrap; }
+.inline-add-row select {
+    font-size: 11px; padding: 3px 6px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+    max-width: 120px;
+}
+/* Qualification tag bubbles */
+.tag-input-wrap { padding: 4px 0; }
+.tag-bubbles { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.qual-tag {
+    display: inline-flex; align-items: center; gap: 3px;
+    background: rgba(79,70,229,0.1); border: 1px solid rgba(79,70,229,0.25);
+    color: var(--primary); font-size: 11px; font-weight: 600;
+    padding: 3px 8px; border-radius: 10px; white-space: nowrap;
+}
+.qual-tag .tag-x {
+    cursor: pointer; font-size: 13px; color: #DC2626; opacity: 0.5;
+    margin-left: 2px; line-height: 1;
+}
+.qual-tag .tag-x:hover { opacity: 1; }
+/* Filter Pills */
+.filter-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text-light);
+    cursor: pointer; transition: all 0.15s;
+}
+.filter-pill:hover { border-color: var(--primary); color: var(--primary); }
+.filter-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+.filter-pill.active .filter-count { background: rgba(255,255,255,0.25); color: #fff; }
+.filter-count {
+    font-size: 10px; background: var(--bg); padding: 1px 6px;
+    border-radius: 10px; color: var(--text-muted); font-weight: 600;
+}
+/* Column toggle dropdown */
+.col-toggle {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text); padding: 3px 0; cursor: pointer;
+}
+.col-toggle input { cursor: pointer; accent-color: var(--primary); }
+/* Table horizontal scroll when many columns visible */
+.table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.data-table { min-width: 100%; }
+.data-table th, .data-table td { white-space: nowrap; }
+.data-table .col-tc, .data-table .col-ct { white-space: normal; min-width: 140px; }
+.data-table td:first-child { white-space: normal; min-width: 160px; }
+.col-qual, .col-exp, .col-join, .col-spec { font-size: 12px; }
+</style>
 <div class="card">
     <div class="card-header">
         <h2>Teachers ({{ teachers | length }})</h2>
-        <button class="btn btn-primary" onclick="openModal('addTeacherModal')">
-            <i class="fas fa-plus"></i> Add Teacher
-        </button>
+        <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" onclick="exportTeachersCSV()">
+                <i class="fas fa-download"></i> Export CSV
+            </button>
+            <button class="btn btn-primary" onclick="openModal('addTeacherModal')">
+                <i class="fas fa-plus"></i> Add Teacher
+            </button>
+        </div>
     </div>
     <div class="card-body">
         {% if teachers %}
+        <!-- Status Filter Pills + Column Selector -->
+        <div style="display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
+            <span class="text-xs text-muted" style="margin-right:4px;">Filter:</span>
+            <button class="filter-pill active" data-filter="all" onclick="filterTeachers('all', this)">
+                All <span class="filter-count">{{ teachers|length }}</span>
+            </button>
+            <button class="filter-pill" data-filter="active" onclick="filterTeachers('active', this)">
+                <span style="width:7px;height:7px;border-radius:50%;background:#10B981;display:inline-block;"></span>
+                Active <span class="filter-count">{{ teachers|selectattr('is_active')|list|length }}</span>
+            </button>
+            <button class="filter-pill" data-filter="on_leave" onclick="filterTeachers('on_leave', this)">
+                <span style="width:7px;height:7px;border-radius:50%;background:#F59E0B;display:inline-block;"></span>
+                On Leave <span class="filter-count" id="onLeaveCount">0</span>
+            </button>
+            <button class="filter-pill" data-filter="suspended" onclick="filterTeachers('suspended', this)">
+                <span style="width:7px;height:7px;border-radius:50%;background:#DC2626;display:inline-block;"></span>
+                Suspended <span class="filter-count" id="suspendedCount">0</span>
+            </button>
+            <button class="filter-pill" data-filter="resigned" onclick="filterTeachers('resigned', this)">
+                <span style="width:7px;height:7px;border-radius:50%;background:#9CA3AF;display:inline-block;"></span>
+                Resigned <span class="filter-count" id="resignedCount">0</span>
+            </button>
+            <span style="flex:1;"></span>
+            <!-- Column Selector -->
+            <div style="position:relative;" id="colSelectorWrap">
+                <button class="btn btn-secondary btn-sm" onclick="toggleColSelector()" style="font-size:11px; padding:5px 10px;">
+                    <i class="fas fa-columns"></i> Columns
+                </button>
+                <div id="colSelectorDropdown" style="display:none; position:absolute; right:0; top:110%; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:8px; min-width:180px; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                    <div class="text-xs text-muted" style="margin-bottom:6px; font-weight:600;">Toggle Columns</div>
+                    <label class="col-toggle"><input type="checkbox" checked disabled> Teacher</label>
+                    <label class="col-toggle"><input type="checkbox" checked onchange="toggleColumn('col-empid', this.checked)"> Employee ID</label>
+                    <label class="col-toggle"><input type="checkbox" checked onchange="toggleColumn('col-desig', this.checked)"> Designation</label>
+                    <label class="col-toggle"><input type="checkbox" checked onchange="toggleColumn('col-contact', this.checked)"> Contact</label>
+                    <label class="col-toggle"><input type="checkbox" checked onchange="toggleColumn('col-tc', this.checked)"> Teaching Classes</label>
+                    <label class="col-toggle"><input type="checkbox" checked onchange="toggleColumn('col-ct', this.checked)"> Class Teacher Of</label>
+                    <hr style="margin:6px 0;border:none;border-top:1px solid var(--border-light);">
+                    <label class="col-toggle"><input type="checkbox" onchange="toggleColumn('col-qual', this.checked)"> Qualification</label>
+                    <label class="col-toggle"><input type="checkbox" onchange="toggleColumn('col-exp', this.checked)"> Experience</label>
+                    <label class="col-toggle"><input type="checkbox" onchange="toggleColumn('col-join', this.checked)"> Joining Date</label>
+                    <label class="col-toggle"><input type="checkbox" onchange="toggleColumn('col-spec', this.checked)"> Specialization</label>
+                </div>
+            </div>
+        </div>
         <div class="table-wrapper">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Teacher</th>
-                        <th>Employee ID</th>
-                        <th>Designation</th>
-                        <th>Contact</th>
-                        <th>Qualification</th>
+                        <th onclick="sortTable(0)" style="cursor:pointer;">Teacher <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-empid" onclick="sortTable(1)" style="cursor:pointer;">Employee ID <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-desig" onclick="sortTable(2)" style="cursor:pointer;">Designation <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-contact">Contact</th>
+                        <th class="col-tc" onclick="sortTable(4)" style="cursor:pointer;">Teaching Classes <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-ct" onclick="sortTable(5)" style="cursor:pointer;">Class Teacher Of <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-qual" style="display:none; cursor:pointer;" onclick="sortTable(6)">Qualification <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-exp" style="display:none; cursor:pointer;" onclick="sortTable(7)">Experience <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-join" style="display:none; cursor:pointer;" onclick="sortTable(8)">Joining Date <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
+                        <th class="col-spec" style="display:none; cursor:pointer;" onclick="sortTable(9)">Specialization <i class="fas fa-sort" style="opacity:0.4;font-size:11px;"></i></th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for t in teachers %}
-                    <tr>
+                    {% set ws = t.work_status if t.work_status else 'available' %}
+                    {% set on_leave = teachers_on_leave.get(t.id|string) if teachers_on_leave else None %}
+                    {% set effective_status = 'resigned' if not t.is_active else ('suspended' if ws == 'suspended' else ('on_leave' if on_leave else 'active')) %}
+                    <tr data-status="{{ effective_status }}">
                         <td>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <div class="student-thumb" style="background: linear-gradient(135deg, var(--primary-50), var(--primary-100)); color: var(--primary);">
@@ -41,28 +189,91 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="text-sm">{{ t.employee_id or '—' }}</td>
-                        <td><span class="badge badge-purple">{{ t.designation or 'Teacher' }}</span></td>
-                        <td>
-                            <div class="text-sm">{{ t.phone or '—' }}</div>
+                        <td class="col-empid text-sm">{{ t.employee_id or '—' }}</td>
+                        <td class="col-desig"><span class="badge badge-purple">{{ t.designation or 'Teacher' }}</span></td>
+                        <td class="col-contact">
+                            <div class="text-sm">{% if t.phone %}+91 {{ t.phone }}{% else %}—{% endif %}</div>
                             <div class="text-xs text-muted">{{ t.email or '' }}</div>
                         </td>
-                        <td class="text-sm">{{ t.qualification or '—' }}</td>
+                        <!-- Teaching Classes Column — Inline Editable -->
+                        <td class="col-tc inline-cell" data-teacher-id="{{ t.id }}" data-col="tc" onclick="openInlineEditor(this, '{{ t.id }}', 'tc')">
+                            <div class="inline-display">
+                                {% if teacher_assignments.get(t.id|string) %}
+                                    {% for a in teacher_assignments[t.id|string] %}
+                                    <span class="inline-bubble tc-type" title="{{ a.subject }} in {{ a.class_name }} {{ a.section }}">{{ a.class_name }}-{{ a.section }} ({{ a.subject[:3] }})</span>
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-xs text-muted">— click to assign</span>
+                                {% endif %}
+                            </div>
+                            <div class="inline-editor" style="display:none;">
+                                <div class="inline-bubbles" id="tcBubbles_{{ t.id }}"></div>
+                                <div class="inline-add-row" id="tcAddRow_{{ t.id }}">
+                                    <select id="tcClass_{{ t.id }}" onchange="loadTCSections('{{ t.id }}')">
+                                        <option value="">Class...</option>
+                                    </select>
+                                    <select id="tcSection_{{ t.id }}">
+                                        <option value="">Section...</option>
+                                    </select>
+                                    <select id="tcSubject_{{ t.id }}">
+                                        <option value="">Subject...</option>
+                                    </select>
+                                    <button class="btn btn-primary btn-sm" style="font-size:10px;padding:2px 8px;" onclick="event.stopPropagation(); addTCAssignment('{{ t.id }}')">+</button>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- Class Teacher Column — Inline Editable -->
+                        <td class="col-ct inline-cell" data-teacher-id="{{ t.id }}" data-col="ct" onclick="openInlineEditor(this, '{{ t.id }}', 'ct')">
+                            <div class="inline-display">
+                                {% if class_teacher_map.get(t.id|string) %}
+                                    {% for label in class_teacher_map[t.id|string].split(', ') %}
+                                    <span class="inline-bubble ct-type">
+                                        <i class="fas fa-star" style="font-size:0.5rem;"></i>
+                                        {{ label }}
+                                    </span>
+                                    {% endfor %}
+                                {% else %}
+                                <span class="text-xs text-muted">— click to assign</span>
+                                {% endif %}
+                            </div>
+                            <div class="inline-editor" style="display:none;">
+                                <div class="inline-bubbles" id="ctBubbles_{{ t.id }}"></div>
+                                <div class="inline-add-row">
+                                    <select id="ctAdd_{{ t.id }}" onchange="addCTSection('{{ t.id }}', this)" style="max-width:170px;">
+                                        <option value="">+ Add section...</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- Hidden columns (toggle via Column Selector) -->
+                        <td class="col-qual text-sm" style="display:none;">{{ t.qualification or '—' }}</td>
+                        <td class="col-exp text-sm" style="display:none;" data-sort-val="{{ t.experience_years or 0 }}">{{ t.experience_years or '—' }}{{ ' yrs' if t.experience_years else '' }}</td>
+                        <td class="col-join text-sm" style="display:none;" data-sort-val="{{ t.joining_date.isoformat() if t.joining_date else '' }}">{{ t.joining_date.strftime('%d %b %Y') if t.joining_date else '—' }}</td>
+                        <td class="col-spec text-sm" style="display:none;">{{ t.specialization or '—' }}</td>
                         <td>
-                            {% if t.is_active %}
-                            <span class="badge badge-success">Active</span>
+                            {% if not t.is_active %}
+                            <span class="badge badge-gray">Resigned</span>
+                            {% elif ws == 'suspended' %}
+                            <span class="badge badge-danger" style="background:rgba(220,38,38,0.12);color:#DC2626;">Suspended</span>
+                            {% elif on_leave %}
+                            <span class="badge badge-warning" style="background:rgba(245,158,11,0.15);color:#D97706;">On Leave</span>
+                            <div class="text-xs text-muted" style="margin-top:2px;">{{ on_leave }}</div>
                             {% else %}
-                            <span class="badge badge-gray">Inactive</span>
+                            <span class="badge badge-success">Active</span>
                             {% endif %}
                         </td>
                         <td>
-                            <div style="display: flex; gap: 6px;">
-                                <button class="btn btn-secondary btn-sm" onclick="editTeacher('{{ t.id }}')">
+                            <div style="display: flex; gap: 6px; align-items: center;">
+                                <a href="/school/teachers/{{ t.id }}" class="btn btn-primary btn-sm" title="View Profile" style="font-size:11px;padding:5px 8px;">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button class="btn btn-secondary btn-sm" onclick="openEditTeacher('{{ t.id }}')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-secondary btn-sm" onclick="deleteItem('/api/school/teachers/{{ t.id }}', '{{ t.full_name }}')">
-                                    <i class="fas fa-trash" style="color: var(--danger);"></i>
-                                </button>
+                                <select class="status-dropdown" onchange="changeWorkStatus('{{ t.id }}', this.value, '{{ t.full_name }}')" title="Change status" style="font-size:11px; padding:4px 6px; border-radius:6px; border:1px solid var(--border); background:var(--bg-card); color:var(--text); cursor:pointer; max-width:90px;">
+                                    <option value="available" {{ 'selected' if ws == 'available' and t.is_active }}>Active</option>
+                                    <option value="suspended" {{ 'selected' if ws == 'suspended' and t.is_active }}>Suspended</option>
+                                </select>
                             </div>
                         </td>
                     </tr>
@@ -83,7 +294,7 @@
     </div>
 </div>
 
-<!-- Add Teacher Modal -->
+<!-- ═══ ADD Teacher Modal ═══ -->
 <div class="modal-overlay" id="addTeacherModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
     <div class="modal modal-lg">
         <div class="modal-header">
@@ -130,17 +341,73 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Phone</label>
-                        <input type="tel" name="phone" class="form-input" placeholder="9876543210">
+                        <div style="display:flex; align-items:center; gap:0;">
+                            <select name="country_code" style="background:var(--bg); border:1px solid var(--border); border-right:none; padding:8px 4px; border-radius:8px 0 0 8px; font-size:0.78rem; color:var(--text-light); min-width:82px; cursor:pointer;">
+                                <option value="+91" selected>🇮🇳 +91</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+44">🇬🇧 +44</option>
+                                <option value="+971">🇦🇪 +971</option>
+                                <option value="+966">🇸🇦 +966</option>
+                                <option value="+65">🇸🇬 +65</option>
+                                <option value="+61">🇦🇺 +61</option>
+                                <option value="+977">🇳🇵 +977</option>
+                                <option value="+94">🇱🇰 +94</option>
+                                <option value="+880">🇧🇩 +880</option>
+                                <option value="+60">🇲🇾 +60</option>
+                                <option value="+974">🇶🇦 +974</option>
+                                <option value="+968">🇴🇲 +968</option>
+                                <option value="+965">🇰🇼 +965</option>
+                                <option value="+49">🇩🇪 +49</option>
+                                <option value="+33">🇫🇷 +33</option>
+                                <option value="+81">🇯🇵 +81</option>
+                                <option value="+86">🇨🇳 +86</option>
+                            </select>
+                            <input type="tel" name="phone" class="form-input" placeholder="9876543210" maxlength="10" style="border-radius:0 8px 8px 0;">
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label">Qualification</label>
-                        <input type="text" name="qualification" class="form-input" placeholder="e.g., M.Sc, B.Ed">
+                        <label class="form-label">Qualifications</label>
+                        <div class="tag-input-wrap" id="addQualWrap">
+                            <div class="tag-bubbles" id="addQualBubbles"></div>
+                            <select class="form-select" onchange="addQualTag('add', this)" style="font-size:0.85rem;">
+                                <option value="">Select qualification...</option>
+                                <option value="B.Ed">B.Ed</option>
+                                <option value="M.Ed">M.Ed</option>
+                                <option value="B.A">B.A</option>
+                                <option value="M.A">M.A</option>
+                                <option value="B.Sc">B.Sc</option>
+                                <option value="M.Sc">M.Sc</option>
+                                <option value="B.Com">B.Com</option>
+                                <option value="M.Com">M.Com</option>
+                                <option value="B.Tech">B.Tech</option>
+                                <option value="M.Tech">M.Tech</option>
+                                <option value="MBA">MBA</option>
+                                <option value="MCA">MCA</option>
+                                <option value="BCA">BCA</option>
+                                <option value="Ph.D">Ph.D</option>
+                                <option value="D.El.Ed">D.El.Ed</option>
+                                <option value="NTT">NTT</option>
+                                <option value="CTET">CTET</option>
+                                <option value="TET">TET</option>
+                                <option value="NET">NET</option>
+                                <option value="Diploma">Diploma</option>
+                            </select>
+                            <input type="text" class="form-input" placeholder="Or type custom + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomQual('add',this);}" style="font-size:0.8rem; padding:6px 8px; margin-top:4px;">
+                        </div>
+                        <input type="hidden" name="qualification" id="addQualHidden">
                     </div>
                     <div class="form-group">
-                        <label class="form-label">Specialization</label>
-                        <input type="text" name="specialization" class="form-input" placeholder="e.g., Mathematics, Physics">
+                        <label class="form-label">Specialization (Subject)</label>
+                        <select name="specialization" class="form-select">
+                            <option value="">Select subject...</option>
+                            {% for s in subjects %}
+                            <option value="{{ s.name }}">{{ s.name }}</option>
+                            {% endfor %}
+                            <option value="General">General</option>
+                            <option value="Other">Other</option>
+                        </select>
                     </div>
                 </div>
                 <div class="form-row">
@@ -175,9 +442,609 @@
     </div>
 </div>
 
+<!-- ═══ EDIT Teacher Modal ═══ -->
+<div class="modal-overlay" id="editTeacherModal" style="display:none;">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-edit"></i> Edit Teacher</h2>
+            <button class="modal-close" onclick="closeModal('editTeacherModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="editTeacherForm">
+                <input type="hidden" id="editTeacherId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">First Name <span class="required">*</span></label>
+                        <input type="text" id="editFirstName" class="form-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        <input type="text" id="editLastName" class="form-input">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Employee ID</label>
+                        <input type="text" id="editEmployeeId" class="form-input" readonly style="background:var(--bg); opacity:0.7; cursor:not-allowed;" title="Employee ID cannot be changed after creation">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Designation</label>
+                        <select id="editDesignation" class="form-select">
+                            <option value="">Select...</option>
+                            <option value="PRT">PRT (Primary Teacher)</option>
+                            <option value="TGT">TGT (Trained Graduate Teacher)</option>
+                            <option value="PGT">PGT (Post Graduate Teacher)</option>
+                            <option value="HM">Head Master/Mistress</option>
+                            <option value="VP">Vice Principal</option>
+                            <option value="Coordinator">Coordinator</option>
+                            <option value="Librarian">Librarian</option>
+                            <option value="PTI">PTI (Physical Training Instructor)</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" id="editEmail" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <div style="display:flex; align-items:center; gap:0;">
+                            <select id="editCountryCode" style="background:var(--bg); border:1px solid var(--border); border-right:none; padding:8px 4px; border-radius:8px 0 0 8px; font-size:0.78rem; color:var(--text-light); min-width:82px; cursor:pointer;">
+                                <option value="+91" selected>🇮🇳 +91</option>
+                                <option value="+1">🇺🇸 +1</option>
+                                <option value="+44">🇬🇧 +44</option>
+                                <option value="+971">🇦🇪 +971</option>
+                                <option value="+966">🇸🇦 +966</option>
+                                <option value="+65">🇸🇬 +65</option>
+                                <option value="+61">🇦🇺 +61</option>
+                                <option value="+977">🇳🇵 +977</option>
+                                <option value="+94">🇱🇰 +94</option>
+                                <option value="+880">🇧🇩 +880</option>
+                                <option value="+60">🇲🇾 +60</option>
+                                <option value="+974">🇶🇦 +974</option>
+                                <option value="+968">🇴🇲 +968</option>
+                                <option value="+965">🇰🇼 +965</option>
+                                <option value="+49">🇩🇪 +49</option>
+                                <option value="+33">🇫🇷 +33</option>
+                                <option value="+81">🇯🇵 +81</option>
+                                <option value="+86">🇨🇳 +86</option>
+                            </select>
+                            <input type="tel" id="editPhone" class="form-input" maxlength="10" style="border-radius:0 8px 8px 0;">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Qualifications</label>
+                        <div class="tag-input-wrap" id="editQualWrap">
+                            <div class="tag-bubbles" id="editQualBubbles"></div>
+                            <select class="form-select" onchange="addQualTag('edit', this)" style="font-size:0.85rem;">
+                                <option value="">Select qualification...</option>
+                                <option value="B.Ed">B.Ed</option>
+                                <option value="M.Ed">M.Ed</option>
+                                <option value="B.A">B.A</option>
+                                <option value="M.A">M.A</option>
+                                <option value="B.Sc">B.Sc</option>
+                                <option value="M.Sc">M.Sc</option>
+                                <option value="B.Com">B.Com</option>
+                                <option value="M.Com">M.Com</option>
+                                <option value="B.Tech">B.Tech</option>
+                                <option value="M.Tech">M.Tech</option>
+                                <option value="MBA">MBA</option>
+                                <option value="MCA">MCA</option>
+                                <option value="BCA">BCA</option>
+                                <option value="Ph.D">Ph.D</option>
+                                <option value="D.El.Ed">D.El.Ed</option>
+                                <option value="NTT">NTT</option>
+                                <option value="CTET">CTET</option>
+                                <option value="TET">TET</option>
+                                <option value="NET">NET</option>
+                                <option value="Diploma">Diploma</option>
+                            </select>
+                            <input type="text" class="form-input" placeholder="Or type custom + Enter" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomQual('edit',this);}" style="font-size:0.8rem; padding:6px 8px; margin-top:4px;">
+                        </div>
+                        <input type="hidden" id="editQualHidden">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Specialization (Subject)</label>
+                        <select id="editSpecialization" class="form-select">
+                            <option value="">Select subject...</option>
+                            {% for s in subjects %}
+                            <option value="{{ s.name }}">{{ s.name }}</option>
+                            {% endfor %}
+                            <option value="General">General</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Experience (Years)</label>
+                        <input type="number" id="editExperience" class="form-input" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Joining Date</label>
+                        <input type="date" id="editJoiningDate" class="form-input">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    <textarea id="editAddress" class="form-textarea" rows="2"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('editTeacherModal')">Cancel</button>
+            <button class="btn btn-primary" onclick="submitEditTeacher()">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ ASSIGN Classes Modal ═══ -->
+<div class="modal-overlay" id="assignModal" style="display:none;">
+    <div class="modal modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-link"></i> Assign Classes — <span id="assignTeacherName"></span></h2>
+            <button class="modal-close" onclick="closeModal('assignModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="assignTeacherId">
+            <div class="assign-grid">
+                <!-- Class Teacher Assignment -->
+                <div class="assign-card">
+                    <h4><i class="fas fa-star" style="color:#F59E0B;"></i> Class Teacher Of</h4>
+                    <p class="text-xs text-muted" style="margin-bottom:8px;">Assign this teacher as the class teacher of a section</p>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <select id="ctClass" class="form-select" onchange="loadCTSections()">
+                                <option value="">Select Class</option>
+                                {% for c in classes %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <select id="ctSection" class="form-select">
+                                <option value="">Select Section</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="saveClassTeacher()" style="width:100%;margin-top:4px;">
+                        <i class="fas fa-save"></i> Save Class Teacher
+                    </button>
+                    <div id="currentCT" style="margin-top:8px;"></div>
+                </div>
+
+                <!-- Teaching Classes Assignment -->
+                <div class="assign-card">
+                    <h4><i class="fas fa-chalkboard" style="color:var(--primary);"></i> Teaching Assignments</h4>
+                    <p class="text-xs text-muted" style="margin-bottom:8px;">Which classes & subjects does this teacher teach?</p>
+                    <div id="teachingRows"></div>
+                    <button class="add-assign-btn" onclick="addTeachingRow()">
+                        <i class="fas fa-plus"></i> Add Class + Subject
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="saveTeachingAssignments()" style="width:100%;margin-top:8px;">
+                        <i class="fas fa-save"></i> Save Teaching Assignments
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── REUSABLE CONFIRMATION MODAL ─── -->
+<div class="modal-overlay" id="confirmModal" style="display:none;">
+    <div class="modal" style="max-width:420px;">
+        <div class="modal-header" style="border-bottom:none; padding-bottom:0;">
+            <h2 id="confirmTitle" style="font-size:1.1rem;"><i class="fas fa-exclamation-triangle" style="color:#D97706;"></i> Confirm Action</h2>
+            <button class="modal-close" onclick="closeConfirmModal()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" style="padding-top:8px;">
+            <p id="confirmMessage" style="color:var(--text); font-size:0.92rem; line-height:1.5;"></p>
+            <p id="confirmSubtext" class="text-xs text-muted" style="margin-top:6px;"></p>
+        </div>
+        <div class="modal-footer" style="border-top:none; padding-top:0;">
+            <button class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+            <button class="btn btn-primary" id="confirmBtn" onclick="executeConfirmAction()">
+                <i class="fas fa-check"></i> Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
+// ─── COLUMN SELECTOR ───
+function toggleColSelector() {
+    const dd = document.getElementById('colSelectorDropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleColumn(className, show) {
+    document.querySelectorAll('.' + className).forEach(el => {
+        el.style.display = show ? '' : 'none';
+    });
+}
+
+// Close column selector when clicking outside
+document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('colSelectorWrap');
+    const dd = document.getElementById('colSelectorDropdown');
+    if (wrap && dd && !wrap.contains(e.target)) {
+        dd.style.display = 'none';
+    }
+});
+
+// ─── STATUS FILTER ───
+function filterTeachers(status, btnEl) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    btnEl.classList.add('active');
+    const rows = document.querySelectorAll('.data-table tbody tr[data-status]');
+    let visible = 0;
+    rows.forEach(row => {
+        const rowStatus = row.getAttribute('data-status');
+        if (status === 'all' || rowStatus === status) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+// Auto-count statuses on load
+document.addEventListener('DOMContentLoaded', () => {
+    const rows = document.querySelectorAll('.data-table tbody tr[data-status]');
+    const counts = { active: 0, on_leave: 0, suspended: 0, resigned: 0 };
+    rows.forEach(r => {
+        const s = r.getAttribute('data-status');
+        if (counts[s] !== undefined) counts[s]++;
+    });
+    const el = (id) => document.getElementById(id);
+    if (el('onLeaveCount')) el('onLeaveCount').textContent = counts.on_leave;
+    if (el('suspendedCount')) el('suspendedCount').textContent = counts.suspended;
+    if (el('resignedCount')) el('resignedCount').textContent = counts.resigned;
+});
+
+// ─── TABLE SORTING ───
+let sortDirection = {};
+function sortTable(colIndex) {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const dir = sortDirection[colIndex] === 'asc' ? 'desc' : 'asc';
+    sortDirection[colIndex] = dir;
+
+    // Get the actual th at this index
+    const ths = Array.from(table.querySelectorAll('thead th'));
+
+    rows.sort((a, b) => {
+        const aCell = a.cells[colIndex];
+        const bCell = b.cells[colIndex];
+        if (!aCell || !bCell) return 0;
+
+        // Use data-sort-val if present (for numeric/date sorting)
+        let aVal = aCell.getAttribute('data-sort-val');
+        let bVal = bCell.getAttribute('data-sort-val');
+
+        if (aVal !== null && bVal !== null) {
+            // Numeric sort for experience, date sort for joining
+            const aNum = parseFloat(aVal) || 0;
+            const bNum = parseFloat(bVal) || 0;
+            if (!isNaN(aNum) && !isNaN(bNum) && aVal !== '' && bVal !== '') {
+                return dir === 'asc' ? aNum - bNum : bNum - aNum;
+            }
+            // String/date sort
+            aVal = aVal || 'zzz';
+            bVal = bVal || 'zzz';
+            return dir === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+
+        let aText = aCell.innerText.trim().toLowerCase();
+        let bText = bCell.innerText.trim().toLowerCase();
+        if (aText === '—' || aText === '— click to assign' || aText === 'not assigned') aText = 'zzz';
+        if (bText === '—' || bText === '— click to assign' || bText === 'not assigned') bText = 'zzz';
+        if (dir === 'asc') return aText.localeCompare(bText);
+        return bText.localeCompare(aText);
+    });
+    rows.forEach(row => tbody.appendChild(row));
+
+    // Update sort icons
+    table.querySelectorAll('th .fa-sort, th .fa-sort-up, th .fa-sort-down').forEach(icon => {
+        icon.className = 'fas fa-sort';
+        icon.style.opacity = '0.4';
+    });
+    const th = ths[colIndex];
+    if (th) {
+        const icon = th.querySelector('i');
+        if (icon) {
+            icon.className = dir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            icon.style.opacity = '1';
+        }
+    }
+}
+
+// ─── CSV EXPORT ───
+function exportTeachersCSV() {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    const rows = table.querySelectorAll('tr');
+    let csv = [];
+    // Header
+    csv.push(['Name','Specialization','Employee ID','Designation','Phone','Email','Teaching Classes','Class Teacher Of','Status'].join(','));
+    // Data rows (skip header row)
+    for (let i = 1; i < rows.length; i++) {
+        const cells = rows[i].querySelectorAll('td');
+        if (cells.length < 7) continue;
+        const name = cells[0].querySelector('div[style*="font-weight"]')?.innerText.trim() || '';
+        const spec = cells[0].querySelector('.text-xs')?.innerText.trim() || '';
+        const empId = cells[1].innerText.trim();
+        const desig = cells[2].innerText.trim();
+        const phone = cells[3].querySelector('.text-sm')?.innerText.trim() || '';
+        const email = cells[3].querySelector('.text-xs')?.innerText.trim() || '';
+        const teaching = cells[4].innerText.trim().replace(/\n/g, '; ');
+        const classTeacher = cells[5].innerText.trim();
+        const status = cells[6].innerText.trim();
+        csv.push([name, spec, empId, desig, phone, email, teaching, classTeacher, status].map(v => `"${v.replace(/"/g, '""')}"`).join(','));
+    }
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `teachers_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('success', 'Exported!', `${rows.length - 1} teachers exported to CSV`);
+}
+const CLASSES_DATA = {{ classes_json | safe }};
+const SECTIONS_MAP = {{ sections_json | safe }};
+const SUBJECTS_DATA = {{ subjects_json | safe }};
+const TEACHERS_DATA = {{ teachers_json | safe }};
+
+// ─── BUILD ALL SECTIONS FLAT LIST ───
+const ALL_SECTIONS = [];
+CLASSES_DATA.forEach(cls => {
+    const secs = SECTIONS_MAP[cls.id] || [];
+    secs.forEach(sec => {
+        ALL_SECTIONS.push({
+            section_id: sec.id,
+            class_id: cls.id,
+            label: cls.name + ' - ' + sec.name,
+        });
+    });
+});
+
+// ═══════════════════════════════════════════════════════════
+// UNIFIED INLINE EDITORS — Class Teacher & Teaching Classes
+// ═══════════════════════════════════════════════════════════
+let activeCell = null;
+
+// ─── DATA STORES ───
+let ctAssignments = {};  // {teacher_id: [{section_id, label}, ...]}
+let tcAssignments = {};  // {teacher_id: [{class_id, section_id, subject_id, label}, ...]}
+
+{% autoescape false %}
+// Initialize CT assignments from server
+{% for tid, label in class_teacher_map.items() %}
+ctAssignments['{{ tid }}'] = [
+    {% for lbl in label.split(', ') %}
+    { label: '{{ lbl }}', section_id: (function(){
+        {% for cls in classes %}{% for sec in cls.sections if sec.is_active %}
+        if ('{{ cls.name }} - {{ sec.name }}' === '{{ lbl }}') return '{{ sec.id }}';
+        {% endfor %}{% endfor %}
+        return '';
+    })() },
+    {% endfor %}
+];
+{% endfor %}
+
+// Initialize TC assignments from server
+{% for tid, assigns in teacher_assignments.items() %}
+tcAssignments['{{ tid }}'] = [
+    {% for a in assigns %}
+    { class_id: '{{ a.class_id }}', section_id: {{ ("'" ~ a.section_id ~ "'") if a.section_id else 'null' }}, subject_id: '{{ a.subject_id }}', label: '{{ a.class_name }}-{{ a.section }} ({{ a.subject[:3] }})' },
+    {% endfor %}
+];
+{% endfor %}
+{% endautoescape %}
+
+// ─── OPEN / CLOSE EDITOR ───
+function openInlineEditor(cell, teacherId, colType) {
+    if (activeCell && activeCell !== cell) closeInlineEditor(activeCell);
+    const editor = cell.querySelector('.inline-editor');
+    if (editor.style.display === 'block') return;
+
+    activeCell = cell;
+    cell.querySelector('.inline-display').style.display = 'none';
+    editor.style.display = 'block';
+
+    if (colType === 'ct') {
+        renderCTBubbles(teacherId);
+        populateCTDropdown(teacherId);
+    } else {
+        renderTCBubbles(teacherId);
+        populateTCDropdowns(teacherId);
+    }
+
+    setTimeout(() => document.addEventListener('click', handleOutsideClick), 50);
+}
+
+function handleOutsideClick(e) {
+    if (activeCell && !activeCell.contains(e.target)) {
+        closeInlineEditor(activeCell);
+        document.removeEventListener('click', handleOutsideClick);
+    }
+}
+
+function closeInlineEditor(cell) {
+    if (!cell) return;
+    cell.querySelector('.inline-display').style.display = '';
+    cell.querySelector('.inline-editor').style.display = 'none';
+    const tid = cell.dataset.teacherId;
+    const col = cell.dataset.col;
+    const displayDiv = cell.querySelector('.inline-display');
+
+    if (col === 'ct') {
+        const items = ctAssignments[tid] || [];
+        displayDiv.innerHTML = items.length > 0
+            ? items.map(a => `<span class="inline-bubble ct-type"><i class="fas fa-star" style="font-size:0.5rem;"></i> ${a.label}</span>`).join(' ')
+            : '<span class="text-xs text-muted">— click to assign</span>';
+    } else {
+        const items = tcAssignments[tid] || [];
+        displayDiv.innerHTML = items.length > 0
+            ? items.map(a => `<span class="inline-bubble tc-type">${a.label}</span>`).join(' ')
+            : '<span class="text-xs text-muted">— click to assign</span>';
+    }
+    activeCell = null;
+}
+
+// ═══════════════════════════════════════════════
+// CLASS TEACHER (CT) — one teacher per section
+// ═══════════════════════════════════════════════
+function renderCTBubbles(tid) {
+    const el = document.getElementById('ctBubbles_' + tid);
+    const items = ctAssignments[tid] || [];
+    el.innerHTML = items.length > 0
+        ? items.map(a => `<span class="inline-bubble ct-type"><i class="fas fa-star" style="font-size:0.5rem;"></i> ${a.label} <span class="bubble-remove" onclick="event.stopPropagation(); removeCT('${tid}','${a.section_id}')">&times;</span></span>`).join('')
+        : '<span class="text-xs text-muted">None</span>';
+}
+
+function populateCTDropdown(tid) {
+    const sel = document.getElementById('ctAdd_' + tid);
+    const existing = (ctAssignments[tid] || []).map(a => a.section_id);
+    sel.innerHTML = '<option value="">+ Add section...</option>';
+    ALL_SECTIONS.forEach(s => {
+        if (!existing.includes(s.section_id)) {
+            sel.innerHTML += `<option value="${s.section_id}">${s.label}</option>`;
+        }
+    });
+}
+
+async function addCTSection(tid, selectEl) {
+    const sid = selectEl.value;
+    if (!sid) return;
+    const label = selectEl.options[selectEl.selectedIndex].text;
+    try {
+        const resp = await apiCall(`/api/school/teachers/${tid}/class-teacher`, 'POST', { section_id: sid });
+        if (resp.warning) showToast('info', 'Reassigned', resp.warning);
+        if (!ctAssignments[tid]) ctAssignments[tid] = [];
+        ctAssignments[tid].push({ section_id: sid, label: label });
+        renderCTBubbles(tid);
+        populateCTDropdown(tid);
+        showToast('success', 'Assigned!', label);
+        // If another teacher had this section, remove from their local data AND update their display
+        Object.keys(ctAssignments).forEach(otherTid => {
+            if (otherTid !== tid) {
+                const before = (ctAssignments[otherTid] || []).length;
+                ctAssignments[otherTid] = (ctAssignments[otherTid] || []).filter(a => a.section_id !== sid);
+                if (ctAssignments[otherTid].length !== before) {
+                    // Update that teacher's display cell
+                    const otherCell = document.querySelector(`.inline-cell[data-teacher-id="${otherTid}"][data-col="ct"]`);
+                    if (otherCell) {
+                        const disp = otherCell.querySelector('.inline-display');
+                        const items = ctAssignments[otherTid] || [];
+                        disp.innerHTML = items.length > 0
+                            ? items.map(a => `<span class="inline-bubble ct-type"><i class="fas fa-star" style="font-size:0.5rem;"></i> ${a.label}</span>`).join(' ')
+                            : '<span class="text-xs text-muted">— click to assign</span>';
+                    }
+                }
+            }
+        });
+    } catch (e) { showToast('error', 'Error', 'Failed to assign'); }
+    selectEl.value = '';
+}
+
+async function removeCT(tid, sid) {
+    try {
+        await apiCall(`/api/school/teachers/${tid}/class-teacher-remove`, 'POST', { section_id: sid });
+        ctAssignments[tid] = (ctAssignments[tid] || []).filter(a => a.section_id !== sid);
+        renderCTBubbles(tid);
+        populateCTDropdown(tid);
+        showToast('success', 'Removed', 'Class teacher unassigned');
+    } catch (e) { showToast('error', 'Error', 'Failed'); }
+}
+
+// ═══════════════════════════════════════════════
+// TEACHING CLASSES (TC) — class + section + subject
+// ═══════════════════════════════════════════════
+function renderTCBubbles(tid) {
+    const el = document.getElementById('tcBubbles_' + tid);
+    const items = tcAssignments[tid] || [];
+    el.innerHTML = items.length > 0
+        ? items.map((a, i) => `<span class="inline-bubble tc-type">${a.label} <span class="bubble-remove" onclick="event.stopPropagation(); removeTC('${tid}', ${i})">&times;</span></span>`).join('')
+        : '<span class="text-xs text-muted">None</span>';
+}
+
+function populateTCDropdowns(tid) {
+    const clsSel = document.getElementById('tcClass_' + tid);
+    const subSel = document.getElementById('tcSubject_' + tid);
+    clsSel.innerHTML = '<option value="">Class...</option>';
+    CLASSES_DATA.forEach(c => { clsSel.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+    subSel.innerHTML = '<option value="">Subject...</option>';
+    SUBJECTS_DATA.forEach(s => { subSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    document.getElementById('tcSection_' + tid).innerHTML = '<option value="">Section...</option>';
+}
+
+function loadTCSections(tid) {
+    const classId = document.getElementById('tcClass_' + tid).value;
+    const secSel = document.getElementById('tcSection_' + tid);
+    secSel.innerHTML = '<option value="">All</option>';
+    if (classId && SECTIONS_MAP[classId]) {
+        SECTIONS_MAP[classId].forEach(s => { secSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    }
+}
+
+async function addTCAssignment(tid) {
+    const classId = document.getElementById('tcClass_' + tid).value;
+    const sectionId = document.getElementById('tcSection_' + tid).value || null;
+    const subjectId = document.getElementById('tcSubject_' + tid).value;
+    if (!classId || !subjectId) { showToast('error', 'Error', 'Select class and subject'); return; }
+
+    // Build label
+    const clsName = CLASSES_DATA.find(c => c.id === classId)?.name || '?';
+    const secName = sectionId ? (SECTIONS_MAP[classId] || []).find(s => s.id === sectionId)?.name || '?' : 'All';
+    const subName = SUBJECTS_DATA.find(s => s.id === subjectId)?.name || '?';
+    const label = `${clsName}-${secName} (${subName.substring(0,3)})`;
+
+    // Check duplicate
+    const existing = tcAssignments[tid] || [];
+    if (existing.find(a => a.class_id === classId && a.section_id === sectionId && a.subject_id === subjectId)) {
+        showToast('info', 'Exists', 'Already assigned'); return;
+    }
+
+    // Add locally first, then save all
+    if (!tcAssignments[tid]) tcAssignments[tid] = [];
+    tcAssignments[tid].push({ class_id: classId, section_id: sectionId, subject_id: subjectId, label: label });
+    renderTCBubbles(tid);
+    await saveTCAssignments(tid);
+    showToast('success', 'Added!', label);
+}
+
+async function removeTC(tid, index) {
+    (tcAssignments[tid] || []).splice(index, 1);
+    renderTCBubbles(tid);
+    await saveTCAssignments(tid);
+    showToast('success', 'Removed', 'Teaching assignment removed');
+}
+
+async function saveTCAssignments(tid) {
+    const assignments = (tcAssignments[tid] || []).map(a => ({
+        class_id: a.class_id, section_id: a.section_id, subject_id: a.subject_id
+    }));
+    try {
+        await apiCall(`/api/school/teachers/${tid}/assignments`, 'POST', { assignments: assignments });
+    } catch (e) { console.error('Save TC failed', e); }
+}
+
+// ─── ADD TEACHER ───
 async function submitTeacherForm() {
     const data = getFormData('addTeacherForm');
+    // Set qualification from tags
+    data.qualification = document.getElementById('addQualHidden').value;
     if (!data.first_name || !data.password) {
         showToast('error', 'Error', 'Name and password are required');
         return;
@@ -189,8 +1056,267 @@ async function submitTeacherForm() {
     } catch (e) {}
 }
 
-function editTeacher(id) {
-    showToast('info', 'Coming Soon', 'Edit functionality will be available soon');
+// ─── EDIT TEACHER ───
+const qualTags = { add: [], edit: [] };
+
+function renderQualTags(mode) {
+    const container = document.getElementById(mode + 'QualBubbles');
+    const hidden = document.getElementById(mode + 'QualHidden');
+    container.innerHTML = qualTags[mode].map((q, i) =>
+        `<span class="qual-tag">${q} <span class="tag-x" onclick="removeQualTag('${mode}', ${i})">&times;</span></span>`
+    ).join('');
+    hidden.value = qualTags[mode].join(', ');
+}
+
+function addQualTag(mode, selectEl) {
+    const val = selectEl.value;
+    if (!val || qualTags[mode].includes(val)) { selectEl.value = ''; return; }
+    qualTags[mode].push(val);
+    renderQualTags(mode);
+    selectEl.value = '';
+}
+
+function addCustomQual(mode, inputEl) {
+    const val = inputEl.value.trim();
+    if (!val || qualTags[mode].includes(val)) { inputEl.value = ''; return; }
+    qualTags[mode].push(val);
+    renderQualTags(mode);
+    inputEl.value = '';
+}
+
+function removeQualTag(mode, index) {
+    qualTags[mode].splice(index, 1);
+    renderQualTags(mode);
+}
+
+async function openEditTeacher(id) {
+    const t = TEACHERS_DATA.find(x => x.id === id);
+    if (!t) { showToast('error', 'Teacher not found'); return; }
+    document.getElementById('editTeacherId').value = id;
+    document.getElementById('editFirstName').value = t.first_name || '';
+    document.getElementById('editLastName').value = t.last_name || '';
+    document.getElementById('editEmployeeId').value = t.employee_id || '';
+    document.getElementById('editDesignation').value = t.designation || '';
+    document.getElementById('editEmail').value = t.email || '';
+    // Strip +91 prefix if present
+    let phone = t.phone || '';
+    phone = phone.replace(/^\+?91/, '');
+    document.getElementById('editPhone').value = phone;
+    // Populate qualification tags
+    qualTags.edit = [];
+    if (t.qualification) {
+        qualTags.edit = t.qualification.split(',').map(q => q.trim()).filter(q => q);
+    }
+    renderQualTags('edit');
+    document.getElementById('editSpecialization').value = t.specialization || '';
+    document.getElementById('editExperience').value = t.experience_years || 0;
+    document.getElementById('editJoiningDate').value = t.joining_date || '';
+    document.getElementById('editAddress').value = t.address || '';
+    openModal('editTeacherModal');
+}
+
+async function submitEditTeacher() {
+    const id = document.getElementById('editTeacherId').value;
+    const data = {
+        first_name: document.getElementById('editFirstName').value,
+        last_name: document.getElementById('editLastName').value,
+        employee_id: document.getElementById('editEmployeeId').value,
+        designation: document.getElementById('editDesignation').value,
+        email: document.getElementById('editEmail').value,
+        phone: document.getElementById('editPhone').value,
+        qualification: document.getElementById('editQualHidden').value,
+        specialization: document.getElementById('editSpecialization').value,
+        experience_years: parseInt(document.getElementById('editExperience').value) || 0,
+        joining_date: document.getElementById('editJoiningDate').value || null,
+        address: document.getElementById('editAddress').value,
+    };
+    if (!data.first_name) { showToast('error', 'First name is required'); return; }
+    try {
+        await apiCall('/api/school/teachers/' + id, 'PUT', data);
+        showToast('success', 'Updated!', 'Teacher details saved');
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+// ─── REUSABLE CONFIRM MODAL ───
+let pendingConfirmAction = null;
+
+function showConfirmModal(title, message, subtext, btnLabel, btnClass, actionFn) {
+    document.getElementById('confirmTitle').innerHTML = title;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmSubtext').textContent = subtext || '';
+    const btn = document.getElementById('confirmBtn');
+    btn.innerHTML = `<i class="fas fa-check"></i> ${btnLabel || 'Confirm'}`;
+    btn.className = `btn ${btnClass || 'btn-primary'}`;
+    pendingConfirmAction = actionFn;
+    openModal('confirmModal');
+}
+
+function closeConfirmModal() {
+    closeModal('confirmModal');
+    pendingConfirmAction = null;
+}
+
+function executeConfirmAction() {
+    if (pendingConfirmAction) pendingConfirmAction();
+    closeConfirmModal();
+}
+
+// ─── CHANGE WORK STATUS ───
+async function changeWorkStatus(teacherId, newStatus, teacherName) {
+    const statusLabels = { available: 'Active', suspended: 'Suspended' };
+    const label = statusLabels[newStatus] || newStatus;
+
+    if (newStatus === 'suspended') {
+        showConfirmModal(
+            '<i class="fas fa-ban" style="color:#DC2626;"></i> Suspend Teacher',
+            `Are you sure you want to suspend ${teacherName}?`,
+            'This will block their login and QR attendance.',
+            'Suspend',
+            'btn-primary" style="background:#DC2626;border-color:#DC2626;',
+            () => doStatusChange(teacherId, newStatus, teacherName, label)
+        );
+        return;
+    }
+
+    // Active — no confirmation needed
+    doStatusChange(teacherId, newStatus, teacherName, label);
+}
+
+async function doStatusChange(teacherId, newStatus, teacherName, label) {
+    try {
+        await apiCall(`/api/school/teachers/${teacherId}/work-status`, 'POST', { work_status: newStatus });
+        showToast('success', 'Status Updated', `${teacherName} → ${label}`);
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {
+        showToast('error', 'Error', 'Failed to update status');
+        window.location.reload();
+    }
+}
+
+// ─── DELETE TEACHER (with in-app confirm) ───
+function confirmDeleteTeacher(url, name) {
+    showConfirmModal(
+        '<i class="fas fa-trash" style="color:#DC2626;"></i> Delete Teacher',
+        `Are you sure you want to delete ${name}?`,
+        'This action cannot be undone. All assignments will be removed.',
+        'Delete',
+        'btn-primary" style="background:#DC2626;border-color:#DC2626;',
+        async () => {
+            try {
+                await apiCall(url, 'DELETE');
+                showToast('success', 'Deleted', `${name} has been removed`);
+                setTimeout(() => window.location.reload(), 800);
+            } catch (e) {
+                showToast('error', 'Error', 'Failed to delete teacher');
+            }
+        }
+    );
+}
+
+// ─── ASSIGN MODAL ───
+function openAssignModal(id, name) {
+    document.getElementById('assignTeacherId').value = id;
+    document.getElementById('assignTeacherName').textContent = name;
+    openModal('assignModal');
+    loadCurrentAssignments(id);
+}
+
+function loadCTSections() {
+    const cid = document.getElementById('ctClass').value;
+    const secSel = document.getElementById('ctSection');
+    secSel.innerHTML = '<option value="">Select Section</option>';
+    if (!cid) return;
+    const secs = SECTIONS_MAP[cid] || [];
+    secs.forEach(s => { secSel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+}
+
+async function saveClassTeacher() {
+    const teacherId = document.getElementById('assignTeacherId').value;
+    const sectionId = document.getElementById('ctSection').value;
+    try {
+        await apiCall('/api/school/teachers/' + teacherId + '/class-teacher', 'POST', {
+            section_id: sectionId || null
+        });
+        showToast('success', 'Saved!', sectionId ? 'Class teacher assigned' : 'Class teacher removed');
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+let teachingRowIdx = 0;
+function addTeachingRow(classId, sectionId, subjectId) {
+    const idx = teachingRowIdx++;
+    const classOpts = CLASSES_DATA.map(c => `<option value="${c.id}" ${c.id===classId?'selected':''}>${c.name}</option>`).join('');
+    const subjectOpts = SUBJECTS_DATA.map(s => `<option value="${s.id}" ${s.id===subjectId?'selected':''}>${s.name}</option>`).join('');
+
+    const row = document.createElement('div');
+    row.className = 'assign-row';
+    row.id = 'trow_' + idx;
+    row.innerHTML = `
+        <select onchange="updateTRowSections(${idx})" id="tc_${idx}"><option value="">Class</option>${classOpts}</select>
+        <select id="ts_${idx}"><option value="">Section</option></select>
+        <select id="tsub_${idx}"><option value="">Subject</option>${subjectOpts}</select>
+        <button class="remove-btn" onclick="document.getElementById('trow_${idx}').remove()"><i class="fas fa-times"></i></button>
+    `;
+    document.getElementById('teachingRows').appendChild(row);
+    if (classId) { updateTRowSections(idx, sectionId); }
+}
+
+function updateTRowSections(idx, preselect) {
+    const cid = document.getElementById('tc_' + idx).value;
+    const secSel = document.getElementById('ts_' + idx);
+    secSel.innerHTML = '<option value="">All</option>';
+    const secs = SECTIONS_MAP[cid] || [];
+    secs.forEach(s => { secSel.innerHTML += `<option value="${s.id}" ${s.id===preselect?'selected':''}>${s.name}</option>`; });
+}
+
+async function saveTeachingAssignments() {
+    const teacherId = document.getElementById('assignTeacherId').value;
+    const rows = document.querySelectorAll('[id^="trow_"]');
+    const assignments = [];
+    rows.forEach(r => {
+        const idx = r.id.split('_')[1];
+        const classId = document.getElementById('tc_' + idx).value;
+        const sectionId = document.getElementById('ts_' + idx).value;
+        const subjectId = document.getElementById('tsub_' + idx).value;
+        if (classId && subjectId) {
+            assignments.push({ class_id: classId, section_id: sectionId || null, subject_id: subjectId });
+        }
+    });
+    try {
+        await apiCall('/api/school/teachers/' + teacherId + '/assignments', 'POST', { assignments });
+        showToast('success', 'Saved!', assignments.length + ' teaching assignments saved');
+        setTimeout(() => window.location.reload(), 800);
+    } catch (e) {}
+}
+
+async function loadCurrentAssignments(teacherId) {
+    document.getElementById('teachingRows').innerHTML = '';
+    teachingRowIdx = 0;
+    try {
+        const r = await fetch('/api/school/teachers/' + teacherId + '/assignments', { credentials: 'same-origin' });
+        const d = await r.json();
+        // Class teacher
+        if (d.class_teacher_of) {
+            // Find the class for this section
+            for (const [cid, secs] of Object.entries(SECTIONS_MAP)) {
+                const sec = secs.find(s => s.id === d.class_teacher_of);
+                if (sec) {
+                    document.getElementById('ctClass').value = cid;
+                    loadCTSections();
+                    setTimeout(() => { document.getElementById('ctSection').value = d.class_teacher_of; }, 100);
+                    break;
+                }
+            }
+        }
+        // Teaching assignments
+        (d.assignments || []).forEach(a => {
+            addTeachingRow(a.class_id, a.section_id, a.subject_id);
+        });
+        if ((d.assignments || []).length === 0) addTeachingRow();
+    } catch (e) {
+        addTeachingRow();
+    }
 }
 </script>
 {% endblock %}

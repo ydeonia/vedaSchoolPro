@@ -101,7 +101,7 @@ async function applyLeave() {
     const reasonText = document.getElementById('reasonText').value;
 
     if (!startDate || !endDate) return;
-    if (endDate < startDate) { alert('End date must be after start date'); return; }
+    if (endDate < startDate) { showToast('warning', 'End date must be after start date'); return; }
 
     btn.disabled = true; btn.textContent = '⏳ Submitting...';
     document.getElementById('warningBox').style.display = 'none';
@@ -125,9 +125,9 @@ async function applyLeave() {
             document.getElementById('reasonText').value = '';
             loadHistory();
         } else if (data.error) {
-            alert(data.error);
+            showToast('error', data.error);
         }
-    } catch(e) { alert('Failed to submit'); }
+    } catch(e) { showToast('error', 'Failed to submit'); }
 
     btn.disabled = false; btn.textContent = '📨 Submit Leave Application';
 }

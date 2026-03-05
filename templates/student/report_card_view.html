@@ -1,0 +1,1154 @@
+{% extends "base.html" %}
+{% block title %}My Report Card{% endblock %}
+{% block page_title %}My Report Card{% endblock %}
+{% block page_subtitle %}View your published results and download report cards{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Toast Animations */
+    @keyframes slideIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+        0% { background-position: -400px 0; }
+        100% { background-position: 400px 0; }
+    }
+    @keyframes pulseGlow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.2); }
+        50% { box-shadow: 0 0 0 8px rgba(79, 70, 229, 0); }
+    }
+
+    /* Toast Container */
+    #toastContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    /* Student Info Bar */
+    .student-info-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 24px;
+        background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 50%, #6366F1 100%);
+        border-radius: var(--radius-lg);
+        color: white;
+        margin-bottom: 24px;
+        box-shadow: 0 8px 32px rgba(79, 70, 229, 0.25);
+        animation: fadeInUp 0.5s ease;
+    }
+    .student-info-bar .avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.4rem;
+        font-weight: 800;
+        flex-shrink: 0;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    .student-info-bar .info { flex: 1; }
+    .student-info-bar .name {
+        font-size: 1.15rem;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+    }
+    .student-info-bar .meta {
+        display: flex;
+        gap: 16px;
+        margin-top: 4px;
+        font-size: 0.78rem;
+        opacity: 0.85;
+        flex-wrap: wrap;
+    }
+    .student-info-bar .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .student-info-bar .meta-item i {
+        font-size: 0.68rem;
+        opacity: 0.7;
+    }
+    .student-info-bar .header-icon {
+        font-size: 2.2rem;
+        opacity: 0.15;
+        position: absolute;
+        right: 28px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    /* Exam Result Card */
+    .exam-result-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        margin-bottom: 24px;
+        overflow: hidden;
+        animation: fadeInUp 0.5s ease;
+        animation-fill-mode: both;
+        border: 1px solid var(--border-light);
+        transition: var(--transition-slow);
+    }
+    .exam-result-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+    }
+    .exam-result-card:nth-child(1) { animation-delay: 0.1s; }
+    .exam-result-card:nth-child(2) { animation-delay: 0.2s; }
+    .exam-result-card:nth-child(3) { animation-delay: 0.3s; }
+
+    /* Card Header with Gradient */
+    .exam-card-header {
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: linear-gradient(135deg, var(--bg-card) 0%, #F8FAFF 100%);
+        border-bottom: 1px solid var(--border-light);
+        flex-wrap: wrap;
+    }
+    .exam-card-header .exam-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .exam-card-header .exam-title i {
+        color: var(--primary);
+        font-size: 1.1rem;
+    }
+    .exam-card-header .exam-date {
+        font-size: 0.72rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+    .result-badge {
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-weight: 800;
+        font-size: 0.78rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+    .result-badge.promoted {
+        background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+        color: #059669;
+        box-shadow: 0 2px 8px rgba(5, 150, 105, 0.15);
+    }
+    .result-badge.compartment {
+        background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+        color: #B45309;
+        box-shadow: 0 2px 8px rgba(180, 83, 9, 0.15);
+    }
+    .result-badge.detained {
+        background: linear-gradient(135deg, #FEE2E2, #FECACA);
+        color: #DC2626;
+        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+    }
+
+    /* Quick Stats Row */
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        padding: 20px 24px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border-light);
+    }
+    .stat-box {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        text-align: center;
+        box-shadow: var(--shadow-sm);
+        transition: var(--transition);
+        position: relative;
+        overflow: hidden;
+    }
+    .stat-box:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow);
+    }
+    .stat-box .stat-label {
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+    .stat-box .stat-value {
+        font-size: 1.5rem;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+    .stat-box .stat-sub {
+        font-size: 0.68rem;
+        color: var(--text-light);
+        margin-top: 2px;
+    }
+    .stat-box.total-box .stat-value { color: var(--primary); }
+    .stat-box.pct-box .stat-value { color: var(--info); }
+    .stat-box.grade-box .stat-value { font-size: 1.3rem; }
+    .stat-box.rank-box .stat-value { color: var(--warning); }
+    .stat-box .medal {
+        font-size: 1.2rem;
+        position: absolute;
+        top: 6px;
+        right: 8px;
+    }
+
+    /* Marks Table */
+    .marks-table-wrapper {
+        padding: 0;
+        overflow-x: auto;
+    }
+    .marks-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+    }
+    .marks-table thead th {
+        padding: 12px 16px;
+        background: linear-gradient(135deg, #1E1B4B, #312E81);
+        color: white;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
+    .marks-table thead th:first-child {
+        text-align: left;
+    }
+    .marks-table tbody td {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-light);
+        text-align: center;
+        vertical-align: middle;
+        transition: background 0.15s ease;
+    }
+    .marks-table tbody td:first-child {
+        text-align: left;
+        font-weight: 600;
+    }
+    .marks-table tbody tr:hover {
+        background: #FAFBFF;
+    }
+    .marks-table tbody tr.row-passed td:first-child {
+        border-left: 3px solid var(--success);
+    }
+    .marks-table tbody tr.row-failed td:first-child {
+        border-left: 3px solid var(--danger);
+    }
+    .marks-table tbody tr.row-special td:first-child {
+        border-left: 3px solid var(--text-light);
+    }
+    .marks-table tbody tr.row-highest {
+        background: #F0FDF4;
+    }
+    .marks-table tbody tr.row-lowest {
+        background: #FFF7ED;
+    }
+    .marks-table tbody tr.total-row {
+        background: linear-gradient(135deg, #EEF2FF, #E0E7FF);
+        font-weight: 800;
+        font-size: 0.88rem;
+    }
+    .marks-table tbody tr.total-row td {
+        border-bottom: none;
+        padding: 14px 16px;
+    }
+    .marks-highlight {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+    .marks-highlight.highest {
+        background: #D1FAE5;
+        color: #059669;
+    }
+    .marks-highlight.lowest {
+        background: #FEF3C7;
+        color: #D97706;
+    }
+
+    /* Grade Pill Styles */
+    .grade-pill {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .grade-A1 { background: #D1FAE5; color: #059669; }
+    .grade-A2 { background: #A7F3D0; color: #047857; }
+    .grade-B1 { background: #DBEAFE; color: #2563EB; }
+    .grade-B2 { background: #BFDBFE; color: #1D4ED8; }
+    .grade-C1 { background: #FEF3C7; color: #D97706; }
+    .grade-C2 { background: #FDE68A; color: #B45309; }
+    .grade-D  { background: #FFEDD5; color: #C2410C; }
+    .grade-E  { background: #FEE2E2; color: #DC2626; }
+
+    /* Special Code Badges */
+    .code-badge {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 8px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+    }
+    .code-badge.ab { background: #FEE2E2; color: #DC2626; }
+    .code-badge.ml { background: #FEF3C7; color: #D97706; }
+    .code-badge.na { background: #F1F5F9; color: #94A3B8; }
+    .code-badge.ex { background: #DBEAFE; color: #2563EB; }
+
+    /* Teacher Remarks */
+    .teacher-remarks {
+        margin: 0 24px 20px;
+        padding: 16px 20px;
+        background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
+        border-left: 4px solid #F59E0B;
+        border-radius: 0 var(--radius) var(--radius) 0;
+        position: relative;
+    }
+    .teacher-remarks::before {
+        content: '\201C';
+        font-size: 3rem;
+        color: #F59E0B;
+        opacity: 0.3;
+        position: absolute;
+        top: -4px;
+        left: 10px;
+        font-family: Georgia, serif;
+        line-height: 1;
+    }
+    .teacher-remarks .remarks-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #B45309;
+        margin-bottom: 4px;
+    }
+    .teacher-remarks .remarks-text {
+        font-size: 0.85rem;
+        color: #92400E;
+        font-style: italic;
+        line-height: 1.6;
+        padding-left: 20px;
+    }
+
+    /* Download Button */
+    .download-section {
+        padding: 16px 24px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 12px;
+    }
+    .btn-download {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 22px;
+        background: linear-gradient(135deg, #4F46E5, #6366F1);
+        color: white;
+        border: none;
+        border-radius: var(--radius);
+        font-weight: 700;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: var(--transition);
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+    .btn-download:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
+    }
+    .btn-download:active {
+        transform: translateY(0);
+    }
+    .btn-download.loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    .btn-download .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+    .btn-download.loading .spinner { display: inline-block; }
+    .btn-download.loading .dl-icon { display: none; }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Grading Scale Legend */
+    .grading-legend {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 20px 24px;
+        margin-bottom: 24px;
+        animation: fadeInUp 0.5s ease 0.4s both;
+        border: 1px solid var(--border-light);
+    }
+    .grading-legend .legend-title {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .grading-legend .legend-title i {
+        color: var(--primary);
+    }
+    .legend-pills {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .legend-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        transition: var(--transition);
+    }
+    .legend-pill:hover {
+        transform: scale(1.05);
+    }
+    .legend-pill .lpill-grade { font-weight: 800; }
+    .legend-pill .lpill-range { opacity: 0.7; font-weight: 500; }
+
+    /* Empty State */
+    .empty-state-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        padding: 60px 24px;
+        text-align: center;
+        animation: fadeInUp 0.5s ease;
+        border: 1px solid var(--border-light);
+    }
+    .empty-state-card .empty-icon {
+        font-size: 4rem;
+        color: var(--border);
+        margin-bottom: 16px;
+    }
+    .empty-state-card h3 {
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: var(--text);
+        margin-bottom: 8px;
+    }
+    .empty-state-card p {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        max-width: 400px;
+        margin: 0 auto;
+        line-height: 1.6;
+    }
+
+    /* Skeleton Loading */
+    .skeleton {
+        background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+        background-size: 400px 100%;
+        animation: shimmer 1.5s ease-in-out infinite;
+        border-radius: var(--radius-sm);
+    }
+    .skeleton-card {
+        background: var(--bg-card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 24px;
+        overflow: hidden;
+        border: 1px solid var(--border-light);
+    }
+    .skeleton-header {
+        padding: 20px 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--border-light);
+    }
+    .skeleton-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        padding: 20px 24px;
+        background: var(--bg);
+    }
+    .skeleton-stat-box {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        text-align: center;
+    }
+    .skeleton-table {
+        padding: 16px 24px;
+    }
+    .skeleton-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-light);
+    }
+
+    /* Privacy Note */
+    .privacy-note {
+        font-size: 0.72rem;
+        color: var(--text-light);
+        text-align: center;
+        padding: 12px;
+    }
+    .privacy-note i { margin-right: 4px; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .student-info-bar {
+            flex-direction: column;
+            text-align: center;
+            padding: 16px;
+        }
+        .student-info-bar .meta {
+            justify-content: center;
+        }
+        .student-info-bar .header-icon { display: none; }
+        .quick-stats {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            padding: 12px 16px;
+        }
+        .stat-box { padding: 10px 12px; }
+        .stat-box .stat-value { font-size: 1.2rem; }
+        .exam-card-header { padding: 14px 16px; }
+        .marks-table thead th,
+        .marks-table tbody td { padding: 8px 10px; font-size: 0.75rem; }
+        .teacher-remarks { margin: 0 16px 16px; }
+        .download-section { padding: 12px 16px 16px; justify-content: center; }
+        .skeleton-stats { grid-template-columns: repeat(2, 1fr); }
+        .skeleton-row { grid-template-columns: 2fr 1fr 1fr; }
+        .legend-pills { gap: 6px; }
+        .legend-pill { padding: 4px 10px; font-size: 0.68rem; }
+    }
+    @media (max-width: 480px) {
+        .quick-stats { grid-template-columns: 1fr 1fr; }
+        .marks-table { font-size: 0.72rem; }
+        .marks-table thead th,
+        .marks-table tbody td { padding: 8px 6px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Toast Container -->
+<div id="toastContainer"></div>
+
+<!-- Loading State -->
+<div id="loadingState">
+    <div class="student-info-bar" style="position:relative;">
+        <div class="avatar"><div class="skeleton" style="width:100%;height:100%;border-radius:50%;"></div></div>
+        <div class="info">
+            <div class="skeleton" style="width:180px;height:18px;margin-bottom:8px;"></div>
+            <div class="skeleton" style="width:280px;height:14px;"></div>
+        </div>
+    </div>
+    <div class="skeleton-card">
+        <div class="skeleton-header">
+            <div class="skeleton" style="width:200px;height:20px;"></div>
+            <div class="skeleton" style="width:80px;height:28px;border-radius:20px;"></div>
+        </div>
+        <div class="skeleton-stats">
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:40px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:60px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:50px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:50px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:36px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:40px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:30px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:30px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+        </div>
+        <div class="skeleton-table">
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="skeleton-card">
+        <div class="skeleton-header">
+            <div class="skeleton" style="width:160px;height:20px;"></div>
+            <div class="skeleton" style="width:90px;height:28px;border-radius:20px;"></div>
+        </div>
+        <div class="skeleton-stats">
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:40px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:60px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:50px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:50px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:36px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:40px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+            <div class="skeleton-stat-box">
+                <div class="skeleton" style="width:30px;height:10px;margin:0 auto 8px;"></div>
+                <div class="skeleton" style="width:30px;height:24px;margin:0 auto 4px;"></div>
+            </div>
+        </div>
+        <div class="skeleton-table">
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+            <div class="skeleton-row">
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+                <div class="skeleton" style="height:14px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content (hidden until loaded) -->
+<div id="mainContent" style="display:none;">
+    <!-- Student Info Bar -->
+    <div id="studentInfoBar"></div>
+
+    <!-- Results Container -->
+    <div id="resultsContainer"></div>
+
+    <!-- Grading Scale Legend -->
+    <div class="grading-legend" id="gradingLegend" style="display:none;">
+        <div class="legend-title">
+            <i class="fas fa-ruler-combined"></i>
+            Grading Scale
+        </div>
+        <div class="legend-pills">
+            <div class="legend-pill grade-A1">
+                <span class="lpill-grade">A1</span>
+                <span class="lpill-range">&ge;91%</span>
+            </div>
+            <div class="legend-pill grade-A2">
+                <span class="lpill-grade">A2</span>
+                <span class="lpill-range">&ge;81%</span>
+            </div>
+            <div class="legend-pill grade-B1">
+                <span class="lpill-grade">B1</span>
+                <span class="lpill-range">&ge;71%</span>
+            </div>
+            <div class="legend-pill grade-B2">
+                <span class="lpill-grade">B2</span>
+                <span class="lpill-range">&ge;61%</span>
+            </div>
+            <div class="legend-pill grade-C1">
+                <span class="lpill-grade">C1</span>
+                <span class="lpill-range">&ge;51%</span>
+            </div>
+            <div class="legend-pill grade-C2">
+                <span class="lpill-grade">C2</span>
+                <span class="lpill-range">&ge;41%</span>
+            </div>
+            <div class="legend-pill grade-D">
+                <span class="lpill-grade">D</span>
+                <span class="lpill-range">&ge;33%</span>
+            </div>
+            <div class="legend-pill grade-E">
+                <span class="lpill-grade">E</span>
+                <span class="lpill-range">&lt;33%</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Empty State (hidden until needed) -->
+<div id="emptyState" style="display:none;">
+    <div class="empty-state-card">
+        <div class="empty-icon">
+            <i class="fas fa-file-alt"></i>
+        </div>
+        <h3>No Results Published Yet</h3>
+        <p>Your results will appear here once your class teacher publishes them. Check back later!</p>
+    </div>
+</div>
+
+<div class="privacy-note">
+    <i class="fas fa-lock"></i> Your report card is private. Only you, your parents, and authorized school staff can view this.
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% raw %}
+// ─── Toast Notification ───
+function showToast(message, type='success', duration=4000) {
+    const toast = document.createElement('div');
+    const colors = {success:'#10B981',error:'#EF4444',warning:'#F59E0B',info:'#3B82F6'};
+    const icons = {success:'fa-check-circle',error:'fa-times-circle',warning:'fa-exclamation-triangle',info:'fa-info-circle'};
+    toast.style.cssText = `display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--bg-card);border-left:4px solid ${colors[type]};border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:300px;max-width:450px;animation:slideIn 0.3s ease;font-size:0.85rem;color:var(--text);`;
+    toast.innerHTML = `<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:1.1rem;"></i><span style="flex:1">${message}</span><i class="fas fa-times" style="cursor:pointer;color:var(--text-light);font-size:0.8rem;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('toastContainer').appendChild(toast);
+    setTimeout(() => { toast.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(),300); }, duration);
+}
+
+// ─── Grade Helpers ───
+function getGradeClass(grade) {
+    if (!grade) return '';
+    const g = grade.toUpperCase().replace(/\s/g, '');
+    if (['A1','A2','B1','B2','C1','C2','D','E'].includes(g)) return 'grade-' + g;
+    return '';
+}
+
+function getResultBadgeClass(result) {
+    if (!result) return '';
+    const r = result.toLowerCase();
+    if (r === 'promoted' || r === 'pass' || r === 'passed') return 'promoted';
+    if (r === 'compartment') return 'compartment';
+    if (r === 'detained' || r === 'fail' || r === 'failed') return 'detained';
+    return 'promoted';
+}
+
+function getResultLabel(result) {
+    if (!result) return 'N/A';
+    const r = result.toLowerCase();
+    if (r === 'promoted' || r === 'pass' || r === 'passed') return 'Promoted';
+    if (r === 'compartment') return 'Compartment';
+    if (r === 'detained' || r === 'fail' || r === 'failed') return 'Detained';
+    return result;
+}
+
+function getMedalEmoji(rank) {
+    if (rank === 1) return '<span style="font-size:1.4rem;">&#x1F947;</span>';
+    if (rank === 2) return '<span style="font-size:1.4rem;">&#x1F948;</span>';
+    if (rank === 3) return '<span style="font-size:1.4rem;">&#x1F949;</span>';
+    return '';
+}
+
+function isSpecialCode(value) {
+    if (typeof value !== 'string') return false;
+    return ['AB', 'ML', 'NA', 'EX'].includes(value.toUpperCase());
+}
+
+function getSpecialCodeBadge(code) {
+    const c = code.toUpperCase();
+    const labels = { AB: 'Absent', ML: 'Medical Leave', NA: 'Not Applicable', EX: 'Exempted' };
+    return `<span class="code-badge ${c.toLowerCase()}" title="${labels[c] || c}">${c}</span>`;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (e) {
+        return dateStr;
+    }
+}
+
+// ─── Render Student Info Bar ───
+function renderStudentInfo(data) {
+    const student = data.student || {};
+    const initial = (student.name || student.full_name || 'S').charAt(0).toUpperCase();
+    const name = student.name || student.full_name || 'Student';
+    const className = student.class_name || student.class_ || '';
+    const section = student.section_name || student.section || '';
+    const classSection = [className, section].filter(Boolean).join('-');
+    const roll = student.roll_number || student.roll || '—';
+    const admNo = student.admission_number || student.adm_no || '—';
+
+    document.getElementById('studentInfoBar').innerHTML = `
+        <div class="student-info-bar" style="position:relative;">
+            <div class="avatar">${initial}</div>
+            <div class="info">
+                <div class="name"><i class="fas fa-graduation-cap" style="margin-right:8px;opacity:0.8;"></i>${name}</div>
+                <div class="meta">
+                    <div class="meta-item"><i class="fas fa-school"></i> ${classSection || 'N/A'}</div>
+                    <div class="meta-item"><i class="fas fa-hashtag"></i> Roll: ${roll}</div>
+                    <div class="meta-item"><i class="fas fa-id-card"></i> Adm: ${admNo}</div>
+                </div>
+            </div>
+            <i class="fas fa-graduation-cap header-icon"></i>
+        </div>
+    `;
+}
+
+// ─── Render Single Exam Card ───
+function renderExamCard(exam, index) {
+    const subjects = exam.subjects || [];
+    const totalMax = exam.total_max || exam.max || subjects.reduce((s, sub) => s + (parseFloat(sub.max_marks || sub.max) || 0), 0);
+    const totalObtained = exam.total_obtained || exam.total || subjects.reduce((s, sub) => {
+        const m = parseFloat(sub.final_marks || sub.marks || sub.obtained);
+        return s + (isNaN(m) ? 0 : m);
+    }, 0);
+    const percentage = exam.percentage || exam.pct || (totalMax > 0 ? ((totalObtained / totalMax) * 100).toFixed(1) : '0.0');
+    const grade = exam.grade || exam.overall_grade || calculateGrade(parseFloat(percentage));
+    const rank = exam.rank || null;
+    const result = exam.result || exam.overall_result || 'Promoted';
+    const publishedDate = exam.published_date || exam.published_at || exam.date || '';
+    const remarks = exam.remarks || exam.teacher_remarks || exam.class_teacher_remarks || '';
+
+    // Find highest and lowest marks subjects
+    let highestIdx = -1, lowestIdx = -1, highestVal = -1, lowestVal = Infinity;
+    subjects.forEach((sub, i) => {
+        const marks = parseFloat(sub.final_marks || sub.marks || sub.obtained);
+        if (isNaN(marks) || isSpecialCode(String(sub.final_marks || sub.marks || sub.obtained))) return;
+        if (marks > highestVal) { highestVal = marks; highestIdx = i; }
+        if (marks < lowestVal) { lowestVal = marks; lowestIdx = i; }
+    });
+
+    let html = `<div class="exam-result-card" style="animation-delay:${0.1 + index * 0.1}s;">`;
+
+    // Card Header
+    html += `
+        <div class="exam-card-header">
+            <div>
+                <div class="exam-title">
+                    <i class="fas fa-clipboard-check"></i>
+                    ${exam.name || exam.exam_name || 'Examination'}
+                </div>
+                ${publishedDate ? `<div class="exam-date"><i class="fas fa-calendar-alt" style="margin-right:4px;"></i>Published: ${formatDate(publishedDate)}</div>` : ''}
+            </div>
+            <span class="result-badge ${getResultBadgeClass(result)}">${getResultLabel(result)}</span>
+        </div>
+    `;
+
+    // Quick Stats
+    const pctFloat = parseFloat(percentage);
+    let pctColor = 'var(--success)';
+    if (pctFloat < 33) pctColor = 'var(--danger)';
+    else if (pctFloat < 50) pctColor = 'var(--warning)';
+    else if (pctFloat < 75) pctColor = 'var(--info)';
+
+    html += `
+        <div class="quick-stats">
+            <div class="stat-box total-box">
+                <div class="stat-label">Total</div>
+                <div class="stat-value">${totalObtained}<span style="font-size:0.75rem;font-weight:500;color:var(--text-secondary);">/${totalMax}</span></div>
+            </div>
+            <div class="stat-box pct-box">
+                <div class="stat-label">Percentage</div>
+                <div class="stat-value" style="color:${pctColor};">${parseFloat(percentage).toFixed(1)}%</div>
+            </div>
+            <div class="stat-box grade-box">
+                <div class="stat-label">Grade</div>
+                <div class="stat-value"><span class="grade-pill ${getGradeClass(grade)}" style="font-size:0.88rem;padding:4px 14px;">${grade || '—'}</span></div>
+            </div>
+            <div class="stat-box rank-box">
+                <div class="stat-label">Rank</div>
+                <div class="stat-value">
+                    ${rank ? `#${rank}` : '—'}
+                </div>
+                ${rank && rank <= 3 ? `<div class="medal">${getMedalEmoji(rank)}</div>` : ''}
+            </div>
+        </div>
+    `;
+
+    // Marks Table
+    html += `
+        <div class="marks-table-wrapper">
+            <table class="marks-table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Max Marks</th>
+                        <th>Marks Obtained</th>
+                        <th>Grace</th>
+                        <th>Final Marks</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    subjects.forEach((sub, i) => {
+        const subName = sub.subject || sub.name || sub.subject_name || '';
+        const maxMarks = sub.max_marks || sub.max || 0;
+        const obtained = sub.marks_obtained || sub.obtained || sub.marks || 0;
+        const grace = sub.grace || sub.grace_marks || 0;
+        const finalMarks = sub.final_marks || sub.final || obtained;
+        const subGrade = sub.grade || '';
+        const isCode = isSpecialCode(String(finalMarks)) || isSpecialCode(String(obtained));
+        const numFinal = parseFloat(finalMarks);
+        const passed = !isCode && !isNaN(numFinal) && numFinal >= (parseFloat(maxMarks) * 0.33);
+
+        let rowClass = '';
+        if (isCode) {
+            rowClass = 'row-special';
+        } else if (passed) {
+            rowClass = 'row-passed';
+        } else {
+            rowClass = 'row-failed';
+        }
+        if (i === highestIdx) rowClass += ' row-highest';
+        if (i === lowestIdx && subjects.length > 1) rowClass += ' row-lowest';
+
+        html += `<tr class="${rowClass}">`;
+        html += `<td>
+            ${subName}
+            ${i === highestIdx ? '<span class="marks-highlight highest"><i class="fas fa-arrow-up"></i> Best</span>' : ''}
+            ${i === lowestIdx && subjects.length > 1 ? '<span class="marks-highlight lowest"><i class="fas fa-arrow-down"></i> Improve</span>' : ''}
+        </td>`;
+        html += `<td>${maxMarks}</td>`;
+
+        // Marks Obtained
+        if (isSpecialCode(String(obtained))) {
+            html += `<td>${getSpecialCodeBadge(String(obtained))}</td>`;
+        } else {
+            html += `<td style="font-weight:600;${!passed && !isCode ? 'color:var(--danger);' : ''}">${obtained}</td>`;
+        }
+
+        // Grace
+        html += `<td>${grace > 0 ? `<span style="color:var(--success);font-weight:600;">+${grace}</span>` : '<span style="color:var(--text-light);">—</span>'}</td>`;
+
+        // Final Marks
+        if (isSpecialCode(String(finalMarks))) {
+            html += `<td>${getSpecialCodeBadge(String(finalMarks))}</td>`;
+        } else {
+            html += `<td style="font-weight:700;${!passed && !isCode ? 'color:var(--danger);' : 'color:var(--text);'}">${finalMarks}</td>`;
+        }
+
+        // Grade
+        html += `<td><span class="grade-pill ${getGradeClass(subGrade)}">${subGrade || '—'}</span></td>`;
+        html += `</tr>`;
+    });
+
+    // Total Row
+    html += `
+                <tr class="total-row">
+                    <td>TOTAL</td>
+                    <td>${totalMax}</td>
+                    <td colspan="2" style="font-weight:800;">${totalObtained}</td>
+                    <td style="font-weight:800;">${parseFloat(percentage).toFixed(1)}%</td>
+                    <td><span class="grade-pill ${getGradeClass(grade)}" style="font-size:0.82rem;">${grade || '—'}</span></td>
+                </tr>
+            </tbody>
+            </table>
+        </div>
+    `;
+
+    // Teacher Remarks
+    if (remarks) {
+        html += `
+            <div class="teacher-remarks">
+                <div class="remarks-label"><i class="fas fa-comment-dots" style="margin-right:4px;"></i> Class Teacher Remarks</div>
+                <div class="remarks-text">${remarks}</div>
+            </div>
+        `;
+    }
+
+    // Download PDF Button
+    const cycleId = exam.cycle_id || exam.exam_cycle_id || exam.id || '';
+    html += `
+        <div class="download-section">
+            <button class="btn-download" onclick="downloadPDF('${cycleId}', this)" title="Download Report Card PDF">
+                <i class="fas fa-download dl-icon"></i>
+                <div class="spinner"></div>
+                Download Report Card
+            </button>
+        </div>
+    `;
+
+    html += `</div>`;
+    return html;
+}
+
+// ─── Calculate Grade from Percentage ───
+function calculateGrade(pct) {
+    if (pct >= 91) return 'A1';
+    if (pct >= 81) return 'A2';
+    if (pct >= 71) return 'B1';
+    if (pct >= 61) return 'B2';
+    if (pct >= 51) return 'C1';
+    if (pct >= 41) return 'C2';
+    if (pct >= 33) return 'D';
+    return 'E';
+}
+
+// ─── Download PDF ───
+function downloadPDF(cycleId, btn) {
+    if (!cycleId) {
+        showToast('Unable to generate PDF. Missing exam cycle information.', 'error');
+        return;
+    }
+    btn.classList.add('loading');
+    showToast('Preparing your report card PDF...', 'info', 3000);
+
+    // Navigate to download endpoint
+    const url = `/api/report-card/student/download-pdf?cycle_id=${encodeURIComponent(cycleId)}`;
+
+    // Use a hidden iframe to trigger download without navigating away
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = url;
+    document.body.appendChild(iframe);
+
+    // Reset button state after a delay
+    setTimeout(() => {
+        btn.classList.remove('loading');
+        showToast('Report card PDF download started!', 'success');
+        setTimeout(() => iframe.remove(), 5000);
+    }, 3000);
+}
+
+// ─── Load Results from API ───
+async function loadResults() {
+    try {
+        const response = await fetch('/api/report-card/student/my-results', {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load results (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        // Hide loading, show content
+        document.getElementById('loadingState').style.display = 'none';
+
+        if (!data || (!data.results && !data.exam_results) ||
+            ((data.results || data.exam_results || []).length === 0)) {
+            // Show empty state
+            document.getElementById('emptyState').style.display = 'block';
+            return;
+        }
+
+        // Render student info
+        renderStudentInfo(data);
+
+        // Render exam cards
+        const results = data.results || data.exam_results || [];
+        const container = document.getElementById('resultsContainer');
+        let cardsHtml = '';
+        results.forEach((exam, idx) => {
+            cardsHtml += renderExamCard(exam, idx);
+        });
+        container.innerHTML = cardsHtml;
+
+        // Show main content and grading legend
+        document.getElementById('mainContent').style.display = 'block';
+        document.getElementById('gradingLegend').style.display = 'block';
+
+    } catch (error) {
+        console.error('Error loading results:', error);
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('resultsContainer').innerHTML = '';
+
+        // Show error state
+        document.getElementById('emptyState').innerHTML = `
+            <div class="empty-state-card">
+                <div class="empty-icon" style="color:var(--danger);">
+                    <i class="fas fa-exclamation-circle"></i>
+                </div>
+                <h3>Unable to Load Results</h3>
+                <p>${error.message || 'Something went wrong while fetching your results. Please try again.'}</p>
+                <button class="btn btn-primary" onclick="location.reload()" style="margin-top:16px;">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </div>
+        `;
+        document.getElementById('emptyState').style.display = 'block';
+        document.getElementById('mainContent').style.display = 'block';
+
+        showToast('Failed to load your results. Please try again.', 'error');
+    }
+}
+
+// ─── Initialize ───
+document.addEventListener('DOMContentLoaded', function() {
+    loadResults();
+});
+{% endraw %}
+</script>
+{% endblock %}

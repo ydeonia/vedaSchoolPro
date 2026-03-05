@@ -38,6 +38,7 @@ PRIVILEGE_GROUPS = {
         "exam_management": "Exam Creation & Marks Entry",
         "results": "Results & Report Cards",
         "activities": "Activities, Sports & Quiz",
+        "online_classes": "Online Classes & Meetings",
     },
     "Finance": {
         "fee_structure": "Fee Structure Setup",

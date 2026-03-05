@@ -130,8 +130,8 @@ async function loadWaivers(){
 async function grantWaiver(){
     const sid=document.getElementById('wStudent').value;
     const val=parseFloat(document.getElementById('wValue').value)||0;
-    if(!sid){alert('Select class → section → student first');return;}
-    if(!val){alert('Enter discount value');return;}
+    if(!sid){showToast('warning','Select class → section → student first');return;}
+    if(!val){showToast('warning','Enter discount value');return;}
     const d={student_id:sid,waiver_type:document.getElementById('wType').value,
         title:document.getElementById('wTitle').value.trim()||(document.getElementById('wType').value.replace(/_/g,' ')+' '+val+(document.getElementById('wDiscType').value==='percentage'?'%':'')),
         discount_type:document.getElementById('wDiscType').value,discount_value:val,
@@ -141,8 +141,11 @@ async function grantWaiver(){
     try{await apiCall('/api/school/fee-waivers','POST',d);showToast('success','Waiver granted!');loadWaivers();switchTab('list',document.querySelectorAll('.w-tab')[0]);}catch(e){showToast('error','Failed');}
 }
 
-async function revokeWaiver(id){if(!confirm('Revoke this waiver?'))return;
-try{await apiCall('/api/school/fee-waivers/'+id+'/revoke','POST');showToast('success','Revoked');loadWaivers();}catch(e){}}
+async function revokeWaiver(id){
+showConfirm('Confirm','Revoke this waiver?', async () => {
+try{await apiCall('/api/school/fee-waivers/'+id+'/revoke','POST');showToast('success','Revoked');loadWaivers();}catch(e){}
+}, {icon:'⚠️'});
+}
 init();
 </script>
 {% endblock %}

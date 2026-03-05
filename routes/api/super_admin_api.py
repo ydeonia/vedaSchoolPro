@@ -5,7 +5,7 @@ from database import get_db
 from models.user import User, UserRole
 from models.organization import Organization, PlanType
 from models.branch import Branch, BranchSettings, PaymentGatewayConfig, CommunicationConfig, BoardType
-from utils.auth import hash_password
+from utils.auth import hash_password, decode_access_token
 from utils.helpers import generate_slug
 from utils.permissions import get_current_user, require_role
 from pydantic import BaseModel
@@ -32,6 +32,7 @@ class BranchCreate(BaseModel):
     org_id: str
     name: str
     code: Optional[str] = None
+    subdomain: Optional[str] = None  # e.g. "goenkajammu" → goenkajammu.vedaschoolpro.com
     board_type: Optional[str] = "cbse"
     principal_name: Optional[str] = None
     email: Optional[str] = None
@@ -111,10 +112,22 @@ async def create_branch(
 ):
     await verify_super_admin(request)
 
+    # Validate subdomain — lowercase, alphanumeric + hyphens, no spaces
+    subdomain_val = None
+    if data.subdomain:
+        import re as _re
+        subdomain_val = _re.sub(r'[^a-z0-9\-]', '', data.subdomain.lower().strip())
+        if subdomain_val:
+            # Check uniqueness
+            existing_sub = await db.scalar(select(Branch).where(Branch.subdomain == subdomain_val))
+            if existing_sub:
+                raise HTTPException(status_code=400, detail=f"Subdomain '{subdomain_val}' already taken")
+
     branch = Branch(
         org_id=uuid.UUID(data.org_id),
         name=data.name,
         code=data.code,
+        subdomain=subdomain_val,
         board_type=BoardType(data.board_type) if data.board_type else BoardType.CBSE,
         principal_name=data.principal_name,
         email=data.email,
@@ -139,7 +152,57 @@ async def create_branch(
     comm_config = CommunicationConfig(branch_id=branch.id)
     db.add(comm_config)
 
-    return {"success": True, "message": "Branch created", "id": str(branch.id)}
+    return {"success": True, "message": "Branch created", "id": str(branch.id), "subdomain": subdomain_val}
+
+
+@router.put("/branches/{branch_id}/subdomain")
+async def update_branch_subdomain(
+    branch_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Set or update a branch's subdomain (e.g. goenkajammu → goenkajammu.vedaschoolpro.com)"""
+    await verify_super_admin(request)
+    body = await request.json()
+    new_subdomain = body.get("subdomain", "").lower().strip()
+
+    branch = await db.scalar(select(Branch).where(Branch.id == uuid.UUID(branch_id)))
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    if new_subdomain:
+        import re as _re
+        new_subdomain = _re.sub(r'[^a-z0-9\-]', '', new_subdomain)
+        if not new_subdomain:
+            raise HTTPException(status_code=400, detail="Invalid subdomain. Use only letters, numbers, hyphens.")
+        if len(new_subdomain) < 3:
+            raise HTTPException(status_code=400, detail="Subdomain must be at least 3 characters")
+        if len(new_subdomain) > 63:
+            raise HTTPException(status_code=400, detail="Subdomain must be 63 characters or fewer")
+
+        # Check reserved
+        from utils.subdomain import RESERVED_SUBDOMAINS
+        if new_subdomain in RESERVED_SUBDOMAINS:
+            raise HTTPException(status_code=400, detail=f"'{new_subdomain}' is a reserved name")
+
+        # Check uniqueness
+        existing = await db.scalar(
+            select(Branch).where(Branch.subdomain == new_subdomain, Branch.id != branch.id)
+        )
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Subdomain '{new_subdomain}' is already taken")
+
+        branch.subdomain = new_subdomain
+    else:
+        branch.subdomain = None  # Remove subdomain
+
+    await db.commit()
+    return {
+        "success": True,
+        "message": f"Subdomain {'set to ' + new_subdomain if new_subdomain else 'removed'}",
+        "subdomain": new_subdomain or None,
+        "url": f"https://{new_subdomain}.vedaschoolpro.com" if new_subdomain else None,
+    }
 
 
 # --- School Admin APIs ---
@@ -241,6 +304,9 @@ async def update_chairman(request: Request, chairman_id: str, db: AsyncSession =
     if data.get("org_id"): user.org_id = uuid.UUID(data["org_id"])
     await db.commit()
     return {"success": True, "message": f"Chairman {user.first_name} updated"}
+
+
+@router.delete("/admins/{admin_id}")
 async def delete_admin(
     admin_id: str,
     request: Request,
@@ -318,6 +384,8 @@ async def system_analytics(request: Request, db: AsyncSession = Depends(get_db))
             "name": b.name, "org": org_name, "students": stu_count, "teachers": teacher_count,
             "storage": "N/A", "db_rows": stu_count, "active": b.is_active if hasattr(b, 'is_active') else True,
             "branch_id": str(b.id),
+            "subdomain": getattr(b, 'subdomain', None),
+            "url": f"https://{b.subdomain}.vedaschoolpro.com" if getattr(b, 'subdomain', None) else None,
         })
 
     # GA ID
@@ -765,10 +833,11 @@ async def update_branch(request: Request, branch_id: str, db: AsyncSession = Dep
 
 @router.post("/admins/{admin_id}/reset-password")
 async def reset_admin_password(request: Request, admin_id: str, db: AsyncSession = Depends(get_db)):
-    """Reset a school admin's password."""
+    """Reset a school admin's password. Optionally email the new password."""
     user = await verify_super_admin(request)
     data = await request.json()
     new_password = data.get("password", "")
+    send_email_flag = data.get("send_email", False)
 
     if len(new_password) < 6:
         return {"error": "Password must be at least 6 characters"}
@@ -779,7 +848,112 @@ async def reset_admin_password(request: Request, admin_id: str, db: AsyncSession
 
     admin.password_hash = hash_password(new_password)
     await db.commit()
-    return {"success": True, "message": f"Password reset for {admin.first_name}"}
+
+    email_sent = False
+    if send_email_flag and admin.email:
+        try:
+            from utils.notifier import send_platform_email
+            body = f"""
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:12px 12px 0 0;">
+                    <h2 style="color:#fff;margin:0;">Password Reset</h2>
+                </div>
+                <div style="background:#fff;padding:24px;border:1px solid #e2e8f0;border-radius:0 0 12px 12px;">
+                    <p style="color:#334155;">Hi <strong>{admin.first_name}</strong>,</p>
+                    <p style="color:#334155;">Your password has been reset by the platform administrator.</p>
+                    <div style="background:#f1f5f9;padding:16px;border-radius:8px;text-align:center;margin:16px 0;">
+                        <div style="font-size:0.75rem;color:#64748b;margin-bottom:4px;">Your New Password</div>
+                        <code style="font-size:1.2rem;font-weight:800;color:#6366f1;letter-spacing:1px;">{new_password}</code>
+                    </div>
+                    <p style="color:#64748b;font-size:0.85rem;">Please login and change your password immediately for security.</p>
+                </div>
+                <p style="color:#94a3b8;font-size:0.75rem;text-align:center;margin-top:12px;">VedaSchoolPro</p>
+            </div>"""
+            result = await send_platform_email(db, admin.email, "Your Password Has Been Reset", body)
+            email_sent = result.get("status") == "sent"
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Password email failed: {e}")
+
+    return {
+        "success": True,
+        "message": f"Password reset for {admin.first_name}",
+        "email_sent": email_sent,
+    }
+
+
+# ═══════════════════════════════════════════════════════════
+# PASSWORD RESET LINK — Token-based, 24hr expiry
+# ═══════════════════════════════════════════════════════════
+
+import secrets
+from time import time as _time
+
+# In-memory reset tokens store: { token: { user_id, email, expires } }
+_password_reset_tokens: dict = {}
+_RESET_LINK_EXPIRY = 60 * 60 * 24  # 24 hours
+
+
+@router.post("/admins/{admin_id}/send-reset-link")
+async def send_reset_link(request: Request, admin_id: str, db: AsyncSession = Depends(get_db)):
+    """Send a password reset link to admin's email. Link expires in 24 hours."""
+    user = await verify_super_admin(request)
+
+    admin = await db.scalar(select(User).where(User.id == uuid.UUID(admin_id)))
+    if not admin:
+        return {"error": "Admin not found"}
+    if not admin.email:
+        return {"error": f"{admin.first_name} has no email on file"}
+
+    # Generate secure token
+    token = secrets.token_urlsafe(48)
+    _password_reset_tokens[token] = {
+        "user_id": str(admin.id),
+        "email": admin.email,
+        "expires": _time() + _RESET_LINK_EXPIRY,
+        "created_at": _time(),
+    }
+
+    # Clean expired tokens
+    now = _time()
+    expired = [t for t, v in _password_reset_tokens.items() if v["expires"] < now]
+    for t in expired:
+        del _password_reset_tokens[t]
+
+    # Build reset URL
+    host = request.headers.get("host", "localhost:8000")
+    scheme = "https" if "localhost" not in host else "http"
+    reset_url = f"{scheme}://{host}/reset-password?token={token}"
+
+    try:
+        from utils.notifier import send_platform_email
+        body = f"""
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:24px;border-radius:12px 12px 0 0;">
+                <h2 style="color:#fff;margin:0;">Password Reset Request</h2>
+            </div>
+            <div style="background:#fff;padding:24px;border:1px solid #e2e8f0;border-radius:0 0 12px 12px;">
+                <p style="color:#334155;">Hi <strong>{admin.first_name}</strong>,</p>
+                <p style="color:#334155;">A password reset was requested for your account. Click the button below to set a new password:</p>
+                <div style="text-align:center;margin:24px 0;">
+                    <a href="{reset_url}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;">Reset My Password</a>
+                </div>
+                <p style="color:#64748b;font-size:0.85rem;">Or copy and paste this link in your browser:</p>
+                <p style="word-break:break-all;background:#f1f5f9;padding:10px;border-radius:6px;font-size:0.78rem;color:#6366f1;">{reset_url}</p>
+                <p style="color:#ef4444;font-size:0.82rem;font-weight:600;"><i>This link expires in 24 hours.</i></p>
+                <p style="color:#94a3b8;font-size:0.78rem;">If you did not request this, please ignore this email.</p>
+            </div>
+            <p style="color:#94a3b8;font-size:0.75rem;text-align:center;margin-top:12px;">VedaSchoolPro</p>
+        </div>"""
+        result = await send_platform_email(db, admin.email, "Password Reset Link — VedaSchoolPro", body)
+        if result.get("status") == "sent":
+            return {"success": True, "message": f"Reset link sent to {admin.email}"}
+        else:
+            return {"error": result.get("reason", "Failed to send email. Check SMTP settings.")}
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Reset link email failed: {e}")
+        return {"error": f"Email sending failed: {str(e)}"}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -900,3 +1074,191 @@ async def send_email_to_admin(request: Request, db: AsyncSession = Depends(get_d
     # TODO: Implement actual email sending via SMTP/Brevo
     # For now, return success placeholder
     return {"error": "Email service not configured yet. Configure SMTP in Settings → Email."}
+
+
+# ═══════════════════════════════════════════════════════════
+# PLATFORM SETTINGS — Save / Load (single-row JSON config)
+# ═══════════════════════════════════════════════════════════
+
+@router.post("/platform-settings")
+async def save_platform_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    """Save platform-wide settings (SMTP, SMS, general, storage, defaults, security)."""
+    user = await verify_super_admin(request)
+    data = await request.json()
+    section = data.get("_section", "general")  # which tab is saving
+
+    from models.branch import PlatformConfig
+    result = await db.execute(select(PlatformConfig))
+    config = result.scalar_one_or_none()
+    if not config:
+        config = PlatformConfig(config={})
+        db.add(config)
+
+    existing = dict(config.config or {})
+
+    # Merge new data — skip masked passwords
+    for key, value in data.items():
+        if key == "_section":
+            continue
+        if isinstance(value, str) and "••••" in value:
+            continue  # keep existing password
+        existing[key] = value
+
+    config.config = existing
+    await db.commit()
+    return {"success": True, "message": f"{section.capitalize()} settings saved!"}
+
+
+@router.get("/platform-settings")
+async def load_platform_settings(request: Request, db: AsyncSession = Depends(get_db)):
+    """Load platform-wide settings."""
+    user = await verify_super_admin(request)
+    from models.branch import PlatformConfig
+    result = await db.execute(select(PlatformConfig))
+    config = result.scalar_one_or_none()
+    if not config:
+        return {"config": {}}
+
+    # Mask sensitive fields
+    safe = dict(config.config or {})
+    for key in list(safe.keys()):
+        if "password" in key or "secret" in key or "api_key" in key:
+            if safe[key]:
+                safe[key] = "••••••••"
+    return {"config": safe}
+
+
+# ═══════════════════════════════════════════════════════════
+# SCHOOL ADMIN — Edit / Update / Photo / Logs
+# ═══════════════════════════════════════════════════════════
+
+@router.put("/admins/{admin_id}")
+async def update_admin(request: Request, admin_id: str, db: AsyncSession = Depends(get_db)):
+    """Update school admin details (name, email, phone, designation)."""
+    user = await verify_super_admin(request)
+    data = await request.json()
+
+    admin = await db.scalar(select(User).where(User.id == uuid.UUID(admin_id)))
+    if not admin:
+        return {"error": "Admin not found"}
+
+    # Update basic fields
+    if data.get("first_name"):
+        admin.first_name = data["first_name"]
+    if "last_name" in data:
+        admin.last_name = data["last_name"] or ""
+    if data.get("email"):
+        # Check uniqueness
+        existing = await db.scalar(
+            select(User).where(User.email == data["email"], User.id != admin.id)
+        )
+        if existing:
+            return {"error": f"Email '{data['email']}' is already registered to another user"}
+        admin.email = data["email"]
+    if "phone" in data:
+        if data["phone"]:
+            existing = await db.scalar(
+                select(User).where(User.phone == data["phone"], User.id != admin.id)
+            )
+            if existing:
+                return {"error": f"Phone '{data['phone']}' is already registered to another user"}
+        admin.phone = data["phone"]
+    if "designation" in data:
+        admin.designation = data["designation"]
+
+    await db.commit()
+    return {"success": True, "message": f"Admin {admin.first_name} updated"}
+
+
+@router.post("/admins/{admin_id}/photo")
+async def upload_admin_photo(request: Request, admin_id: str, db: AsyncSession = Depends(get_db)):
+    """Upload/update a school admin's photo."""
+    user = await verify_super_admin(request)
+    from fastapi import UploadFile
+    import os
+
+    admin = await db.scalar(select(User).where(User.id == uuid.UUID(admin_id)))
+    if not admin:
+        return {"error": "Admin not found"}
+
+    form = await request.form()
+    photo = form.get("photo")
+    if not photo:
+        return {"error": "No photo file provided"}
+
+    # Validate file type
+    filename = getattr(photo, 'filename', '') or ''
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ('.jpg', '.jpeg', '.png', '.webp'):
+        return {"error": "Only JPG, PNG, WEBP images allowed"}
+
+    # Read file content
+    content = await photo.read()
+    if len(content) > 5 * 1024 * 1024:  # 5MB limit
+        return {"error": "Photo must be under 5MB"}
+
+    # Save to static/uploads/avatars/
+    upload_dir = os.path.join("static", "uploads", "avatars")
+    os.makedirs(upload_dir, exist_ok=True)
+    safe_name = f"admin_{admin_id}{ext}"
+    file_path = os.path.join(upload_dir, safe_name)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    admin.avatar_url = f"/static/uploads/avatars/{safe_name}"
+    await db.commit()
+    return {"success": True, "message": "Photo updated", "url": admin.avatar_url}
+
+
+@router.get("/admins/{admin_id}")
+async def get_admin_detail(request: Request, admin_id: str, db: AsyncSession = Depends(get_db)):
+    """Get detailed admin info including login logs."""
+    user = await verify_super_admin(request)
+    from sqlalchemy.orm import selectinload
+
+    admin = await db.scalar(
+        select(User).where(User.id == uuid.UUID(admin_id)).options(selectinload(User.branch))
+    )
+    if not admin:
+        return {"error": "Admin not found"}
+
+    # Get recent login attempts for this admin
+    login_logs = []
+    try:
+        from models.login_security import LoginAttempt
+        attempts = (await db.execute(
+            select(LoginAttempt)
+            .where(LoginAttempt.email == admin.email)
+            .order_by(LoginAttempt.created_at.desc())
+            .limit(20)
+        )).scalars().all()
+        login_logs = [{
+            "time": a.created_at.strftime("%d %b %Y %H:%M") if a.created_at else "",
+            "ip": a.ip_address or "",
+            "browser": a.browser or "",
+            "os": a.os or "",
+            "device": a.device or "",
+            "success": a.success,
+            "reason": a.failure_reason or "",
+        } for a in attempts]
+    except Exception:
+        pass
+
+    return {
+        "admin": {
+            "id": str(admin.id),
+            "first_name": admin.first_name,
+            "last_name": admin.last_name or "",
+            "email": admin.email or "",
+            "phone": admin.phone or "",
+            "designation": admin.designation or "",
+            "avatar_url": admin.avatar_url or "",
+            "is_active": admin.is_active,
+            "is_first_admin": admin.is_first_admin,
+            "branch_name": admin.branch.name if admin.branch else "",
+            "branch_id": str(admin.branch_id) if admin.branch_id else "",
+            "last_login": admin.last_login.strftime("%d %b %Y %H:%M") if admin.last_login else "Never",
+            "created_at": admin.created_at.strftime("%d %b %Y") if admin.created_at else "",
+        },
+        "login_logs": login_logs,
+    }

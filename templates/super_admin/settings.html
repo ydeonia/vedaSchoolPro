@@ -31,6 +31,8 @@
 .about-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
 .about-item{padding:12px;border-radius:10px;background:var(--bg,#f8fafc);}
 .about-item .lbl{font-size:0.58rem;text-transform:uppercase;font-weight:800;color:var(--text-light);}.about-item .val{font-size:0.88rem;font-weight:900;margin-top:2px;}
+.saved-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.58rem;font-weight:800;background:#D1FAE5;color:#065F46;margin-left:8px;opacity:0;transition:opacity 0.3s;}
+.saved-badge.show{opacity:1;}
 @media(max-width:768px){.set-row{grid-template-columns:1fr;}}
 </style>
 {% endblock %}
@@ -55,10 +57,10 @@
             <div class="set-field"><label>Version</label><input id="sVersion" value="{{ app_version or '1.0.0' }}" disabled style="opacity:0.6;"></div>
         </div>
         <div class="set-row">
-            <div class="set-field"><label>Support Email</label><input id="sSupportEmail" value="{{ support_email or '' }}" placeholder="support@eduflow.in"></div>
-            <div class="set-field"><label>Support Phone</label><input id="sSupportPhone" value="{{ support_phone or '' }}" placeholder="+91 9876543210"></div>
+            <div class="set-field"><label>Support Email</label><input id="sSupportEmail" value="" placeholder="support@eduflow.in"></div>
+            <div class="set-field"><label>Support Phone</label><input id="sSupportPhone" value="" placeholder="+91 9876543210"></div>
         </div>
-        <div class="set-field"><label>Platform URL</label><input id="sUrl" value="{{ platform_url or '' }}" placeholder="https://app.eduflow.in"></div>
+        <div class="set-field"><label>Platform URL</label><input id="sUrl" value="" placeholder="https://app.eduflow.in"></div>
     </div>
 
     <div class="set-section">
@@ -78,23 +80,23 @@
     <div class="set-section">
         <h3>🔐 Authentication</h3>
         <p>Configure login security and session policies</p>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Two-Factor Authentication (2FA)</h4><p>Require 2FA for all super admin logins</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Force Password Reset on First Login</h4><p>New school admins must change their temporary password</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Session Timeout</h4><p>Auto-logout after inactivity</p></div><select style="width:120px;padding:6px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;background:var(--bg-card);color:var(--text);"><option>30 minutes</option><option selected>2 hours</option><option>8 hours</option><option>24 hours</option></select></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Two-Factor Authentication (2FA)</h4><p>Require 2FA for all super admin logins</p></div><div class="toggle-sw" id="sSec2fa" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Force Password Reset on First Login</h4><p>New school admins must change their temporary password</p></div><div class="toggle-sw on" id="sSecForceReset" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Session Timeout</h4><p>Auto-logout after inactivity</p></div><select id="sSecTimeout" style="width:120px;padding:6px;border-radius:8px;border:1.5px solid var(--border);font-size:0.78rem;background:var(--bg-card);color:var(--text);"><option value="30">30 minutes</option><option value="120" selected>2 hours</option><option value="480">8 hours</option><option value="1440">24 hours</option></select></div>
     </div>
     <div class="set-section">
         <h3>🛡️ Password Policy</h3>
         <div class="set-row">
-            <div class="set-field"><label>Minimum Length</label><select><option>6</option><option selected>8</option><option>10</option><option>12</option></select></div>
-            <div class="set-field"><label>Password Expiry</label><select><option>Never</option><option selected>90 days</option><option>60 days</option><option>30 days</option></select></div>
+            <div class="set-field"><label>Minimum Length</label><select id="sSecMinLen"><option value="6">6</option><option value="8" selected>8</option><option value="10">10</option><option value="12">12</option></select></div>
+            <div class="set-field"><label>Password Expiry</label><select id="sSecExpiry"><option value="never">Never</option><option value="90" selected>90 days</option><option value="60">60 days</option><option value="30">30 days</option></select></div>
         </div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Require Uppercase + Numbers</h4><p>Passwords must contain at least one uppercase letter and one number</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Block Common Passwords</h4><p>Reject passwords like "password123", "admin@123" etc.</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Require Uppercase + Numbers</h4><p>Passwords must contain at least one uppercase letter and one number</p></div><div class="toggle-sw on" id="sSecUpperNum" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Block Common Passwords</h4><p>Reject passwords like "password123", "admin@123" etc.</p></div><div class="toggle-sw on" id="sSecBlockCommon" onclick="this.classList.toggle('on')"></div></div>
     </div>
     <div class="set-section">
         <h3>📋 IP Restrictions</h3>
         <p>Whitelist IP addresses for super admin access (leave blank to allow all)</p>
-        <div class="set-field"><label>Allowed IPs (one per line)</label><textarea placeholder="e.g. 203.0.113.50&#10;192.168.1.0/24"></textarea></div>
+        <div class="set-field"><label>Allowed IPs (one per line)</label><textarea id="sSecAllowedIPs" placeholder="e.g. 203.0.113.50&#10;192.168.1.0/24"></textarea></div>
     </div>
     <button class="set-btn set-btn-primary" onclick="saveSettings('security')"><i class="fas fa-save"></i> Save Security Settings</button>
 </div>
@@ -105,25 +107,27 @@
         <h3>📧 Email Configuration (SMTP)</h3>
         <p>Used for sending password resets, notifications, and reports</p>
         <div class="set-row">
-            <div class="set-field"><label>SMTP Host</label><input placeholder="smtp-relay.brevo.com"></div>
-            <div class="set-field"><label>SMTP Port</label><input placeholder="587"></div>
+            <div class="set-field"><label>SMTP Host</label><input id="sSmtpHost" placeholder="smtp-relay.brevo.com"></div>
+            <div class="set-field"><label>SMTP Port</label><input id="sSmtpPort" type="number" placeholder="587"></div>
         </div>
         <div class="set-row">
-            <div class="set-field"><label>Username / API Key</label><input placeholder="your-smtp-username"></div>
-            <div class="set-field"><label>Password</label><input type="password" placeholder="••••••••"></div>
+            <div class="set-field"><label>Username / API Key</label><input id="sSmtpUser" placeholder="your-smtp-username"></div>
+            <div class="set-field"><label>Password</label><input id="sSmtpPass" type="password" placeholder="••••••••"></div>
         </div>
-        <div class="set-field"><label>From Email</label><input placeholder="noreply@eduflow.in"></div>
-        <div class="set-field"><label>From Name</label><input placeholder="EduFlow Notifications"></div>
-        <button class="set-btn set-btn-outline" onclick="showToast('info','Test email sent!')"><i class="fas fa-paper-plane"></i> Send Test Email</button>
+        <div class="set-row">
+            <div class="set-field"><label>From Email</label><input id="sFromEmail" placeholder="noreply@eduflow.in"></div>
+            <div class="set-field"><label>From Name</label><input id="sFromName" placeholder="EduFlow Notifications"></div>
+        </div>
+        <button class="set-btn set-btn-outline" onclick="testSmtp()"><i class="fas fa-paper-plane"></i> Send Test Email</button>
     </div>
     <div class="set-section">
         <h3>📱 SMS Configuration</h3>
         <p>SMS gateway for OTP, attendance alerts, and fee reminders</p>
         <div class="set-row">
-            <div class="set-field"><label>SMS Provider</label><select><option value="">— Select Provider —</option><option>MSG91</option><option>Textlocal</option><option>Twilio</option><option>Custom API</option></select></div>
-            <div class="set-field"><label>API Key</label><input type="password" placeholder="Your SMS API key"></div>
+            <div class="set-field"><label>SMS Provider</label><select id="sSmsProvider"><option value="">— Select Provider —</option><option value="msgclub">MsgClub</option><option value="msg91">MSG91</option><option value="textlocal">Textlocal</option><option value="twilio">Twilio</option></select></div>
+            <div class="set-field"><label>API Key</label><input id="sSmsApiKey" type="password" placeholder="Your SMS API key"></div>
         </div>
-        <div class="set-field"><label>Sender ID</label><input placeholder="EDUFLW" maxlength="6"></div>
+        <div class="set-field"><label>Sender ID</label><input id="sSmsSenderId" placeholder="EDUFLW" maxlength="6"></div>
         <div class="info-banner info-yellow"><i class="fas fa-exclamation-triangle"></i> SMS credits are per-plan. Schools on Starter get 100/month, Growth gets 500/month.</div>
     </div>
     <button class="set-btn set-btn-primary" onclick="saveSettings('email')"><i class="fas fa-save"></i> Save Email & SMS Settings</button>
@@ -134,20 +138,20 @@
     <div class="set-section">
         <h3>💾 File Storage</h3>
         <p>Where student documents, photos, and reports are stored</p>
-        <div class="set-field"><label>Storage Provider</label><select><option selected>Local (Server Disk)</option><option>AWS S3</option><option>Google Cloud Storage</option><option>Azure Blob</option></select></div>
+        <div class="set-field"><label>Storage Provider</label><select id="sStorageProvider"><option value="local" selected>Local (Server Disk)</option><option value="s3">AWS S3</option><option value="gcs">Google Cloud Storage</option><option value="azure">Azure Blob</option></select></div>
         <div class="set-row">
-            <div class="set-field"><label>Max File Size (MB)</label><input type="number" value="10"></div>
-            <div class="set-field"><label>Allowed Extensions</label><input value="pdf,jpg,png,docx,xlsx"></div>
+            <div class="set-field"><label>Max File Size (MB)</label><input id="sMaxFileSize" type="number" value="10"></div>
+            <div class="set-field"><label>Allowed Extensions</label><input id="sAllowedExt" value="pdf,jpg,png,docx,xlsx"></div>
         </div>
     </div>
     <div class="set-section">
         <h3>🔄 Backup Configuration</h3>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Automatic Backups</h4><p>Backup database and files on schedule</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Automatic Backups</h4><p>Backup database and files on schedule</p></div><div class="toggle-sw on" id="sAutoBackup" onclick="this.classList.toggle('on')"></div></div>
         <div class="set-row">
-            <div class="set-field"><label>Backup Frequency</label><select><option selected>Daily at 2 AM</option><option>Every 12 hours</option><option>Weekly (Sunday)</option></select></div>
-            <div class="set-field"><label>Retention (days)</label><input type="number" value="30"></div>
+            <div class="set-field"><label>Backup Frequency</label><select id="sBackupFreq"><option value="daily" selected>Daily at 2 AM</option><option value="12h">Every 12 hours</option><option value="weekly">Weekly (Sunday)</option></select></div>
+            <div class="set-field"><label>Retention (days)</label><input id="sBackupRetention" type="number" value="30"></div>
         </div>
-        <div class="set-field"><label>Backup Location</label><input placeholder="/backups or s3://my-bucket/backups"></div>
+        <div class="set-field"><label>Backup Location</label><input id="sBackupPath" placeholder="/backups or s3://my-bucket/backups"></div>
         <button class="set-btn set-btn-outline" onclick="showToast('info','Backup triggered!')"><i class="fas fa-download"></i> Backup Now</button>
     </div>
     <button class="set-btn set-btn-primary" onclick="saveSettings('storage')"><i class="fas fa-save"></i> Save Storage Settings</button>
@@ -159,16 +163,16 @@
         <h3>🏫 Default School Settings</h3>
         <p>Applied to every new school created on the platform</p>
         <div class="set-row">
-            <div class="set-field"><label>Default Academic Year</label><input value="2025-26"></div>
-            <div class="set-field"><label>Default Board</label><select><option selected>CBSE</option><option>ICSE</option><option>State Board</option></select></div>
+            <div class="set-field"><label>Default Academic Year</label><input id="sDefAcYear" value="2025-26"></div>
+            <div class="set-field"><label>Default Board</label><select id="sDefBoard"><option value="cbse" selected>CBSE</option><option value="icse">ICSE</option><option value="state">State Board</option></select></div>
         </div>
         <div class="set-row">
-            <div class="set-field"><label>Trial Duration (days)</label><input type="number" value="14"></div>
-            <div class="set-field"><label>Grace Period After Expiry (days)</label><input type="number" value="7"></div>
+            <div class="set-field"><label>Trial Duration (days)</label><input id="sTrialDays" type="number" value="14"></div>
+            <div class="set-field"><label>Grace Period After Expiry (days)</label><input id="sGraceDays" type="number" value="7"></div>
         </div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Auto-Create Sample Data</h4><p>Create demo classes, sections when a new school signs up</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Parent App by Default</h4><p>Allow parents to access their child's data from day one</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Teacher App by Default</h4><p>Allow teachers to mark attendance, enter marks from mobile</p></div><div class="toggle-sw on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Auto-Create Sample Data</h4><p>Create demo classes, sections when a new school signs up</p></div><div class="toggle-sw" id="sDefSampleData" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Parent App by Default</h4><p>Allow parents to access their child's data from day one</p></div><div class="toggle-sw on" id="sDefParentApp" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Teacher App by Default</h4><p>Allow teachers to mark attendance, enter marks from mobile</p></div><div class="toggle-sw on" id="sDefTeacherApp" onclick="this.classList.toggle('on')"></div></div>
     </div>
     <button class="set-btn set-btn-primary" onclick="saveSettings('defaults')"><i class="fas fa-save"></i> Save Default Settings</button>
 </div>
@@ -178,8 +182,8 @@
     <div class="set-section">
         <h3>🔧 Maintenance Mode</h3>
         <p>When enabled, only super admins can access the platform</p>
-        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Maintenance Mode</h4><p>Shows "Under Maintenance" page to all non-super-admin users</p></div><div class="toggle-sw" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-field"><label>Maintenance Message</label><textarea placeholder="We're upgrading our systems. Back in 30 minutes!"></textarea></div>
+        <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Maintenance Mode</h4><p>Shows "Under Maintenance" page to all non-super-admin users</p></div><div class="toggle-sw" id="sMaintMode" onclick="this.classList.toggle('on')"></div></div>
+        <div class="set-field"><label>Maintenance Message</label><textarea id="sMaintMsg" placeholder="We're upgrading our systems. Back in 30 minutes!"></textarea></div>
     </div>
     <div class="set-section">
         <h3>🗑️ Data Management</h3>
@@ -217,7 +221,7 @@
     </div>
     <div class="set-section">
         <h3>📋 License</h3>
-        <p>EduFlow — School Management System<br>© {{ "2026" }} All rights reserved.<br>Licensed to: {{ user.first_name }} {{ user.last_name or '' }} ({{ user.email }})</p>
+        <p>EduFlow — School Management System<br>&copy; {{ "2026" }} All rights reserved.<br>Licensed to: {{ user.first_name }} {{ user.last_name or '' }} ({{ user.email }})</p>
     </div>
 </div>
 {% endblock %}
@@ -229,8 +233,140 @@ function switchTab(el,panel){
     el.classList.add('active');
     document.getElementById('panel-'+panel).classList.add('active');
 }
-function saveSettings(section){
-    showToast('success',section.charAt(0).toUpperCase()+section.slice(1)+' settings saved!');
+
+/* ── Collect form data per section ── */
+function collectSection(section){
+    const data = {_section: section};
+    if(section === 'general'){
+        data.platform_name = v('sAppName');
+        data.support_email = v('sSupportEmail');
+        data.support_phone = v('sSupportPhone');
+        data.platform_url = v('sUrl');
+        data.timezone = v('sTimezone');
+        data.currency = v('sCurrency');
+        data.date_format = v('sDateFmt');
+    } else if(section === 'security'){
+        data.sec_2fa = tog('sSec2fa');
+        data.sec_force_reset = tog('sSecForceReset');
+        data.sec_timeout = v('sSecTimeout');
+        data.sec_min_length = v('sSecMinLen');
+        data.sec_expiry = v('sSecExpiry');
+        data.sec_upper_num = tog('sSecUpperNum');
+        data.sec_block_common = tog('sSecBlockCommon');
+        data.sec_allowed_ips = v('sSecAllowedIPs');
+    } else if(section === 'email'){
+        data.smtp_host = v('sSmtpHost');
+        data.smtp_port = parseInt(v('sSmtpPort')) || 587;
+        data.smtp_username = v('sSmtpUser');
+        data.smtp_password = v('sSmtpPass');
+        data.from_email = v('sFromEmail');
+        data.from_name = v('sFromName');
+        data.sms_provider = v('sSmsProvider');
+        data.sms_api_key = v('sSmsApiKey');
+        data.sms_sender_id = v('sSmsSenderId');
+    } else if(section === 'storage'){
+        data.storage_provider = v('sStorageProvider');
+        data.max_file_size = parseInt(v('sMaxFileSize')) || 10;
+        data.allowed_extensions = v('sAllowedExt');
+        data.auto_backup = tog('sAutoBackup');
+        data.backup_frequency = v('sBackupFreq');
+        data.backup_retention = parseInt(v('sBackupRetention')) || 30;
+        data.backup_path = v('sBackupPath');
+    } else if(section === 'defaults'){
+        data.default_academic_year = v('sDefAcYear');
+        data.default_board = v('sDefBoard');
+        data.trial_days = parseInt(v('sTrialDays')) || 14;
+        data.grace_days = parseInt(v('sGraceDays')) || 7;
+        data.default_sample_data = tog('sDefSampleData');
+        data.default_parent_app = tog('sDefParentApp');
+        data.default_teacher_app = tog('sDefTeacherApp');
+    }
+    return data;
 }
+
+function v(id){ var el=document.getElementById(id); return el ? el.value : ''; }
+function tog(id){ var el=document.getElementById(id); return el ? el.classList.contains('on') : false; }
+
+/* ── Save settings ── */
+async function saveSettings(section){
+    const data = collectSection(section);
+    try {
+        const r = await apiCall('/api/super-admin/platform-settings', 'POST', data);
+        if(r.success) showToast('success', r.message || (section.charAt(0).toUpperCase()+section.slice(1)+' settings saved!'));
+        else showToast('error', r.error || 'Save failed');
+    } catch(e){
+        showToast('error','Network error — could not save');
+    }
+}
+
+/* ── Load settings on page open ── */
+async function loadSettings(){
+    try {
+        const r = await apiCall('/api/super-admin/platform-settings', 'GET');
+        if(!r.config) return;
+        const c = r.config;
+        // General
+        if(c.platform_name) document.getElementById('sAppName').value = c.platform_name;
+        if(c.support_email) document.getElementById('sSupportEmail').value = c.support_email;
+        if(c.support_phone) document.getElementById('sSupportPhone').value = c.support_phone;
+        if(c.platform_url) document.getElementById('sUrl').value = c.platform_url;
+        if(c.timezone) document.getElementById('sTimezone').value = c.timezone;
+        if(c.currency) document.getElementById('sCurrency').value = c.currency;
+        if(c.date_format) document.getElementById('sDateFmt').value = c.date_format;
+        // Security
+        setTog('sSec2fa', c.sec_2fa);
+        setTog('sSecForceReset', c.sec_force_reset !== false);
+        if(c.sec_timeout) document.getElementById('sSecTimeout').value = c.sec_timeout;
+        if(c.sec_min_length) document.getElementById('sSecMinLen').value = c.sec_min_length;
+        if(c.sec_expiry) document.getElementById('sSecExpiry').value = c.sec_expiry;
+        setTog('sSecUpperNum', c.sec_upper_num !== false);
+        setTog('sSecBlockCommon', c.sec_block_common !== false);
+        if(c.sec_allowed_ips) document.getElementById('sSecAllowedIPs').value = c.sec_allowed_ips;
+        // Email & SMS
+        if(c.smtp_host) document.getElementById('sSmtpHost').value = c.smtp_host;
+        if(c.smtp_port) document.getElementById('sSmtpPort').value = c.smtp_port;
+        if(c.smtp_username) document.getElementById('sSmtpUser').value = c.smtp_username;
+        if(c.smtp_password) document.getElementById('sSmtpPass').value = c.smtp_password;
+        if(c.from_email) document.getElementById('sFromEmail').value = c.from_email;
+        if(c.from_name) document.getElementById('sFromName').value = c.from_name;
+        if(c.sms_provider) document.getElementById('sSmsProvider').value = c.sms_provider;
+        if(c.sms_api_key) document.getElementById('sSmsApiKey').value = c.sms_api_key;
+        if(c.sms_sender_id) document.getElementById('sSmsSenderId').value = c.sms_sender_id;
+        // Storage
+        if(c.storage_provider) document.getElementById('sStorageProvider').value = c.storage_provider;
+        if(c.max_file_size) document.getElementById('sMaxFileSize').value = c.max_file_size;
+        if(c.allowed_extensions) document.getElementById('sAllowedExt').value = c.allowed_extensions;
+        setTog('sAutoBackup', c.auto_backup !== false);
+        if(c.backup_frequency) document.getElementById('sBackupFreq').value = c.backup_frequency;
+        if(c.backup_retention) document.getElementById('sBackupRetention').value = c.backup_retention;
+        if(c.backup_path) document.getElementById('sBackupPath').value = c.backup_path;
+        // Defaults
+        if(c.default_academic_year) document.getElementById('sDefAcYear').value = c.default_academic_year;
+        if(c.default_board) document.getElementById('sDefBoard').value = c.default_board;
+        if(c.trial_days) document.getElementById('sTrialDays').value = c.trial_days;
+        if(c.grace_days) document.getElementById('sGraceDays').value = c.grace_days;
+        setTog('sDefSampleData', c.default_sample_data);
+        setTog('sDefParentApp', c.default_parent_app !== false);
+        setTog('sDefTeacherApp', c.default_teacher_app !== false);
+        // Maintenance
+        setTog('sMaintMode', c.maintenance_mode);
+        if(c.maintenance_message) document.getElementById('sMaintMsg').value = c.maintenance_message;
+    } catch(e){
+        console.warn('Could not load settings', e);
+    }
+}
+
+function setTog(id, val){
+    var el = document.getElementById(id);
+    if(!el) return;
+    if(val) el.classList.add('on'); else el.classList.remove('on');
+}
+
+function testSmtp(){
+    showToast('info','Test email sending... (SMTP not yet implemented)');
+}
+
+// Auto-load on page open
+loadSettings();
 </script>
 {% endblock %}

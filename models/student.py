@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text, Enum as SAEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, Date, ForeignKey, Text, Enum as SAEnum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database import Base
@@ -25,6 +25,10 @@ class AdmissionStatus(str, enum.Enum):
 
 class Student(Base):
     __tablename__ = "students"
+    __table_args__ = (
+        UniqueConstraint("branch_id", "admission_number", name="uq_student_branch_admission"),
+        UniqueConstraint("branch_id", "roll_number", "class_id", "section_id", name="uq_student_roll_class_section"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, unique=True)
@@ -35,6 +39,7 @@ class Student(Base):
 
     # Admission details
     admission_number = Column(String(50), nullable=True, index=True)
+    student_login_id = Column(String(50), unique=True, nullable=True, index=True)
     admission_date = Column(Date, nullable=True)
     admission_status = Column(SAEnum(AdmissionStatus), default=AdmissionStatus.ADMITTED)
     roll_number = Column(String(20), nullable=True)
@@ -53,6 +58,9 @@ class Student(Base):
     father_phone = Column(String(15), nullable=True)
     father_email = Column(String(255), nullable=True)
     father_occupation = Column(String(100), nullable=True)
+    father_qualification = Column(String(100), nullable=True)
+    mother_qualification = Column(String(100), nullable=True)
+    mother_occupation = Column(String(100), nullable=True)
     mother_name = Column(String(200), nullable=True)
     mother_phone = Column(String(15), nullable=True)
     mother_email = Column(String(255), nullable=True)
@@ -72,6 +80,16 @@ class Student(Base):
     # Medical
     medical_conditions = Column(Text, nullable=True)
     emergency_contact = Column(String(15), nullable=True)
+
+    religion = Column(String(50), nullable=True)
+    category = Column(String(50), nullable=True)
+    nationality = Column(String(100), default="Indian")
+    admission_type = Column(String(50), default="new")
+    previous_school = Column(String(255), nullable=True)
+    previous_board = Column(String(50), nullable=True)
+    previous_class = Column(String(50), nullable=True)
+    father_aadhaar = Column(String(12), nullable=True)
+    mother_aadhaar = Column(String(12), nullable=True)
 
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())

@@ -47,6 +47,7 @@ class Section(Base):
     name = Column(String(10), nullable=False)  # "A", "B", "C"
     max_students = Column(Integer, default=40)
     is_active = Column(Boolean, default=True)
+    class_teacher_id = Column(UUID(as_uuid=True), ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
 
     class_ = relationship("Class", back_populates="sections")
     students = relationship("Student", back_populates="section")

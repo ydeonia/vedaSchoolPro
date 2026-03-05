@@ -1844,3 +1844,534 @@ input, select, textarea {
     background: var(--bg-card) !important;
     color: var(--text) !important;
 }
+
+/* ============================================================
+   DARK MODE — Comprehensive Fix (All Pages)
+   ============================================================ */
+
+/* ── Universal Card Backgrounds ── */
+[data-theme="dark"] .chart-card,
+[data-theme="dark"] .kpi-card,
+[data-theme="dark"] .promo-steps,
+[data-theme="dark"] .config-card,
+[data-theme="dark"] .summary-bar,
+[data-theme="dark"] .scan-card,
+[data-theme="dark"] .log-card,
+[data-theme="dark"] .exam-card,
+[data-theme="dark"] .res-tabs,
+[data-theme="dark"] .rs-card,
+[data-theme="dark"] .entry-card,
+[data-theme="dark"] .result-list,
+[data-theme="dark"] .act-tabs,
+[data-theme="dark"] .event-card,
+[data-theme="dark"] .create-card,
+[data-theme="dark"] .ec-btn,
+[data-theme="dark"] .live-card,
+[data-theme="dark"] .cmd-card,
+[data-theme="dark"] .sr-card,
+[data-theme="dark"] .notif-item,
+[data-theme="dark"] .filter-card,
+[data-theme="dark"] .stats-card,
+[data-theme="dark"] .brief-card,
+[data-theme="dark"] .act-card,
+[data-theme="dark"] .schedule-card,
+[data-theme="dark"] .cert-card,
+[data-theme="dark"] .lib-card,
+[data-theme="dark"] .msg-card,
+[data-theme="dark"] .hw-card,
+[data-theme="dark"] .quiz-card,
+[data-theme="dark"] .tt-card,
+[data-theme="dark"] .pay-card,
+[data-theme="dark"] .trans-card,
+[data-theme="dark"] .bus-card,
+[data-theme="dark"] .route-card,
+[data-theme="dark"] .veh-card,
+[data-theme="dark"] .leave-card,
+[data-theme="dark"] .sig-card,
+[data-theme="dark"] .award-card,
+[data-theme="dark"] .export-card,
+[data-theme="dark"] .don-card {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+/* ── Table Hover States ── */
+[data-theme="dark"] .stu-table tr:hover,
+[data-theme="dark"] .results-table tr:hover,
+[data-theme="dark"] .marks-table tr:hover,
+[data-theme="dark"] .student-fee-row:hover:not(.header),
+[data-theme="dark"] .data-table tbody tr:hover td,
+[data-theme="dark"] tr:hover > td {
+    background: var(--bg-secondary) !important;
+}
+
+/* ── Fail/Special Row Backgrounds ── */
+[data-theme="dark"] .results-table tr.fail-row,
+[data-theme="dark"] .marks-table tr.absent-row {
+    background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ── Input/Form Dark Mode ── */
+[data-theme="dark"] .marks-input {
+    background: var(--bg-secondary) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+[data-theme="dark"] .marks-input.pass {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: var(--success) !important;
+}
+[data-theme="dark"] .marks-input.fail {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: var(--danger) !important;
+}
+[data-theme="dark"] .marks-input:focus {
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.25) !important;
+}
+
+/* ── Status Badges & Pills (Colorful in dark mode!) ── */
+[data-theme="dark"] .action-chip.promoted,
+[data-theme="dark"] .rl-badge.pass,
+[data-theme="dark"] .log-status.present,
+[data-theme="dark"] .ls.green {
+    background: rgba(52, 211, 153, 0.2) !important;
+    color: #6EE7B7 !important;
+}
+[data-theme="dark"] .action-chip.detained,
+[data-theme="dark"] .rl-badge.fail,
+[data-theme="dark"] .ls.red {
+    background: rgba(248, 113, 113, 0.2) !important;
+    color: #FCA5A5 !important;
+}
+[data-theme="dark"] .action-chip.tc,
+[data-theme="dark"] .ls.blue {
+    background: rgba(96, 165, 250, 0.2) !important;
+    color: #93C5FD !important;
+}
+[data-theme="dark"] .rl-badge.comp {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #FDE68A !important;
+}
+
+/* ── Rank Badges ── */
+[data-theme="dark"] .rl-rank.gold,
+[data-theme="dark"] .rank-1 {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #FDE68A !important;
+}
+[data-theme="dark"] .rl-rank.silver,
+[data-theme="dark"] .rank-2 {
+    background: rgba(148, 163, 184, 0.2) !important;
+    color: #CBD5E1 !important;
+}
+[data-theme="dark"] .rl-rank.bronze,
+[data-theme="dark"] .rank-3 {
+    background: rgba(251, 146, 60, 0.2) !important;
+    color: #FDBA74 !important;
+}
+
+/* ── Grade Pills ── */
+[data-theme="dark"] .grade-B1,
+[data-theme="dark"] .grade-B2 {
+    background: rgba(96, 165, 250, 0.2) !important;
+    color: #93C5FD !important;
+}
+[data-theme="dark"] .grade-D {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #FDE68A !important;
+}
+
+/* ── Notification Center ── */
+[data-theme="dark"] .notif-item.unread {
+    background: rgba(129, 140, 248, 0.1) !important;
+    border-left-color: var(--primary) !important;
+}
+[data-theme="dark"] .notif-icon.attendance {
+    background: rgba(37, 99, 235, 0.2) !important;
+    color: #93C5FD !important;
+}
+[data-theme="dark"] .notif-icon.fee {
+    background: rgba(217, 119, 6, 0.2) !important;
+    color: #FDE68A !important;
+}
+[data-theme="dark"] .notif-icon.announcement {
+    background: rgba(124, 58, 237, 0.2) !important;
+    color: #C4B5FD !important;
+}
+[data-theme="dark"] .notif-icon.result {
+    background: rgba(5, 150, 105, 0.2) !important;
+    color: #6EE7B7 !important;
+}
+[data-theme="dark"] .notif-icon.alert {
+    background: rgba(220, 38, 38, 0.2) !important;
+    color: #FCA5A5 !important;
+}
+[data-theme="dark"] .notif-icon.message {
+    background: rgba(2, 132, 199, 0.2) !important;
+    color: #7DD3FC !important;
+}
+[data-theme="dark"] .notif-tab {
+    background: var(--bg-secondary) !important;
+    color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .notif-tab.active {
+    background: var(--primary) !important;
+    color: white !important;
+}
+
+/* ── Topper / Accent Gradient Cards ── */
+[data-theme="dark"] .topper-card {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.1)) !important;
+    border-color: rgba(251, 191, 36, 0.3) !important;
+    color: var(--text) !important;
+}
+
+/* ── Code Blocks ── */
+[data-theme="dark"] code {
+    background: var(--bg-secondary) !important;
+    color: var(--primary-light) !important;
+}
+
+/* ── Analytics Chart.js defaults ── */
+[data-theme="dark"] .gauge-ring::after {
+    background: var(--bg-card) !important;
+}
+
+/* ── QR Attendance ── */
+[data-theme="dark"] .scan-card,
+[data-theme="dark"] .log-card {
+    background: var(--bg-card) !important;
+}
+
+/* ── Activities Event Banner (keep colorful gradients) ── */
+[data-theme="dark"] .ec-banner.sports { background: linear-gradient(135deg, #059669, #10B981) !important; }
+[data-theme="dark"] .ec-banner.cultural { background: linear-gradient(135deg, #7C3AED, #A78BFA) !important; }
+[data-theme="dark"] .ec-banner.academic { background: linear-gradient(135deg, #2563EB, #60A5FA) !important; }
+[data-theme="dark"] .ec-banner.arts { background: linear-gradient(135deg, #D97706, #FBBF24) !important; }
+[data-theme="dark"] .ec-banner.tech { background: linear-gradient(135deg, #0891B2, #22D3EE) !important; }
+
+/* ── Attendance Card Gradients (softer in dark) ── */
+[data-theme="dark"] .att-card.present {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(52, 211, 153, 0.08)) !important;
+}
+[data-theme="dark"] .att-card.absent {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(248, 113, 113, 0.08)) !important;
+}
+[data-theme="dark"] .att-card.late {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(251, 191, 36, 0.08)) !important;
+}
+[data-theme="dark"] .att-card {
+    border-color: var(--border) !important;
+}
+
+/* ── Achievement Badges ── */
+[data-theme="dark"] .achievement-badge.gold {
+    background: rgba(245, 158, 11, 0.15) !important;
+    border-color: #F59E0B !important;
+    color: #FDE68A !important;
+}
+[data-theme="dark"] .achievement-badge.silver {
+    background: rgba(148, 163, 184, 0.15) !important;
+    border-color: #94A3B8 !important;
+    color: #CBD5E1 !important;
+}
+[data-theme="dark"] .achievement-badge.bronze {
+    background: rgba(217, 119, 6, 0.15) !important;
+    border-color: #D97706 !important;
+    color: #FDBA74 !important;
+}
+[data-theme="dark"] .achievement-badge.green {
+    background: rgba(16, 185, 129, 0.15) !important;
+    border-color: #10B981 !important;
+    color: #6EE7B7 !important;
+}
+
+/* ── Heatmap Cells ── */
+[data-theme="dark"] .hm-cell[style*="background:#F1F5F9"],
+[data-theme="dark"] .hm-cell[style*="background:#F3F4F6"] {
+    background: var(--bg-secondary) !important;
+}
+
+/* ── Milestone Bar ── */
+[data-theme="dark"] .milestone-bar {
+    background: linear-gradient(90deg, rgba(52, 211, 153, 0.15), rgba(96, 165, 250, 0.15)) !important;
+    color: #6EE7B7 !important;
+}
+
+/* ── Modals ── */
+[data-theme="dark"] .modal-box,
+[data-theme="dark"] .modal-content {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+/* ── Wizard Steps ── */
+[data-theme="dark"] .step-card,
+[data-theme="dark"] .wizard-step,
+[data-theme="dark"] .step-item {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+}
+
+/* ── Generic Inline White Backgrounds ── */
+[data-theme="dark"] [style*="background:white"],
+[data-theme="dark"] [style*="background: white"],
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background:#FFFFFF"],
+[data-theme="dark"] [style*="background: #FFFFFF"] {
+    background: var(--bg-card) !important;
+    color: var(--text) !important;
+}
+[data-theme="dark"] [style*="background:#F8FAFC"],
+[data-theme="dark"] [style*="background: #F8FAFC"],
+[data-theme="dark"] [style*="background:#F1F5F9"],
+[data-theme="dark"] [style*="background: #F1F5F9"],
+[data-theme="dark"] [style*="background:#FAFBFF"],
+[data-theme="dark"] [style*="background: #FAFBFF"],
+[data-theme="dark"] [style*="background:#F9FAFB"],
+[data-theme="dark"] [style*="background: #F9FAFB"] {
+    background: var(--bg-secondary) !important;
+}
+
+/* ── Generic Inline Dark Text ── */
+[data-theme="dark"] [style*="color:#1E293B"],
+[data-theme="dark"] [style*="color: #1E293B"],
+[data-theme="dark"] [style*="color:#333"],
+[data-theme="dark"] [style*="color: #333"],
+[data-theme="dark"] [style*="color:#374151"],
+[data-theme="dark"] [style*="color: #374151"] {
+    color: var(--text) !important;
+}
+
+/* ── Select/Dropdown ── */
+[data-theme="dark"] select option {
+    background: var(--bg-card);
+    color: var(--text);
+}
+
+/* ── Tabs (generic) ── */
+[data-theme="dark"] .tab,
+[data-theme="dark"] .tab-item,
+[data-theme="dark"] .tab-btn {
+    color: var(--text-secondary) !important;
+}
+[data-theme="dark"] .tab.active,
+[data-theme="dark"] .tab-item.active,
+[data-theme="dark"] .tab-btn.active {
+    color: var(--primary) !important;
+    border-color: var(--primary) !important;
+}
+
+/* ── Scrollbar (dark) ── */
+[data-theme="dark"] ::-webkit-scrollbar { width: 8px; height: 8px; }
+[data-theme="dark"] ::-webkit-scrollbar-track { background: var(--bg); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: var(--bg-secondary); border-radius: 4px; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ── Page-specific text colors ── */
+[data-theme="dark"] .page-title,
+[data-theme="dark"] .card-title,
+[data-theme="dark"] h1, [data-theme="dark"] h2,
+[data-theme="dark"] h3, [data-theme="dark"] h4 {
+    color: var(--text) !important;
+}
+[data-theme="dark"] .page-subtitle,
+[data-theme="dark"] .card-subtitle {
+    color: var(--text-secondary) !important;
+}
+
+/* ── Search bars ── */
+[data-theme="dark"] .search-input,
+[data-theme="dark"] .search-box,
+[data-theme="dark"] .search-bar input {
+    background: var(--bg-secondary) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+}
+
+/* ── Notification Panel (dropdown) ── */
+[data-theme="dark"] .notification-panel {
+    background: var(--bg-card) !important;
+    border-color: var(--border) !important;
+}
+[data-theme="dark"] .notif-header {
+    border-color: var(--border) !important;
+}
+
+/* ── Alert items ── */
+[data-theme="dark"] .alert-item.danger {
+    background: rgba(239, 68, 68, 0.12) !important;
+    color: #FCA5A5 !important;
+}
+[data-theme="dark"] .alert-item.warning {
+    background: rgba(245, 158, 11, 0.12) !important;
+    color: #FDE68A !important;
+}
+[data-theme="dark"] .alert-item.info {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: #93C5FD !important;
+}
+
+/* ── Predict / Info boxes ── */
+[data-theme="dark"] .predict-box {
+    background: rgba(245, 158, 11, 0.1) !important;
+    border-color: rgba(245, 158, 11, 0.25) !important;
+    color: var(--text) !important;
+}
+[data-theme="dark"] .info-box,
+[data-theme="dark"] .tip-box {
+    background: rgba(99, 102, 241, 0.1) !important;
+    border-color: rgba(99, 102, 241, 0.25) !important;
+    color: var(--text) !important;
+}
+
+/* ── Stat number colors stay vibrant ── */
+[data-theme="dark"] .kpi-val,
+[data-theme="dark"] .stat-val,
+[data-theme="dark"] .stat-number {
+    color: var(--text) !important;
+}
+
+/* ── Progress bars (stay colorful) ── */
+[data-theme="dark"] .progress-bar {
+    background: var(--bg-secondary) !important;
+}
+
+/* ── Fee Collection ── */
+[data-theme="dark"] .student-fee-row {
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+/* ── Transport pages ── */
+[data-theme="dark"] .bus-card,
+[data-theme="dark"] .route-card,
+[data-theme="dark"] .veh-card,
+[data-theme="dark"] .assign-card {
+    background: var(--bg-card) !important;
+    border-color: var(--border) !important;
+}
+
+/* ── Hostel ── */
+[data-theme="dark"] .room-pill {
+    background: var(--bg-secondary) !important;
+    color: var(--text) !important;
+}
+
+/* ── Promotion page ── */
+[data-theme="dark"] .stu-table th {
+    background: var(--bg-secondary) !important;
+    color: var(--text) !important;
+}
+
+/* ============================================================
+   ANIMATIONS — Beautiful micro-interactions
+   ============================================================ */
+
+/* Staggered card entrance */
+@keyframes cardEntrance {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card, .kpi-card, .chart-card, .event-card, .exam-card,
+.notif-item, .live-card, .cmd-card, .sr-card, .act-card {
+    animation: cardEntrance 0.4s ease backwards;
+}
+.card:nth-child(1), .notif-item:nth-child(1) { animation-delay: 0.03s; }
+.card:nth-child(2), .notif-item:nth-child(2) { animation-delay: 0.06s; }
+.card:nth-child(3), .notif-item:nth-child(3) { animation-delay: 0.09s; }
+.card:nth-child(4), .notif-item:nth-child(4) { animation-delay: 0.12s; }
+.card:nth-child(5), .notif-item:nth-child(5) { animation-delay: 0.15s; }
+.card:nth-child(6), .notif-item:nth-child(6) { animation-delay: 0.18s; }
+
+/* Smooth hover lift */
+.card:hover, .kpi-card:hover, .event-card:hover,
+.exam-card:hover, .live-card:hover, .cmd-card:hover,
+.notif-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Badge pulse for unread */
+@keyframes badgePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+.notification-badge {
+    animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* Button shimmer on hover */
+@keyframes btnShimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+}
+.btn-primary:hover, .btn:hover[style*="background:var(--primary)"] {
+    background-size: 200% auto;
+    animation: btnShimmer 1.5s linear infinite;
+}
+
+/* Smooth theme transition */
+*, *::before, *::after {
+    transition: background-color 0.3s ease, color 0.2s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+/* Exclude elements where transition causes jank */
+input, textarea, select, .sidebar, .topbar, canvas, video, img, svg, .fa, .fas, .far, .fab {
+    transition: none !important;
+}
+
+/* Tab switch animation */
+.notif-tab, .tab, .tab-item {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Notification item slide-in */
+@keyframes notifSlideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+.notif-item {
+    animation: notifSlideIn 0.3s ease backwards !important;
+}
+.notif-item:nth-child(1) { animation-delay: 0.02s !important; }
+.notif-item:nth-child(2) { animation-delay: 0.06s !important; }
+.notif-item:nth-child(3) { animation-delay: 0.10s !important; }
+.notif-item:nth-child(4) { animation-delay: 0.14s !important; }
+.notif-item:nth-child(5) { animation-delay: 0.18s !important; }
+
+/* KPI counter glow */
+@keyframes kpiGlow {
+    from { text-shadow: 0 0 4px rgba(79, 70, 229, 0.2); }
+    to { text-shadow: 0 0 12px rgba(79, 70, 229, 0.4); }
+}
+[data-theme="dark"] .kpi-val,
+[data-theme="dark"] .stat-val {
+    animation: kpiGlow 2s ease-in-out infinite alternate;
+}
+
+/* Colorful focus rings */
+input:focus, select:focus, textarea:focus {
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3) !important;
+    border-color: var(--primary) !important;
+    outline: none !important;
+    transition: box-shadow 0.2s ease !important;
+}
+
+/* Status dot pulse */
+@keyframes statusPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.status-dot.active, .online-dot {
+    animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Smooth page content entry */
+.page-content {
+    animation: cardEntrance 0.35s ease;
+}

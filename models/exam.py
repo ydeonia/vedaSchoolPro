@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, Date, ForeignKey, Integer, Float, Text, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, String, DateTime, Date, ForeignKey, Integer, Float, Text, Boolean, UniqueConstraint, CheckConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -16,6 +16,7 @@ class Exam(Base):
     description = Column(Text, nullable=True)
     start_date = Column(Date, nullable=True)
     end_date = Column(Date, nullable=True)
+    applicable_classes = Column(JSONB, nullable=True)  # [{"id": "uuid", "name": "Class 5"}, ...]
     is_published = Column(Boolean, default=False)  # results visible to students
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
 
@@ -25,6 +26,10 @@ class Exam(Base):
 
 class ExamSubject(Base):
     __tablename__ = "exam_subjects"
+    __table_args__ = (
+        UniqueConstraint("exam_id", "subject_id", "class_id", name="uq_exam_subject_class"),
+        CheckConstraint("passing_marks <= max_marks", name="ck_passing_lte_max"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     exam_id = Column(UUID(as_uuid=True), ForeignKey("exams.id"), nullable=False, index=True)
@@ -41,6 +46,9 @@ class ExamSubject(Base):
 
 class Marks(Base):
     __tablename__ = "marks"
+    __table_args__ = (
+        UniqueConstraint("exam_subject_id", "student_id", name="uq_marks_exam_student"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     exam_subject_id = Column(UUID(as_uuid=True), ForeignKey("exam_subjects.id"), nullable=False, index=True)

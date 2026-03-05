@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Boolean, DateTime, Text, Enum as SAEnum
+from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from database import Base
@@ -30,8 +30,8 @@ class Organization(Base):
     website = Column(String(255), nullable=True)
 
     plan_type = Column(SAEnum(PlanType), default=PlanType.BASIC)
-    max_branches = Column(String(10), default="1")
-    max_students = Column(String(10), default="500")
+    max_branches = Column(Integer, default=1)
+    max_students = Column(Integer, default=500)
 
     is_active = Column(Boolean, default=True)
     trial_ends_at = Column(DateTime, nullable=True)

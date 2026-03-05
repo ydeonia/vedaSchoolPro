@@ -37,6 +37,22 @@
 {% endblock %}
 {% block extra_js %}
 <script>
+async function loadCertStudents(){
+    const cls = document.getElementById('cClass').value;
+    const sel = document.getElementById('cStudent');
+    sel.innerHTML = '<option value="">Select Student</option>';
+    if(!cls) return;
+    try{
+        const data = await apiCall('/api/school/students?class_id=' + cls);
+        const students = data.students || data || [];
+        students.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = s.name || s.full_name || '';
+            sel.appendChild(opt);
+        });
+    }catch(e){ showToast('error','Failed to load students'); }
+}
 async function generateCert(){const d={student_id:document.getElementById('cStudent').value,cert_type:document.getElementById('cType').value,reason:document.getElementById('cReason').value,destination_school:document.getElementById('cDest').value};if(!d.student_id){showToast('error','Select a student');return;}const r=await apiCall('/api/school/certificates/generate','POST',d);showToast('success','Certificate Generated',r.number);setTimeout(()=>location.reload(),1000);}
 </script>
 {% endblock %}

@@ -5,11 +5,11 @@
 
 {% block extra_css %}
 <style>
-.promo-steps { display:flex; gap:4px; margin-bottom:16px; background:white; border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+.promo-steps { display:flex; gap:4px; margin-bottom:16px; background:var(--bg-card, white); border-radius:12px; padding:4px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
 .promo-step { flex:1; padding:10px; text-align:center; border-radius:10px; font-size:0.8rem; font-weight:700; color:var(--text-secondary); }
 .promo-step.active { background:var(--primary); color:white; }
 .promo-step .step-num { font-size:0.65rem; opacity:0.7; }
-.config-card { background:white; border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
+.config-card { background:var(--bg-card, white); border-radius:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); padding:20px; margin-bottom:16px; }
 .config-card h3 { font-size:0.92rem; margin-bottom:14px; }
 .c-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:12px; }
 .c-grp { display:flex; flex-direction:column; gap:3px; }
@@ -25,7 +25,7 @@
 .action-chip.promoted { background:#D1FAE5; color:#059669; border-color:#6EE7B7; }
 .action-chip.detained { background:#FEE2E2; color:#DC2626; border-color:#FCA5A5; }
 .action-chip.tc { background:#DBEAFE; color:#2563EB; border-color:#93C5FD; }
-.summary-bar { display:flex; gap:12px; padding:14px 18px; background:white; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px; align-items:center; }
+.summary-bar { display:flex; gap:12px; padding:14px 18px; background:var(--bg-card, white); border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); margin-bottom:12px; align-items:center; }
 .sb-stat { text-align:center; }
 .sb-val { font-size:1.2rem; font-weight:900; } .sb-lbl { font-size:0.62rem; color:var(--text-light); text-transform:uppercase; }
 .btn-primary { padding:10px 20px; border-radius:10px; background:var(--primary); color:white; border:none; font-weight:700; cursor:pointer; font-size:0.85rem; }
@@ -86,7 +86,7 @@
         <button class="btn-secondary" onclick="setAll('promoted')">✅ Promote All</button>
         <button class="btn-primary" onclick="executePromotion()" id="execBtn"><i class="fas fa-check-double"></i> Execute Promotion</button>
     </div>
-    <div style="background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;max-height:60vh;overflow-y:auto;">
+    <div style="background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);overflow:hidden;max-height:60vh;overflow-y:auto;">
         <table class="stu-table">
             <thead><tr><th style="width:30px;"><input type="checkbox" onchange="toggleAll(this)"></th><th>Student</th><th>Roll</th><th>Current Class</th><th>Action</th><th>Remarks</th></tr></thead>
             <tbody id="stuBody"></tbody>
@@ -124,7 +124,7 @@ async function loadSections(classElId, sectionElId) {
 
 async function loadStudents() {
     const fromClass = document.getElementById('fromClass').value;
-    if (!fromClass) { alert('Select source class'); return; }
+    if (!fromClass) { showToast('warning','Select source class'); return; }
     const section = document.getElementById('fromSection').value;
     let url = `/api/school/students?class_id=${fromClass}`;
     if (section) url += `&section_id=${section}`;
@@ -137,7 +137,7 @@ async function loadStudents() {
         document.getElementById('studentSection').style.display = 'block';
         document.getElementById('step1').classList.remove('active');
         document.getElementById('step2').classList.add('active');
-    } catch(e) { alert('Failed to load students'); }
+    } catch(e) { showToast('error','Failed to load students'); }
 }
 
 function renderStudents() {
@@ -181,9 +181,8 @@ function updateCounts() {
 async function executePromotion() {
     const toClass = document.getElementById('toClass').value;
     const toSection = document.getElementById('toSection').value;
-    if (!toClass && students.some(s => s.action === 'promoted')) { alert('Select target class for promotion'); return; }
-    if (!confirm(`Execute promotion for ${students.length} students?\n\n✅ ${students.filter(s=>s.action==='promoted').length} promoted\n🔴 ${students.filter(s=>s.action==='detained').length} detained\n📋 ${students.filter(s=>s.action==='tc_issued').length} TC`)) return;
-
+    if (!toClass && students.some(s => s.action === 'promoted')) { showToast('warning','Select target class for promotion'); return; }
+    showConfirm('Confirm', `Execute promotion for ${students.length} students?\n\n${students.filter(s=>s.action==='promoted').length} promoted, ${students.filter(s=>s.action==='detained').length} detained, ${students.filter(s=>s.action==='tc_issued').length} TC`, async () => {
     const btn = document.getElementById('execBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
     try {
@@ -200,11 +199,12 @@ async function executePromotion() {
         });
         if (!res.ok) throw new Error();
         const d = await res.json();
-        alert(`✅ Done! ${d.promoted} promoted, ${d.detained} detained, ${d.tc} TC issued.`);
+        showToast('success', `Done! ${d.promoted} promoted, ${d.detained} detained, ${d.tc} TC issued.`);
         document.getElementById('step2').classList.remove('active');
         document.getElementById('step3').classList.add('active');
-    } catch(e) { alert('Promotion failed'); }
+    } catch(e) { showToast('error','Promotion failed'); }
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-double"></i> Execute Promotion';
+    }, {icon:'⚠️'});
 }
 
 init();

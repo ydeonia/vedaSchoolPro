@@ -1,0 +1,12 @@
+{
+  "school_id": "dps_gwalior",
+  "school_name": "Delhi Public School, Gwalior",
+  "package_id": "com.vedaschoolpro.dpsgwalior",
+  "api_base_url": "https://app.vedaschoolpro.com",
+  "default_theme_color": "#1E40AF",
+  "logo_file": "dps_gwalior_logo.png",
+  "motto": "Service Before Self",
+  "language": "en",
+  "play_store_name": "DPS Gwalior - Parent App",
+  "play_store_description": "Official app for Delhi Public School, Gwalior. Track attendance, fees, results, homework and more."
+}

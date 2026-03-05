@@ -9,7 +9,7 @@
     .notif-tab { padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.82rem; font-weight: 600; background: var(--bg-secondary); color: var(--text-secondary); transition: all 0.2s; }
     .notif-tab.active { background: var(--primary); color: white; }
     .notif-tab .count { display: inline-block; background: rgba(255,255,255,0.2); padding: 1px 8px; border-radius: 10px; font-size: 0.68rem; margin-left: 4px; }
-    .notif-item { display: flex; gap: 12px; padding: 14px 16px; background: white; border-radius: var(--radius-sm); margin-bottom: 6px; border-left: 4px solid var(--border); cursor: pointer; transition: all 0.15s; }
+    .notif-item { display: flex; gap: 12px; padding: 14px 16px; background: var(--bg-card, white); border-radius: var(--radius-sm); margin-bottom: 6px; border-left: 4px solid var(--border); cursor: pointer; transition: all 0.15s; }
     .notif-item:hover { transform: translateX(3px); box-shadow: var(--shadow-sm); }
     .notif-item.unread { background: #F0F7FF; border-left-color: var(--primary); }
     .notif-item.urgent { border-left-color: var(--danger); }
@@ -45,7 +45,7 @@
     <button class="btn btn-secondary btn-sm mark-all-btn" onclick="markAllRead()"><i class="fas fa-check-double"></i> Mark All Read</button>
 </div>
 
-<div id="notifList">
+<div id="notifPageList">
     <div style="text-align:center; padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i></div>
 </div>
 {% endblock %}
@@ -61,26 +61,39 @@ const ICONS = {
     message: {cls: 'message', icon: '💬'},
     alert: {cls: 'alert', icon: '🔔'},
     admission: {cls: 'attendance', icon: '📝'},
+    transport: {cls: 'attendance', icon: '🚌'},
+    hostel: {cls: 'message', icon: '🏠'},
+    ack: {cls: 'alert', icon: '✅'},
 };
 let allNotifs = [];
 
-async function loadNotifications() {
-    try {
-        const result = await apiCall('/api/school/notifications/list');
-        allNotifs = result.notifications || [];
-        document.getElementById('unreadBadge').textContent = result.unread_count || 0;
-        renderNotifs(allNotifs);
-    } catch(e) {
-        document.getElementById('notifList').innerHTML = '<div class="empty-state"><i class="fas fa-bell-slash"></i><h3>Could not load notifications</h3></div>';
-    }
+function loadNotifications() {
+    const listEl = document.getElementById('notifPageList');
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/school/notifications/list', true);
+    xhr.withCredentials = true;
+    xhr.onload = function() {
+        try {
+            const data = JSON.parse(xhr.responseText);
+            allNotifs = data.notifications || [];
+            document.getElementById('unreadBadge').textContent = data.unread_count || 0;
+            renderNotifs(allNotifs);
+        } catch(e) {
+            listEl.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell-slash"></i><h3>Error parsing notifications</h3><p>' + e.message + '</p></div></div></div>';
+        }
+    };
+    xhr.onerror = function() {
+        listEl.innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell-slash"></i><h3>Could not load notifications</h3><p>Network error</p></div></div></div>';
+    };
+    xhr.send();
 }
 
 function renderNotifs(notifs) {
     if (notifs.length === 0) {
-        document.getElementById('notifList').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No Notifications</h3><p>You\'re all caught up!</p></div></div></div>';
+        document.getElementById('notifPageList').innerHTML = '<div class="card"><div class="card-body"><div class="empty-state"><i class="fas fa-bell-slash"></i><h3>No Notifications</h3><p>You\'re all caught up!</p></div></div></div>';
         return;
     }
-    document.getElementById('notifList').innerHTML = notifs.map(n => {
+    document.getElementById('notifPageList').innerHTML = notifs.map(n => {
         const ico = ICONS[n.type] || {cls: 'alert', icon: '🔔'};
         const priorityCls = n.priority === 'urgent' ? 'urgent' : (n.priority === 'high' ? 'high' : '');
         return `<div class="notif-item ${n.is_read ? '' : 'unread'} ${priorityCls}" onclick="markRead('${n.id}')">
@@ -105,25 +118,39 @@ function filterNotifs(el) {
     else renderNotifs(allNotifs.filter(n => n.type === filter));
 }
 
+function updateBellBadge(count) {
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count > 99 ? '99+' : count;
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
 async function markRead(id) {
     try {
-        await apiCall(`/api/school/notifications/mark-read?notification_id=${id}`, 'POST');
+        await fetch(`/api/school/notifications/mark-read?notification_id=${id}`, {method: 'POST', credentials: 'same-origin'});
         const n = allNotifs.find(x => x.id === id);
         if (n) n.is_read = true;
         const unread = allNotifs.filter(x => !x.is_read).length;
         document.getElementById('unreadBadge').textContent = unread;
+        updateBellBadge(unread);
         renderNotifs(allNotifs);
-    } catch(e) {}
+    } catch(e) { console.error('Mark read error:', e); }
 }
 
 async function markAllRead() {
     try {
-        await apiCall('/api/school/notifications/mark-read', 'POST');
+        await fetch('/api/school/notifications/mark-read', {method: 'POST', credentials: 'same-origin'});
         allNotifs.forEach(n => n.is_read = true);
         document.getElementById('unreadBadge').textContent = 0;
+        updateBellBadge(0);
         renderNotifs(allNotifs);
-        showToast('success', 'All marked as read ✅', '');
-    } catch(e) {}
+        showToast('success', 'All marked as read', '');
+    } catch(e) { console.error('Mark all read error:', e); }
 }
 
 loadNotifications();

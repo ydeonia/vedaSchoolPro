@@ -32,9 +32,9 @@
                 <button class="btn btn-secondary btn-sm" onclick="openModal('importModal')">
                     <i class="fas fa-file-csv"></i> Import CSV
                 </button>
-                <button class="btn btn-primary btn-sm" onclick="openModal('addStudentModal')">
-                    <i class="fas fa-plus"></i> Add Student
-                </button>
+                <a href="/school/admissions" class="btn btn-primary btn-sm" title="New admissions go through the admissions pipeline">
+                    <i class="fas fa-plus"></i> New Admission
+                </a>
             </div>
         </div>
     </div>
@@ -96,7 +96,7 @@
                         <td class="text-sm">{{ s.roll_number or '—' }}</td>
                         <td class="text-sm">{{ s.father_name or '—' }}</td>
                         <td>
-                            <div class="text-sm">{{ s.father_phone or s.mother_phone or '—' }}</div>
+                            <div class="text-sm">{% if s.father_phone or s.mother_phone %}+91 {{ s.father_phone or s.mother_phone }}{% else %}—{% endif %}</div>
                         </td>
                         <td>
                             {% if s.is_active %}
@@ -129,9 +129,9 @@
                 <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Start with just 2-3 students to try the system. You can add the rest later or import from CSV.
             </div>
             <div style="display: flex; gap: 10px; justify-content: center;">
-                <button class="btn btn-primary" onclick="openModal('addStudentModal')">
-                    <i class="fas fa-plus"></i> Add Student
-                </button>
+                <a href="/school/admissions" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Start Admission
+                </a>
                 <button class="btn btn-secondary" onclick="openModal('importModal')">
                     <i class="fas fa-file-csv"></i> Import CSV
                 </button>
@@ -144,7 +144,7 @@
 <!-- Add Student Modal -->
 <div class="modal-overlay" id="addStudentModal" style="display: {% if action == 'new' %}flex{% else %}none{% endif %};">
     <div class="modal modal-xl" style="max-height: 90vh; overflow-y: auto;">
-        <div class="modal-header" style="position: sticky; top: 0; background: white; z-index: 10; padding: 24px 28px 16px;">
+        <div class="modal-header" style="position: sticky; top: 0; background: var(--bg-card, white); z-index: 10; padding: 24px 28px 16px;">
             <h2><i class="fas fa-user-graduate" style="color: var(--primary); margin-right: 8px;"></i> Add New Student</h2>
             <button class="modal-close" onclick="closeModal('addStudentModal')"><i class="fas fa-times"></i></button>
         </div>
@@ -241,7 +241,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Father's Phone</label>
-                        <input type="tel" name="father_phone" class="form-input" placeholder="9876543210">
+                        <div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input type="tel" name="father_phone" class="form-input" placeholder="9876543210" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div>
                     </div>
                 </div>
                 <div class="form-row">
@@ -251,7 +251,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Mother's Phone</label>
-                        <input type="tel" name="mother_phone" class="form-input" placeholder="9876543210">
+                        <div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input type="tel" name="mother_phone" class="form-input" placeholder="9876543210" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div>
                     </div>
                 </div>
                 <div class="form-row">
@@ -299,7 +299,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Emergency Contact</label>
-                        <input type="tel" name="emergency_contact" class="form-input" placeholder="Emergency phone number">
+                        <div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:var(--bg,#f1f5f9);border:1px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.78rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">+91</span><input type="tel" name="emergency_contact" class="form-input" placeholder="9876543210" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;"></div>
                     </div>
                 </div>
 
@@ -312,7 +312,7 @@
                 </div>
             </form>
         </div>
-        <div class="modal-footer" style="position: sticky; bottom: 0; background: white; z-index: 10;">
+        <div class="modal-footer" style="position: sticky; bottom: 0; background: var(--bg-card, white); z-index: 10;">
             <button class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
             <button class="btn btn-success" onclick="submitStudentForm()">
                 <i class="fas fa-check"></i> Save Student
@@ -335,7 +335,7 @@
                 </p>
                 <p style="font-size: 0.78rem; color: var(--text-secondary);">
                     Your CSV must have these columns (first row as header):<br>
-                    <code style="background: white; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
+                    <code style="background: var(--bg-card, white); padding: 2px 6px; border-radius: 4px; font-size: 0.75rem;">
                         first_name, last_name, gender, date_of_birth, class_name, section_name, roll_number, admission_number, father_name, father_phone, mother_name, address, city
                     </code>
                 </p>

@@ -4,9 +4,9 @@
 {% block page_subtitle %}Book catalog, issue, return, and fine management{% endblock %}
 {% block content %}
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;">
-    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--primary);">{{ total_books }}</div><div style="font-size:0.72rem; color:var(--text-light);">Total Books</div></div>
-    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--success);">{{ available }}</div><div style="font-size:0.72rem; color:var(--text-light);">Available</div></div>
-    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--warning);">{{ issued_count }}</div><div style="font-size:0.72rem; color:var(--text-light);">Issued</div></div>
+    <div style="background:var(--bg-card, white); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--primary);">{{ total_books }}</div><div style="font-size:0.72rem; color:var(--text-light);">Total Books</div></div>
+    <div style="background:var(--bg-card, white); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--success);">{{ available }}</div><div style="font-size:0.72rem; color:var(--text-light);">Available</div></div>
+    <div style="background:var(--bg-card, white); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:16px; text-align:center;"><div style="font-size:1.5rem; font-weight:800; color:var(--warning);">{{ issued_count }}</div><div style="font-size:0.72rem; color:var(--text-light);">Issued</div></div>
 </div>
 <div class="card mb-3">
     <div class="card-header"><h2>Add Book</h2><button class="btn btn-primary btn-sm" onclick="document.getElementById('bookForm').style.display=document.getElementById('bookForm').style.display==='none'?'block':'none'"><i class="fas fa-plus"></i> Add</button></div>

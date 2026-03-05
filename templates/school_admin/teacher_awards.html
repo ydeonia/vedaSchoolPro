@@ -89,7 +89,7 @@
 </div>
 
 <!-- Nominate Modal -->
-<div class="modal-overlay" id="nomModal" onclick="if(event.target===this)document.getElementById('nomModal').classList.remove('show')" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;justify-content:center;align-items:center;">
+<div class="modal-overlay" id="nomModal" onclick="if(event.target===this)closeNomModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;justify-content:center;align-items:center;">
     <div class="nom-card" style="width:90%;max-width:480px;">
         <h3 style="margin-bottom:14px;">✨ Nominate for Award</h3>
         <div class="n-row">
@@ -99,7 +99,7 @@
         <div class="n-grp" style="margin-bottom:10px;"><label>Reason / Citation</label><textarea id="nomReason" placeholder="Why does this teacher deserve recognition?"></textarea></div>
         <div class="n-grp" style="margin-bottom:12px;"><label>Prize Details (optional)</label><input id="nomPrize" placeholder="e.g., Certificate + ₹2000 voucher"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button style="padding:8px 16px;border-radius:8px;background:var(--bg);border:none;cursor:pointer;" onclick="document.getElementById('nomModal').classList.remove('show')">Cancel</button>
+            <button style="padding:8px 16px;border-radius:8px;background:var(--bg);border:none;cursor:pointer;" onclick="closeNomModal()">Cancel</button>
             <button class="btn-primary" onclick="submitNomination()"><i class="fas fa-award"></i> Nominate</button>
         </div>
     </div>
@@ -159,6 +159,7 @@ function populateTeachers(teachers) {
 }
 
 function nominateNew() { document.getElementById('nomModal').style.display='flex'; document.getElementById('nomModal').classList.add('show'); }
+function closeNomModal() { document.getElementById('nomModal').classList.remove('show'); document.getElementById('nomModal').style.display='none'; }
 
 async function submitNomination() {
     const data = {
@@ -167,19 +168,20 @@ async function submitNomination() {
         description: document.getElementById('nomReason').value.trim(),
         prize_details: document.getElementById('nomPrize').value.trim(),
     };
-    if (!data.teacher_id || !data.description) { alert('Select teacher and enter reason'); return; }
+    if (!data.teacher_id || !data.description) { showToast('warning','Select teacher and enter reason'); return; }
     try {
         const res = await fetch('/api/school/teacher-awards/nominate', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
         if (!res.ok) throw new Error();
-        alert('✅ Nomination submitted!');
-        document.getElementById('nomModal').classList.remove('show'); document.getElementById('nomModal').style.display='none';
+        showToast('success','Nomination submitted!');
+        closeNomModal();
         loadData();
-    } catch(e) { alert('Failed'); }
+    } catch(e) { showToast('error','Failed'); }
 }
 
 async function approveAward(id) {
-    if (!confirm('Approve this award?')) return;
+    showConfirm('Confirm','Approve this award?', async () => {
     try { await fetch(`/api/school/teacher-awards/${id}/approve`, {method:'POST',credentials:'same-origin'}); loadData(); } catch(e) {}
+    }, {icon:'⚠️'});
 }
 
 loadData();

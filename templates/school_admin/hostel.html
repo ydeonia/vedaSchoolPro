@@ -4,16 +4,16 @@
 {% block page_subtitle %}Manage hostels, rooms, and student allocations{% endblock %}
 {% block extra_css %}
 <style>
-.h-tabs{display:flex;gap:4px;background:white;border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
+.h-tabs{display:flex;gap:4px;background:var(--bg-card, white);border-radius:12px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:16px;}
 .h-tab{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:0.82rem;font-weight:700;cursor:pointer;color:var(--text-secondary);}
 .h-tab.active{background:var(--primary);color:white;}
-.add-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
+.add-card{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:16px;}
 .f-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;}
 .f-grp{display:flex;flex-direction:column;gap:3px;}
 .f-grp label{font-size:0.62rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;}
 .f-grp input,.f-grp select{padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem;}
 .btn-primary{padding:10px 20px;border-radius:10px;background:var(--primary);color:white;border:none;font-weight:700;cursor:pointer;}
-.h-card{background:white;border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
+.h-card{background:var(--bg-card, white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;margin-bottom:12px;}
 .h-header{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
 .h-icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
 .h-icon.boys{background:#DBEAFE;}.h-icon.girls{background:#FCE7F3;}
@@ -120,12 +120,12 @@ async function loadHostels(){
 
 async function addHostel(){
     const d={name:g('hName'),hostel_type:g('hType'),warden_name:g('hWarden'),warden_phone:g('hWardenPh'),total_rooms:parseInt(g('hRooms'))||20,total_beds:parseInt(g('hBeds'))||80,monthly_fee:parseFloat(g('hFee'))||0,mess_fee:parseFloat(g('hMess'))||0};
-    if(!d.name){alert('Enter hostel name');return;}
+    if(!d.name){showToast('warning','Enter hostel name');return;}
     await apiCall('/api/school/hostels','POST',d);showToast('success','Hostel added');loadHostels();
 }
 async function addRoom(){
     const d={hostel_id:g('rHostel'),room_number:g('rNumber'),floor:g('rFloor'),bed_count:parseInt(g('rBeds'))||4};
-    if(!d.hostel_id||!d.room_number){alert('Select hostel and enter room number');return;}
+    if(!d.hostel_id||!d.room_number){showToast('warning','Select hostel and enter room number');return;}
     await apiCall('/api/school/hostel-rooms','POST',d);showToast('success','Room added');
 }
 async function loadAvailableRooms(){
@@ -135,7 +135,7 @@ async function loadAvailableRooms(){
 }
 async function allocateStudent(){
     const d={student_id:g('aStudent'),hostel_id:g('aHostel'),room_id:g('aRoom'),bed_number:g('aBed')};
-    if(!d.student_id||!d.room_id){alert('Select student and room');return;}
+    if(!d.student_id||!d.room_id){showToast('warning','Select student and room');return;}
     await apiCall('/api/school/hostel-allocations','POST',d);showToast('success','Student allocated');
 }
 function g(id){return document.getElementById(id).value.trim();}

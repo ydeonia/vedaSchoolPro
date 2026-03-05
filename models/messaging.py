@@ -74,8 +74,8 @@ class MessageThread(Base):
 
     # Subject
     subject = Column(String(300), nullable=False)
-    thread_type = Column(SAEnum(ThreadType), default=ThreadType.GENERAL, index=True)
-    status = Column(SAEnum(ThreadStatus), default=ThreadStatus.ACTIVE)
+    thread_type = Column(SAEnum(ThreadType, values_callable=lambda x: [e.value for e in x]), default=ThreadType.GENERAL, index=True)
+    status = Column(SAEnum(ThreadStatus, values_callable=lambda x: [e.value for e in x]), default=ThreadStatus.ACTIVE)
 
     # Related student (if applicable — for parent-teacher communication about a child)
     student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=True)
@@ -155,8 +155,8 @@ class Complaint(Base):
     subject = Column(String(300), nullable=False)
     description = Column(Text, nullable=False)
     category = Column(String(100), nullable=True)
-    priority = Column(SAEnum(ComplaintPriority), default=ComplaintPriority.MEDIUM)
-    status = Column(SAEnum(ComplaintStatus), default=ComplaintStatus.OPEN, index=True)
+    priority = Column(SAEnum(ComplaintPriority, values_callable=lambda x: [e.value for e in x]), default=ComplaintPriority.MEDIUM)
+    status = Column(SAEnum(ComplaintStatus, values_callable=lambda x: [e.value for e in x]), default=ComplaintStatus.OPEN, index=True)
 
     assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     is_escalated = Column(Boolean, default=False)

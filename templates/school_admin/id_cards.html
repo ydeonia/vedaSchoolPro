@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Id Cards{% endblock %}
-{% block page_title %}🪪 ID Card Generation{% endblock %}
-{% block page_subtitle %}Generate student and employee ID cards with school branding{% endblock %}
+{% block title %}ID Cards{% endblock %}
+{% block page_title %}ID Card Generation{% endblock %}
+{% block page_subtitle %}Generate student, teacher, staff & visitor ID cards{% endblock %}
 {% block content %}
 <div class="card mb-3">
-    <div class="card-header"><h2>Student ID Cards</h2></div>
+    <div class="card-header"><h2><i class="fas fa-user-graduate"></i> Student ID Cards</h2></div>
     <div class="card-body">
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <select id="idClass" class="form-select" style="max-width:200px;">
@@ -16,22 +16,91 @@
         <div id="studentList" style="margin-top:12px;"></div>
     </div>
 </div>
-<div class="card">
-    <div class="card-header"><h2>Employee ID Cards</h2></div>
+
+<div class="card mb-3">
+    <div class="card-header"><h2><i class="fas fa-chalkboard-teacher"></i> Teacher ID Cards</h2></div>
     <div class="card-body">
-        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px;">
-        {% for e in employees %}
-            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--bg-secondary,#F8FAFC); border-radius:var(--radius-sm);">
-                <span style="font-size:0.85rem;"><strong>{{ e.full_name }}</strong><br><span style="font-size:0.72rem; color:var(--text-light);">{{ e.designation or 'Staff' }}</span></span>
-                <a href="/api/school/hr/employee-id-card/{{ e.id }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> PDF</a>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px;">
+        {% for t in teachers %}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--bg-secondary,#F0FDF4); border-radius:var(--radius-sm); border-left:3px solid #059669;">
+                <span style="font-size:0.85rem;"><strong>{{ t.full_name }}</strong><br><span style="font-size:0.72rem; color:var(--text-light);">{{ t.designation or 'Teacher' }} {% if t.specialization %}| {{ t.specialization }}{% endif %}</span></span>
+                <a href="/api/school/hr/teacher-id-card/{{ t.id }}" target="_blank" class="btn btn-secondary btn-sm" style="border-color:#059669;color:#059669;"><i class="fas fa-id-card"></i> PDF</a>
             </div>
         {% endfor %}
+        {% if not teachers %}<p style="color:var(--text-light);font-size:0.85rem;">No active teachers found.</p>{% endif %}
         </div>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-header"><h2><i class="fas fa-users-cog"></i> Non-Teaching Staff ID Cards</h2></div>
+    <div class="card-body">
+        <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px;">
+        {% for e in employees %}
+            <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; background:var(--bg-secondary,#F5F3FF); border-radius:var(--radius-sm); border-left:3px solid #7C3AED;">
+                <span style="font-size:0.85rem;"><strong>{{ e.full_name }}</strong><br><span style="font-size:0.72rem; color:var(--text-light);">{{ e.designation or 'Staff' }}</span></span>
+                <a href="/api/school/hr/employee-id-card/{{ e.id }}" target="_blank" class="btn btn-secondary btn-sm" style="border-color:#7C3AED;color:#7C3AED;"><i class="fas fa-id-card"></i> PDF</a>
+            </div>
+        {% endfor %}
+        {% if not employees %}<p style="color:var(--text-light);font-size:0.85rem;">No active non-teaching staff found.</p>{% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header"><h2><i class="fas fa-user-tag"></i> Visitor / Guest Pass</h2></div>
+    <div class="card-body">
+        <p style="font-size:0.82rem;color:var(--text-light);margin-bottom:12px;">Generate a temporary visitor pass for guests, parents, or visitors.</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:600px;">
+            <input type="text" id="visName" class="form-input" placeholder="Visitor Name *">
+            <input type="text" id="visPurpose" class="form-input" placeholder="Purpose of Visit">
+            <input type="text" id="visWhom" class="form-input" placeholder="Visiting Whom (Teacher/Staff)">
+            <input type="text" id="visPhone" class="form-input" placeholder="Phone Number">
+        </div>
+        <button class="btn btn-primary mt-2" onclick="generateVisitorPass()" style="background:#EA580C;border-color:#EA580C;"><i class="fas fa-print"></i> Generate Visitor Pass</button>
     </div>
 </div>
 {% endblock %}
 {% block extra_js %}
 <script>
-async function loadStudents(){const cid=document.getElementById('idClass').value;if(!cid)return;try{const r=await fetch('/api/school/students?class_id='+cid);const d=await r.json();let h='';(d.students||[]).forEach(s=>{h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border-light);"><span>'+s.name+'</span><a href="/api/school/hr/student-id-card/'+s.id+'" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> ID Card PDF</a></div>';});document.getElementById('studentList').innerHTML=h||'No students';}catch(e){showToast('error','Load failed');}}
+async function loadStudents(){
+    const cid=document.getElementById('idClass').value;
+    if(!cid){showToast('warning','Select a class');return;}
+    try{
+        const r=await fetch('/api/school/students?class_id='+cid);
+        const d=await r.json();
+        let h='';
+        (d.students||[]).forEach(s=>{
+            h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border-light);">'
+              +'<span>'+s.name+'</span>'
+              +'<a href="/api/school/hr/student-id-card/'+s.id+'" target="_blank" class="btn btn-secondary btn-sm"><i class="fas fa-id-card"></i> ID Card PDF</a></div>';
+        });
+        document.getElementById('studentList').innerHTML=h||'<p style="color:var(--text-light);">No students found in this class.</p>';
+    }catch(e){showToast('error','Failed to load students');}
+}
+
+async function generateVisitorPass(){
+    const name=document.getElementById('visName').value.trim();
+    if(!name){showToast('error','Enter visitor name');return;}
+    const data={
+        name: name,
+        purpose: document.getElementById('visPurpose').value.trim(),
+        visiting_whom: document.getElementById('visWhom').value.trim(),
+        phone: document.getElementById('visPhone').value.trim(),
+    };
+    try{
+        const r=await fetch('/api/school/hr/visitor-card',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(data)
+        });
+        if(r.ok){
+            const blob=await r.blob();
+            const url=URL.createObjectURL(blob);
+            window.open(url,'_blank');
+            showToast('success','Visitor pass generated');
+        }else{showToast('error','Failed to generate pass');}
+    }catch(e){showToast('error','Error generating pass');}
+}
 </script>
 {% endblock %}

@@ -23,6 +23,7 @@ class Branch(Base):
     org_id = Column(UUID(as_uuid=True), ForeignKey("organizations.id"), nullable=False, index=True)
     name = Column(String(255), nullable=False)
     code = Column(String(50), nullable=True)  # e.g., "DPS-GZB-01"
+    subdomain = Column(String(63), nullable=True, unique=True, index=True)  # e.g., "goenkajammu", "conventgwalior"
     board_type = Column(SAEnum(BoardType), default=BoardType.CBSE)
 
     # Contact info
@@ -188,9 +189,10 @@ class CommunicationConfig(Base):
 
     # SMS
     sms_enabled = Column(Boolean, default=False)
-    sms_provider = Column(String(50), nullable=True)  # msg91, twilio
+    sms_provider = Column(String(50), nullable=True)  # msg91, twilio, msgclub, textlocal
     sms_api_key = Column(String(255), nullable=True)
     sms_sender_id = Column(String(20), nullable=True)
+    sms_route_id = Column(String(10), nullable=True, default="8")  # MsgClub route: 1=Trans, 2=Promo, 8=OTP
 
     # WhatsApp Business
     whatsapp_enabled = Column(Boolean, default=False)
@@ -213,3 +215,13 @@ class CommunicationConfig(Base):
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
 
     branch = relationship("Branch", back_populates="communication_config")
+
+
+class PlatformConfig(Base):
+    """Platform-wide configuration (single row) — Super Admin settings.
+    Stores SMTP, SMS, general settings as a flexible JSON blob."""
+    __tablename__ = "platform_configs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    config = Column(JSONB, nullable=True, default=dict)
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())

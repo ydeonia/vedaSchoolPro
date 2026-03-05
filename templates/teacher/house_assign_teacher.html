@@ -81,9 +81,9 @@ function toggleAll(el){document.querySelectorAll('.stu-check').forEach(c=>c.chec
 function updateCount(){document.getElementById('selectedCount').textContent=document.querySelectorAll('.stu-check:checked').length+' selected';}
 
 async function assignSelected(){
-    const hid=document.getElementById('tHouse').value;if(!hid){alert('Select a house');return;}
+    const hid=document.getElementById('tHouse').value;if(!hid){showToast('warning','Select a house');return;}
     const ids=[...document.querySelectorAll('.stu-check:checked')].map(c=>c.value);
-    if(!ids.length){alert('Select students first');return;}
+    if(!ids.length){showToast('warning','Select students first');return;}
     await apiCall('/api/school/houses/assign','POST',{house_id:hid,student_ids:ids});
     showToast('success',ids.length+' students assigned');loadTStudents();
     // Refresh summary

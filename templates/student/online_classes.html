@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Online Classes{% endblock %}
+{% block page_title %}Online Classes{% endblock %}
+{% block page_subtitle %}Upcoming lectures, past recordings &amp; class calendar{% endblock %}
+{% block extra_css %}
+<style>
+.cal-nav{display:flex;align-items:center;justify-content:space-between;background:var(--bg-card,white);border-radius:12px;padding:10px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:12px;}
+.cal-title{font-weight:900;font-size:.92rem;}
+.cal-btn{padding:6px 12px;border-radius:8px;font-size:.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+.cal-btn:hover{background:var(--primary);color:white;border-color:var(--primary);}
+
+.cal-grid{display:grid;grid-template-columns:60px repeat(6,1fr);background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow:hidden;margin-bottom:16px;}
+.cal-header{background:var(--primary-50);padding:8px 4px;text-align:center;font-size:.68rem;font-weight:900;border-bottom:1px solid var(--border-light);}
+.cal-header.time-col{background:transparent;}
+.cal-time{padding:4px;text-align:right;font-size:.60rem;color:var(--text-light);font-weight:700;border-right:1px solid var(--border-light);height:40px;line-height:40px;}
+.cal-cell{border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);min-height:40px;position:relative;}
+.cal-event{position:absolute;left:2px;right:2px;border-radius:6px;padding:2px 4px;font-size:.55rem;font-weight:700;cursor:pointer;overflow:hidden;z-index:2;line-height:1.2;color:white;}
+.cal-event.attended{background:#059669!important;} .cal-event.upcoming{background:#2563EB!important;} .cal-event.missed{background:#9CA3AF!important;}
+.cal-event .ev-sub{font-size:.50rem;font-weight:500;opacity:.85;}
+
+/* Detail popup (Outlook-style) */
+.detail-popup{background:var(--bg-card,white);border-radius:12px;padding:16px;box-shadow:0 4px 20px rgba(0,0,0,.15);position:fixed;z-index:1001;width:280px;display:none;}
+.dp-title{font-weight:900;font-size:.88rem;margin-bottom:6px;}
+.dp-meta{font-size:.72rem;color:var(--text-light);margin-bottom:4px;}
+.dp-link{font-size:.68rem;color:var(--primary);word-break:break-all;margin:6px 0;}
+.dp-att{font-size:.72rem;margin-top:6px;padding:6px 10px;border-radius:8px;font-weight:700;}
+.dp-att.yes{background:#D1FAE5;color:#059669;} .dp-att.no{background:#FEF3C7;color:#92400E;}
+.btn-join{padding:10px 20px;border-radius:10px;background:#059669;color:white;border:none;font-weight:700;cursor:pointer;width:100%;margin-top:8px;font-size:.82rem;}
+.btn-join:hover{background:#047857;}
+.btn-watch{padding:8px 16px;border-radius:8px;background:#2563EB;color:white;border:none;font-weight:700;cursor:pointer;font-size:.75rem;margin-top:6px;}
+.btn-sm{padding:5px 10px;border-radius:8px;font-size:.68rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card,white);}
+
+/* Past lectures */
+.past-section{margin-top:20px;}
+.section-title{font-weight:900;font-size:1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.search-bar{display:flex;gap:8px;margin-bottom:12px;}
+.search-bar input,.search-bar select{padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:.80rem;flex:1;}
+.past-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;}
+.past-card{background:var(--bg-card,white);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px;display:flex;flex-direction:column;gap:6px;}
+.pc-title{font-weight:900;font-size:.85rem;} .pc-meta{font-size:.68rem;color:var(--text-light);}
+.pc-badges{display:flex;gap:4px;}
+.badge{font-size:.55rem;padding:2px 6px;border-radius:10px;font-weight:700;}
+.badge-joined{background:#D1FAE5;color:#059669;} .badge-watched{background:#DBEAFE;color:#2563EB;} .badge-missed{background:#F3F4F6;color:#6B7280;}
+.pc-actions{display:flex;gap:4px;margin-top:auto;}
+.empty-state{text-align:center;padding:40px;color:var(--text-light);font-size:.85rem;}
+@media(max-width:768px){.cal-grid{grid-template-columns:40px repeat(6,1fr);}.search-bar{flex-direction:column;}.past-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<!-- Calendar Navigation -->
+<div class="cal-nav">
+    <button class="cal-btn" onclick="changeWeek(-1)"><i class="fas fa-chevron-left"></i></button>
+    <div class="cal-title" id="week-label">This Week</div>
+    <div style="display:flex;gap:6px;">
+        <button class="cal-btn" onclick="goToday()">Today</button>
+        <button class="cal-btn" onclick="changeWeek(1)"><i class="fas fa-chevron-right"></i></button>
+    </div>
+</div>
+
+<!-- Calendar Grid (read-only) -->
+<div class="cal-grid" id="cal-grid"></div>
+
+<!-- Past Lectures -->
+<div class="past-section">
+    <div class="section-title"><i class="fas fa-history"></i> Past Lectures</div>
+    <div class="search-bar">
+        <input type="text" id="search-q" placeholder="Search by topic..." onkeyup="if(event.key==='Enter')searchPast()">
+        <select id="search-subject" onchange="searchPast()"><option value="">All Subjects</option></select>
+        <button class="cal-btn" onclick="searchPast()"><i class="fas fa-search"></i></button>
+    </div>
+    <div class="past-grid" id="past-grid"><div class="empty-state">Loading...</div></div>
+</div>
+
+<!-- Detail Popup -->
+<div class="detail-popup" id="detail-popup"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+let currentWeekStart = getMonday(new Date());
+let calendarData = [];
+const HOURS = [8,9,10,11,12,13,14,15,16,17];
+
+function getMonday(d){ const dt=new Date(d); const day=dt.getDay(); const diff=dt.getDate()-day+(day===0?-6:1); dt.setDate(diff); dt.setHours(0,0,0,0); return dt; }
+function fmtDate(d){ return d.toISOString().split('T')[0]; }
+
+function renderCalendar(){
+    const grid = document.getElementById('cal-grid');
+    const ws = currentWeekStart;
+    const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+    const today = fmtDate(new Date());
+
+    const we = new Date(ws); we.setDate(we.getDate()+5);
+    document.getElementById('week-label').textContent = `${ws.getDate()} ${ws.toLocaleString('en',{month:'short'})} — ${we.getDate()} ${we.toLocaleString('en',{month:'short'})} ${we.getFullYear()}`;
+
+    let html = '<div class="cal-header time-col"></div>';
+    for(let i=0;i<6;i++){
+        const d = new Date(ws); d.setDate(d.getDate()+i);
+        const isToday = fmtDate(d)===today;
+        html += `<div class="cal-header" style="${isToday?'background:var(--primary);color:white;':''}"> ${dayNames[i]} ${d.getDate()}</div>`;
+    }
+
+    for(const h of HOURS){
+        html += `<div class="cal-time">${h>12?h-12:h}${h>=12?'PM':'AM'}</div>`;
+        for(let i=0;i<6;i++){
+            const d = new Date(ws); d.setDate(d.getDate()+i);
+            const dateStr = fmtDate(d);
+            const dayData = calendarData.find(dd=>dd.date===dateStr);
+            let eventsHtml = '';
+            if(dayData){
+                dayData.classes.forEach(c=>{
+                    const startH = parseInt(c.start_time.split(':')[0]);
+                    const startM = parseInt(c.start_time.split(':')[1]);
+                    if(startH===h){
+                        const endH = c.end_time? parseInt(c.end_time.split(':')[0]):startH;
+                        const endM = c.end_time? parseInt(c.end_time.split(':')[1]):startM+45;
+                        const durSlots = Math.max(1, endH - startH + (endM>startM?1:0));
+                        const topPx = Math.round(startM/60*40);
+                        const heightPx = Math.max(30, durSlots*40 - 4);
+
+                        // Color: green=attended, blue=upcoming, grey=missed
+                        const isPast = dateStr < today || (dateStr===today && startH < new Date().getHours());
+                        let colorClass = 'upcoming';
+                        if(c.attended) colorClass = 'attended';
+                        else if(isPast) colorClass = 'missed';
+
+                        eventsHtml += `<div class="cal-event ${colorClass}" style="top:${topPx}px;height:${heightPx}px;" onclick="showDetail(event,'${c.id}')">
+                            ${c.subject||c.title}<br><span class="ev-sub">${c.teacher_name||''}</span>
+                        </div>`;
+                    }
+                });
+            }
+            html += `<div class="cal-cell">${eventsHtml}</div>`;
+        }
+    }
+    grid.innerHTML = html;
+}
+
+async function loadCalendar(){
+    try{
+        const r = await fetch(`/api/online-class/student-calendar?week_start=${fmtDate(currentWeekStart)}`,{headers:{'X-CSRF-Token':CSRF}});
+        const data = await r.json();
+        calendarData = data.days||[];
+        renderCalendar();
+    }catch(e){ renderCalendar(); }
+}
+
+function changeWeek(dir){ currentWeekStart.setDate(currentWeekStart.getDate()+dir*7); loadCalendar(); }
+function goToday(){ currentWeekStart=getMonday(new Date()); loadCalendar(); }
+
+function showDetail(e, classId){
+    e.stopPropagation();
+    let cls = null;
+    for(const day of calendarData){ cls = day.classes.find(c=>c.id===classId); if(cls) break; }
+    if(!cls) return;
+
+    const today = fmtDate(new Date());
+    const isPast = cls.date < today;
+    const popup = document.getElementById('detail-popup');
+
+    popup.innerHTML = `
+        <div class="dp-title">${cls.title}</div>
+        <div class="dp-meta">By: ${cls.teacher_name||'Teacher'}</div>
+        <div class="dp-meta">${cls.start_time}${cls.end_time?' - '+cls.end_time:''}</div>
+        <div class="dp-meta">Platform: ${cls.platform.replace('_',' ')}</div>
+        ${cls.meeting_password?`<div class="dp-meta">Password: ${cls.meeting_password}</div>`:''}
+        ${cls.attended?'<div class="dp-att yes"><i class="fas fa-check-circle"></i> You attended this class</div>':''}
+        ${!isPast&&cls.meeting_link?`<button class="btn-join" onclick="joinClass('${cls.id}','${cls.meeting_link}')"><i class="fas fa-video"></i> Join Class</button>`:''}
+        ${cls.recording_url?`<button class="btn-watch" onclick="watchRecording('${cls.id}','${cls.recording_url}')"><i class="fas fa-play"></i> Watch Recording</button>`:''}
+        <button class="btn-sm" style="margin-top:6px;width:100%;" onclick="closeDetail()">Close</button>
+    `;
+    popup.style.display = 'block';
+    const rect = e.target.getBoundingClientRect();
+    popup.style.top = Math.min(rect.bottom+4, window.innerHeight-350)+'px';
+    popup.style.left = Math.min(rect.left, window.innerWidth-290)+'px';
+}
+function closeDetail(){ document.getElementById('detail-popup').style.display='none'; }
+document.addEventListener('click',e=>{ if(!e.target.closest('.detail-popup')&&!e.target.closest('.cal-event')) closeDetail(); });
+
+async function joinClass(id, link){
+    try{
+        const r = await fetch(`/api/online-class/${id}/join`,{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+        window.open(d.meeting_link||link, '_blank');
+        loadCalendar();
+    }catch(e){ window.open(link,'_blank'); }
+}
+
+async function watchRecording(id, url){
+    try{
+        await fetch(`/api/online-class/${id}/watched`,{method:'POST',headers:{'X-CSRF-Token':CSRF}});
+    }catch(e){}
+    window.open(url, '_blank');
+    searchPast();
+}
+
+// Past lectures
+async function searchPast(){
+    const grid = document.getElementById('past-grid');
+    grid.innerHTML='<div class="empty-state">Loading...</div>';
+    const q = document.getElementById('search-q').value;
+    const subjectId = document.getElementById('search-subject').value;
+    const params = new URLSearchParams();
+    if(q) params.set('q',q);
+    if(subjectId) params.set('subject_id',subjectId);
+    try{
+        const r = await fetch(`/api/online-class/past?${params}`,{headers:{'X-CSRF-Token':CSRF}});
+        const classes = await r.json();
+        if(!classes.length){grid.innerHTML='<div class="empty-state">No past lectures found</div>';return;}
+        grid.innerHTML = classes.map(c=>`
+            <div class="past-card">
+                <div class="pc-title">${c.title}</div>
+                <div class="pc-meta"><i class="fas fa-calendar"></i> ${c.date} &nbsp; <i class="fas fa-clock"></i> ${c.start_time} &nbsp; <i class="fas fa-book"></i> ${c.subject_name||'—'}</div>
+                <div class="pc-badges">
+                    ${c.joined?'<span class="badge badge-joined">Attended</span>':'<span class="badge badge-missed">Missed</span>'}
+                    ${c.watched?'<span class="badge badge-watched">Watched</span>':''}
+                </div>
+                <div class="pc-actions">
+                    ${c.recording_url?`<button class="btn-sm" onclick="watchRecording('${c.id}','${c.recording_url}')"><i class="fas fa-play"></i> Watch Recording</button>`:'<span style="font-size:.65rem;color:var(--text-light);">No recording</span>'}
+                </div>
+            </div>
+        `).join('');
+    }catch(e){grid.innerHTML='<div class="empty-state">Error loading</div>';}
+}
+
+// Load subjects for filter
+async function loadSubjects(){
+    try{
+        const r = await fetch('/api/school-admin/classes-sections-subjects',{headers:{'X-CSRF-Token':CSRF}});
+        const d = await r.json();
+        const sel = document.getElementById('search-subject');
+        (d.subjects||[]).forEach(s=>{ sel.innerHTML += `<option value="${s.id}">${s.name}</option>`; });
+    }catch(e){}
+}
+
+loadCalendar();
+searchPast();
+loadSubjects();
+</script>
+{% endblock %}

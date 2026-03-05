@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Photo Approvals{% endblock %}
+{% block page_title %}📸 Photo Change Approvals{% endblock %}
+{% block page_subtitle %}Review and approve photo change requests from students, teachers, and staff{% endblock %}
+{% block extra_css %}
+<style>
+.req-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.req-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 1px 3px rgba(0,0,0,0.06);padding:18px;border:1px solid var(--border-light);}
+.req-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.req-type{display:inline-block;padding:2px 8px;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;}
+.req-type.student{background:#DBEAFE;color:#1D4ED8;}.req-type.teacher{background:#D1FAE5;color:#059669;}.req-type.employee{background:#FEF3C7;color:#D97706;}
+.req-name{font-weight:800;font-size:0.92rem;}.req-date{font-size:0.62rem;color:var(--text-light);}
+.photo-compare{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.photo-box{border-radius:10px;overflow:hidden;background:var(--bg,#f1f5f9);aspect-ratio:3/4;display:flex;align-items:center;justify-content:center;font-size:2rem;}
+.photo-box img{width:100%;height:100%;object-fit:cover;}
+.photo-label{text-align:center;font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);margin-top:4px;}
+.req-actions{display:flex;gap:8px;}
+.btn-approve{padding:8px 16px;border-radius:8px;background:#22C55E;color:white;border:none;font-weight:700;font-size:0.78rem;cursor:pointer;}
+.btn-reject{padding:8px 16px;border-radius:8px;background:#EF4444;color:white;border:none;font-weight:700;font-size:0.78rem;cursor:pointer;}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-light);}
+.empty-state i{font-size:3rem;display:block;margin-bottom:12px;opacity:0.3;}
+.empty-state p{font-weight:700;}
+</style>
+{% endblock %}
+{% block content %}
+<div id="reqContainer">
+    <div style="text-align:center;padding:40px;color:var(--text-light);">Loading...</div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+async function loadRequests(){
+    try{
+        const r=await fetch('/api/school/photo-requests',{credentials:'same-origin'});
+        const d=await r.json();
+        const reqs=d.requests||[];
+        if(!reqs.length){
+            document.getElementById('reqContainer').innerHTML=`<div class="empty-state"><i class="fas fa-check-circle"></i><p>No pending photo requests</p><div style="font-size:0.82rem;">All photo change requests have been reviewed.</div></div>`;
+            return;
+        }
+        let html='<div class="req-grid">';
+        reqs.forEach(r=>{
+            html+=`<div class="req-card" id="card-${r.id}">
+                <div class="req-header">
+                    <span class="req-type ${r.entity_type}">${r.entity_type}</span>
+                    <div><div class="req-name">${r.name}</div><div class="req-date">${r.created_at}</div></div>
+                </div>
+                <div class="photo-compare">
+                    <div><div class="photo-box">${r.current_photo_url?`<img src="${r.current_photo_url}">`:'👤'}</div><div class="photo-label">Current</div></div>
+                    <div><div class="photo-box"><img src="${r.new_photo_url}"></div><div class="photo-label">New (Requested)</div></div>
+                </div>
+                <div class="req-actions">
+                    <button class="btn-approve" onclick="approvePhoto('${r.id}')"><i class="fas fa-check"></i> Approve</button>
+                    <button class="btn-reject" onclick="rejectPhoto('${r.id}')"><i class="fas fa-times"></i> Reject</button>
+                </div>
+            </div>`;
+        });
+        html+='</div>';
+        document.getElementById('reqContainer').innerHTML=html;
+    }catch(e){console.error(e);}
+}
+
+async function approvePhoto(id){
+    try{
+        const r=await fetch(`/api/school/photo-requests/${id}/approve`,{method:'POST',credentials:'same-origin'});
+        const d=await r.json();
+        if(d.success){showToast('success','Photo approved');document.getElementById('card-'+id).remove();}
+        else{showToast('error',d.detail||'Failed');}
+    }catch(e){showToast('error','Failed');}
+}
+
+async function rejectPhoto(id){
+    var reason=prompt('Rejection reason (optional):');
+    try{
+        const r=await fetch(`/api/school/photo-requests/${id}/reject`,{
+            method:'POST',credentials:'same-origin',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({reason:reason||''})
+        });
+        const d=await r.json();
+        if(d.success){showToast('success','Photo rejected');document.getElementById('card-'+id).remove();}
+        else{showToast('error',d.detail||'Failed');}
+    }catch(e){showToast('error','Failed');}
+}
+
+window.approvePhoto=approvePhoto;
+window.rejectPhoto=rejectPhoto;
+loadRequests();
+})();
+</script>
+{% endblock %}

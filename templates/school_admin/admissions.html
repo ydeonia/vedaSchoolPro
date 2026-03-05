@@ -5,7 +5,7 @@
 {% block content %}
 <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; margin-bottom:16px;">
     {% for s,count in stats.items() %}
-    <div style="background:white; border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:12px; text-align:center;">
+    <div style="background:var(--bg-card, white); border-radius:var(--radius); box-shadow:var(--shadow-sm); padding:12px; text-align:center;">
         <div style="font-size:1.3rem; font-weight:800; color:var(--primary);">{{ count }}</div>
         <div style="font-size:0.7rem; color:var(--text-light); text-transform:capitalize;">{{ s|replace('_',' ') }}</div>
     </div>

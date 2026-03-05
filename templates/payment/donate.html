@@ -42,7 +42,7 @@
         <input type="text" id="donorName" placeholder="Full Name"></div>
     <div class="row2">
         <div class="df"><label>Phone</label>
-            <input type="tel" id="donorPhone" placeholder="+91 98765 43210"></div>
+            <div style="display:flex;gap:0;"><span style="display:flex;align-items:center;padding:0 10px;background:#f1f5f9;border:1.5px solid #e2e8f0;border-right:none;border-radius:10px 0 0 10px;font-size:0.78rem;font-weight:700;color:#64748b;white-space:nowrap;">+91</span><input type="tel" id="donorPhone" placeholder="9876543210" maxlength="10" inputmode="numeric" style="border-radius:0 10px 10px 0;"></div></div>
         <div class="df"><label>Email</label>
             <input type="email" id="donorEmail" placeholder="you@email.com"></div>
     </div>
@@ -84,6 +84,15 @@
 </div>
 
 <script>
+/* Lightweight showToast for standalone page (no base.html) */
+if(typeof showToast==='undefined'){window.showToast=function(type,msg){
+    const colors={success:'#22c55e',error:'#ef4444',warning:'#f59e0b',info:'#3b82f6'};
+    const icons={success:'\u2705',error:'\u274c',warning:'\u26a0\ufe0f',info:'\u2139\ufe0f'};
+    const t=document.createElement('div');
+    t.textContent=icons[type]+' '+msg;
+    Object.assign(t.style,{position:'fixed',top:'20px',left:'50%',transform:'translateX(-50%)',background:colors[type]||'#333',color:'white',padding:'12px 24px',borderRadius:'12px',fontSize:'0.88rem',fontWeight:'700',zIndex:'99999',boxShadow:'0 4px 16px rgba(0,0,0,0.15)',transition:'opacity 0.3s'});
+    document.body.appendChild(t);setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},3000);
+};}
 const branchId=new URLSearchParams(window.location.search).get('branch_id')||window.location.pathname.split('/').pop();
 
 function setAmt(v,btn){
@@ -96,8 +105,8 @@ function clearPresets(){document.querySelectorAll('.amount-presets button').forE
 async function submitDonation(){
     const name=document.getElementById('donorName').value.trim();
     const amount=parseFloat(document.getElementById('donorAmount').value);
-    if(!name){alert('Please enter your name');return;}
-    if(!amount||amount<100){alert('Minimum donation is ₹100');return;}
+    if(!name){showToast('warning','Please enter your name');return;}
+    if(!amount||amount<100){showToast('warning','Minimum donation is ₹100');return;}
 
     const btn=document.getElementById('donateBtn');
     btn.disabled=true;btn.innerHTML='<div class="spinner"></div> Processing...';
@@ -129,7 +138,7 @@ async function submitDonation(){
                 </div>`;
         }else{throw new Error(r.detail||'Failed');}
     }catch(e){
-        alert('Error: '+e.message);
+        showToast('error',e.message);
         btn.disabled=false;btn.innerHTML='<i class="fas fa-heart"></i> Donate Now';
     }
 }

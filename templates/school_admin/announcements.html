@@ -73,6 +73,18 @@
             </div>
         </div>
     </div>
+    <!-- Class/Section targeting — shown when Students or Parents selected -->
+    <div id="classSectionFilter" style="display:none; margin-top:12px; padding:12px 16px; background:#F0F9FF; border:1px solid #BAE6FD; border-radius:8px;">
+        <label class="form-label" style="font-size:.76rem; color:#0369A1; margin-bottom:8px;"><i class="fas fa-filter"></i> Target specific class/section (optional — leave blank for all)</label>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <select id="annClassId" class="form-input" style="max-width:200px; font-size:.78rem;" onchange="loadSectionsForAnn()">
+                <option value="">All Classes</option>
+            </select>
+            <select id="annSectionId" class="form-input" style="max-width:200px; font-size:.78rem;">
+                <option value="">All Sections</option>
+            </select>
+        </div>
+    </div>
     <div style="display:flex; align-items:center; gap:16px; margin-top:16px;">
         <label style="font-size:0.82rem; display:flex; align-items:center; gap:6px; cursor:pointer;">
             <input type="checkbox" id="annPinned"> 📌 Pin to top
@@ -100,7 +112,8 @@
         </div>
         <div class="ann-content">{{ a.content }}</div>
         <div class="ann-badges">
-            <span class="ann-badge target">{{ a.target_role or 'all' | title }}</span>
+            <span class="ann-badge target">{{ (a.target_role or 'all') | title }}</span>
+            {% if a.target_class_id %}<span class="ann-badge target" style="background:#DBEAFE;color:#1D4ED8;"><i class="fas fa-filter"></i> Filtered</span>{% endif %}
             {% if a.is_pinned %}<span class="ann-badge pin">Pinned</span>{% endif %}
             {% if a.is_emergency %}<span class="ann-badge emg">Emergency</span>{% endif %}
         </div>
@@ -116,6 +129,7 @@
 <script>
 let selectedPriority = 'normal';
 let selectedTarget = 'all';
+let classesLoaded = false;
 
 function selectPriority(el) {
     document.querySelectorAll('.priority-pill').forEach(p => p.classList.remove('selected'));
@@ -126,6 +140,44 @@ function selectTarget(el) {
     document.querySelectorAll('.target-pill').forEach(p => p.classList.remove('selected'));
     el.classList.add('selected');
     selectedTarget = el.dataset.t;
+    // Show class/section filter for student/parent targeting
+    const csf = document.getElementById('classSectionFilter');
+    if (selectedTarget === 'student' || selectedTarget === 'parent') {
+        csf.style.display = 'block';
+        if (!classesLoaded) loadClassesForAnn();
+    } else {
+        csf.style.display = 'none';
+    }
+}
+
+async function loadClassesForAnn() {
+    try {
+        const r = await fetch('/api/school/classes', {credentials:'same-origin'});
+        const d = await r.json();
+        const sel = document.getElementById('annClassId');
+        const classes = d.classes || d || [];
+        classes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id; opt.textContent = c.name;
+            sel.appendChild(opt);
+        });
+        classesLoaded = true;
+    } catch(e) {}
+}
+async function loadSectionsForAnn() {
+    const classId = document.getElementById('annClassId').value;
+    const sel = document.getElementById('annSectionId');
+    sel.innerHTML = '<option value="">All Sections</option>';
+    if (!classId) return;
+    try {
+        const r = await fetch('/api/school/classes/'+classId+'/sections', {credentials:'same-origin'});
+        const d = await r.json();
+        (d.sections || d || []).forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id; opt.textContent = s.name;
+            sel.appendChild(opt);
+        });
+    } catch(e) {}
 }
 
 async function publishAnnouncement() {
@@ -134,22 +186,44 @@ async function publishAnnouncement() {
     if (!title || !content) { showToast('warning', 'Enter title & message', ''); return; }
 
     const isEmergency = selectedPriority === 'emergency';
-    if (isEmergency && !confirm('🚨 Emergency announcements override quiet hours and are sent immediately to everyone. Continue?')) return;
+    const classId = document.getElementById('annClassId')?.value || '';
+    const sectionId = document.getElementById('annSectionId')?.value || '';
 
-    try {
-        const result = await apiCall('/api/school/announcements/create', 'POST', {
-            title, content, priority: selectedPriority, target_role: selectedTarget,
-            is_pinned: document.getElementById('annPinned').checked,
-            is_emergency: isEmergency,
-        });
-        showToast('success', 'Published! 📢', result.message);
-        setTimeout(() => location.reload(), 800);
-    } catch(e) { showToast('error', 'Error', e.message); }
+    // Build target description for confirmation
+    let targetDesc = selectedTarget === 'all' ? 'everyone' : selectedTarget + 's';
+    if (classId) {
+        const clsName = document.getElementById('annClassId').selectedOptions[0]?.textContent || '';
+        const secName = document.getElementById('annSectionId').selectedOptions[0]?.textContent || '';
+        targetDesc = selectedTarget + 's in ' + clsName + (secName && secName !== 'All Sections' ? ' - ' + secName : '');
+    }
+
+    const doPublish = async () => {
+        try {
+            const body = {
+                title, content, priority: selectedPriority, target_role: selectedTarget,
+                is_pinned: document.getElementById('annPinned').checked,
+                is_emergency: isEmergency,
+            };
+            if (classId) body.target_class_id = classId;
+            if (sectionId) body.target_section_id = sectionId;
+
+            const result = await apiCall('/api/school/announcements/create', 'POST', body);
+            showToast('success', 'Published! 📢', 'Sent to ' + targetDesc);
+            setTimeout(() => location.reload(), 800);
+        } catch(e) { showToast('error', 'Error', e.message); }
+    };
+
+    if (isEmergency) {
+        showConfirm('Confirm', 'Emergency announcement will be sent immediately to ' + targetDesc + ', overriding quiet hours. Continue?', doPublish, {icon:'⚠️'});
+        return;
+    }
+    await doPublish();
 }
 
 async function deleteAnn(id) {
-    if (!confirm('Delete this announcement? It will be removed for all users.')) return;
-    try { await apiCall(`/api/school/announcements/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+    showConfirm('Delete Announcement', 'Delete this announcement? It will be removed for all users.', async () => {
+        try { await apiCall(`/api/school/announcements/${id}`, 'DELETE'); location.reload(); } catch(e) {}
+    }, {icon:'🗑️', danger:true, yesText:'Delete'});
 }
 
 async function togglePin(id) {

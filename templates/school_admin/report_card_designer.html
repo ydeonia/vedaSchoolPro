@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+{% block title %}Report Card Designer{% endblock %}
+{% block extra_css %}
+<style>
+@keyframes slideIn{from{transform:translateX(100px);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes slideOut{from{transform:translateX(0);opacity:1;}to{transform:translateX(100px);opacity:0;}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+.designer-layout{display:grid;grid-template-columns:300px 1fr;gap:16px;min-height:72vh;}
+.config-panel{background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;overflow-y:auto;max-height:78vh;}
+.config-section{margin-bottom:18px;}
+.config-section h4{font-size:0.72rem;text-transform:uppercase;color:var(--text-light);font-weight:700;margin-bottom:8px;letter-spacing:0.5px;display:flex;align-items:center;gap:6px;}
+.config-row{margin-bottom:10px;}
+.config-row label{font-size:0.7rem;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:3px;}
+.config-row input,.config-row select,.config-row textarea{width:100%;padding:7px 10px;border-radius:8px;border:1px solid var(--border);font-size:0.8rem;background:var(--bg-card);color:var(--text);transition:border-color 0.2s;}
+.config-row input:focus,.config-row select:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+.config-row input[type=color]{height:34px;padding:3px;cursor:pointer;border-radius:6px;}
+.config-row input[type=checkbox]{width:auto;margin-right:6px;}
+.check-row{display:flex;align-items:center;gap:6px;padding:6px 0;font-size:0.8rem;color:var(--text);cursor:pointer;}
+.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--primary);}
+.preview-panel{background:var(--bg-card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;display:flex;flex-direction:column;align-items:center;}
+.preview-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;width:100%;align-items:center;}
+.preview-toolbar .ptb{padding:6px 12px;border-radius:8px;font-size:0.72rem;font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--bg-card);display:flex;align-items:center;gap:4px;color:var(--text);transition:all 0.15s;}
+.preview-toolbar .ptb:hover{background:var(--primary-50);border-color:var(--primary);}
+.preview-toolbar .ptb.active{background:var(--primary);color:white;border-color:var(--primary);}
+.rc-preview{width:100%;max-width:595px;min-height:700px;background:white;border:1px solid var(--border);border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.08);padding:30px;font-family:'Plus Jakarta Sans',sans-serif;overflow:auto;color:#1e293b;}
+.rc-header{text-align:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #4F46E5;}
+.rc-school-name{font-size:18px;font-weight:800;color:#1E293B;margin-bottom:2px;}
+.rc-school-addr{font-size:10px;color:#64748B;margin-bottom:2px;}
+.rc-exam-title{font-size:13px;font-weight:700;color:#4F46E5;margin-top:8px;}
+.rc-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;margin:12px 0;font-size:11px;}
+.rc-info-label{color:#64748B;font-weight:600;}
+.rc-info-value{color:#1E293B;font-weight:700;}
+.rc-marks-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:10px;}
+.rc-marks-table th{background:#4F46E5;color:white;padding:6px 8px;text-align:center;font-weight:700;font-size:9px;}
+.rc-marks-table td{border:1px solid #E2E8F0;padding:5px 8px;text-align:center;}
+.rc-marks-table tr:nth-child(even){background:#F8FAFC;}
+.rc-marks-table .total-row{background:#EEF2FF;font-weight:700;}
+.rc-result-box{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;padding:10px;background:#F8FAFC;border-radius:8px;}
+.rc-result-item{text-align:center;}
+.rc-result-item .label{font-size:9px;color:#64748B;font-weight:600;}
+.rc-result-item .value{font-size:14px;font-weight:800;color:#1E293B;}
+.rc-remarks{font-size:10px;color:#64748B;font-style:italic;margin:10px 0;padding:8px;background:#F8FAFC;border-radius:6px;border-left:3px solid #4F46E5;}
+.rc-signatures{display:flex;justify-content:space-between;margin-top:24px;padding-top:10px;}
+.rc-sig{text-align:center;font-size:10px;color:#64748B;}
+.rc-sig-line{width:120px;border-top:1px solid #94A3B8;margin:0 auto 4px;}
+.rc-grade-legend{margin-top:14px;font-size:8px;color:#94A3B8;text-align:center;}
+.rc-attendance{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;font-size:10px;}
+.rc-att-item{text-align:center;padding:6px;background:#F0FDF4;border-radius:6px;}
+.rc-att-item .att-label{font-size:8px;color:#64748B;}
+.rc-att-item .att-val{font-weight:700;color:#1E293B;}
+
+/* Template cards */
+.tmpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;}
+.tmpl-card{border:2px solid var(--border);border-radius:10px;padding:10px;cursor:pointer;text-align:center;transition:all 0.15s;}
+.tmpl-card:hover,.tmpl-card.active{border-color:var(--primary);background:var(--primary-50);}
+.tmpl-icon{font-size:1.6rem;margin-bottom:3px;}
+.tmpl-label{font-size:0.68rem;font-weight:700;color:var(--text);}
+
+/* Grade scale editor */
+.grade-row{display:grid;grid-template-columns:50px 1fr 50px;gap:6px;align-items:center;margin-bottom:4px;font-size:0.75rem;}
+.grade-row input{padding:4px 6px;border-radius:6px;border:1px solid var(--border);font-size:0.75rem;background:var(--bg-card);color:var(--text);text-align:center;}
+.grade-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-weight:700;font-size:0.68rem;}
+
+/* Saved templates list */
+.saved-list{margin-top:12px;}
+.saved-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:4px;font-size:0.78rem;cursor:pointer;transition:all 0.15s;}
+.saved-item:hover{background:var(--primary-50);border-color:var(--primary);}
+.saved-item.active{background:var(--primary-50);border-color:var(--primary);}
+.saved-item .si-name{font-weight:600;color:var(--text);}
+.saved-item .si-default{font-size:0.62rem;color:var(--success);font-weight:700;}
+.saved-item .si-actions{display:flex;gap:4px;}
+.saved-item .si-actions button{padding:3px 6px;border-radius:4px;font-size:0.65rem;border:1px solid var(--border);background:var(--bg-card);cursor:pointer;color:var(--text);}
+
+@media(max-width:900px){.designer-layout{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;display:flex;flex-direction:column;gap:10px;"></div>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <div>
+        <h2 style="font-size:1.3rem;font-weight:800;color:var(--text);margin:0;">Report Card Designer</h2>
+        <p style="font-size:0.8rem;color:var(--text-secondary);margin:0;">Design your school's report card template</p>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="loadTemplates()" style="padding:8px 14px;font-size:0.78rem;"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="btn btn-primary" onclick="saveTemplate()" style="padding:8px 18px;font-size:0.78rem;"><i class="fas fa-save"></i> Save Template</button>
+    </div>
+</div>
+
+<div class="designer-layout">
+    <!-- Left: Configuration Panel -->
+    <div class="config-panel">
+        <!-- Saved Templates -->
+        <div class="config-section">
+            <h4><i class="fas fa-file-alt"></i> Saved Templates</h4>
+            <div id="savedTemplatesList" class="saved-list">
+                <div style="color:var(--text-light);font-size:0.78rem;padding:10px;">Loading...</div>
+            </div>
+            <button class="btn btn-ghost" onclick="newTemplate()" style="width:100%;margin-top:8px;padding:7px;font-size:0.75rem;"><i class="fas fa-plus"></i> New Template</button>
+        </div>
+
+        <!-- Presets -->
+        <div class="config-section">
+            <h4><i class="fas fa-palette"></i> Quick Presets</h4>
+            <div class="tmpl-grid">
+                <div class="tmpl-card active" onclick="applyPreset('standard',this)"><div class="tmpl-icon">📋</div><div class="tmpl-label">Standard</div></div>
+                <div class="tmpl-card" onclick="applyPreset('cbse',this)"><div class="tmpl-icon">🏛️</div><div class="tmpl-label">CBSE Style</div></div>
+                <div class="tmpl-card" onclick="applyPreset('modern',this)"><div class="tmpl-icon">✨</div><div class="tmpl-label">Modern</div></div>
+                <div class="tmpl-card" onclick="applyPreset('minimal',this)"><div class="tmpl-icon">📎</div><div class="tmpl-label">Minimal</div></div>
+            </div>
+        </div>
+
+        <!-- Template Name -->
+        <div class="config-section">
+            <h4><i class="fas fa-cog"></i> Template Settings</h4>
+            <div class="config-row">
+                <label>Template Name</label>
+                <input type="text" id="templateName" value="Standard Report Card" placeholder="Enter template name">
+            </div>
+            <div class="config-row">
+                <label>Page Size</label>
+                <select id="pageSize"><option value="A4">A4</option><option value="letter">Letter</option></select>
+            </div>
+            <div class="config-row">
+                <label>Orientation</label>
+                <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+            </div>
+            <label class="check-row"><input type="checkbox" id="isDefault"> Set as default template</label>
+        </div>
+
+        <!-- Header Config -->
+        <div class="config-section">
+            <h4><i class="fas fa-heading"></i> Header</h4>
+            <div class="config-row">
+                <label>Primary Color</label>
+                <input type="color" id="primaryColor" value="#4F46E5">
+            </div>
+            <div class="config-row">
+                <label>School Name Font Size</label>
+                <input type="range" id="schoolNameSize" min="14" max="28" value="18" oninput="updatePreview()">
+                <span style="font-size:0.68rem;color:var(--text-light);" id="schoolNameSizeLabel">18px</span>
+            </div>
+            <label class="check-row"><input type="checkbox" id="showLogo" checked onchange="updatePreview()"> Show School Logo</label>
+            <label class="check-row"><input type="checkbox" id="showAffiliation" checked onchange="updatePreview()"> Show Affiliation Number</label>
+            <label class="check-row"><input type="checkbox" id="showMotto" onchange="updatePreview()"> Show School Motto</label>
+        </div>
+
+        <!-- Content Config -->
+        <div class="config-section">
+            <h4><i class="fas fa-table"></i> Content Sections</h4>
+            <label class="check-row"><input type="checkbox" id="showStudentPhoto" onchange="updatePreview()"> Student Photo</label>
+            <label class="check-row"><input type="checkbox" id="showRank" checked onchange="updatePreview()"> Show Rank</label>
+            <label class="check-row"><input type="checkbox" id="showGrade" checked onchange="updatePreview()"> Show Grades</label>
+            <label class="check-row"><input type="checkbox" id="showGraceMarks" onchange="updatePreview()"> Show Grace Marks Column</label>
+            <label class="check-row"><input type="checkbox" id="showAttendance" checked onchange="updatePreview()"> Show Attendance Summary</label>
+            <label class="check-row"><input type="checkbox" id="showRemarks" checked onchange="updatePreview()"> Show Class Teacher Remarks</label>
+            <label class="check-row"><input type="checkbox" id="showGradingScale" checked onchange="updatePreview()"> Show Grading Scale Legend</label>
+        </div>
+
+        <!-- Signatures -->
+        <div class="config-section">
+            <h4><i class="fas fa-signature"></i> Signatures</h4>
+            <label class="check-row"><input type="checkbox" id="showClassTeacherSig" checked onchange="updatePreview()"> Class Teacher</label>
+            <label class="check-row"><input type="checkbox" id="showPrincipalSig" checked onchange="updatePreview()"> Principal</label>
+            <label class="check-row"><input type="checkbox" id="showParentSig" onchange="updatePreview()"> Parent/Guardian</label>
+            <label class="check-row"><input type="checkbox" id="showStamp" onchange="updatePreview()"> School Stamp</label>
+        </div>
+
+        <!-- Grading Scale -->
+        <div class="config-section">
+            <h4><i class="fas fa-chart-bar"></i> Grading Scale</h4>
+            <div id="gradingScaleEditor">
+                <div class="grade-row"><span class="grade-badge" style="background:#D1FAE5;color:#065F46;">A1</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="91" data-grade="A1" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#D1FAE5;color:#065F46;">A2</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="81" data-grade="A2" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#DBEAFE;color:#1E40AF;">B1</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="71" data-grade="B1" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#DBEAFE;color:#1E40AF;">B2</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="61" data-grade="B2" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#FEF3C7;color:#92400E;">C1</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="51" data-grade="C1" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#FEF3C7;color:#92400E;">C2</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="41" data-grade="C2" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#FFEDD5;color:#9A3412;">D</span><span style="color:var(--text-secondary);">≥</span><input type="number" value="33" data-grade="D" onchange="updatePreview()">%</div>
+                <div class="grade-row"><span class="grade-badge" style="background:#FEE2E2;color:#991B1B;">E</span><span style="color:var(--text-secondary);">&lt;</span><input type="number" value="33" data-grade="E" disabled>%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Live Preview -->
+    <div class="preview-panel">
+        <div class="preview-toolbar">
+            <button class="ptb active" onclick="setPreviewSize('a4',this)"><i class="fas fa-file"></i> A4</button>
+            <button class="ptb" onclick="setPreviewSize('mobile',this)"><i class="fas fa-mobile-alt"></i> Mobile</button>
+            <div style="flex:1;"></div>
+            <span style="font-size:0.72rem;color:var(--text-light);font-weight:600;">Live Preview</span>
+        </div>
+        <div class="rc-preview" id="reportCardPreview">
+            <!-- Dynamic preview rendered by JS -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% raw %}
+// ═══════════════════════════════════════════════════════════
+// TOAST & CONFIRM SYSTEM
+// ═══════════════════════════════════════════════════════════
+function showToast(message, type='success', duration=4000) {
+    const toast = document.createElement('div');
+    const colors = {success:'#10B981',error:'#EF4444',warning:'#F59E0B',info:'#3B82F6'};
+    const icons = {success:'fa-check-circle',error:'fa-times-circle',warning:'fa-exclamation-triangle',info:'fa-info-circle'};
+    toast.style.cssText = `display:flex;align-items:center;gap:10px;padding:14px 20px;background:var(--bg-card);border-left:4px solid ${colors[type]};border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);min-width:300px;max-width:450px;animation:slideIn 0.3s ease;font-size:0.85rem;color:var(--text);`;
+    toast.innerHTML = `<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:1.1rem;"></i><span style="flex:1">${message}</span><i class="fas fa-times" style="cursor:pointer;color:var(--text-light);font-size:0.8rem;" onclick="this.parentElement.remove()"></i>`;
+    document.getElementById('toastContainer').appendChild(toast);
+    setTimeout(() => { toast.style.animation='slideOut 0.3s ease forwards'; setTimeout(()=>toast.remove(),300); }, duration);
+}
+function showConfirm(message, title='Confirm Action') {
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay active';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:99999;';
+        overlay.innerHTML = `<div class="modal-box" style="max-width:420px;padding:28px;background:var(--bg-card);border-radius:var(--radius-lg);"><h3 style="margin-bottom:8px;color:var(--text);font-size:1.1rem;">${title}</h3><p style="color:var(--text-secondary);margin-bottom:24px;font-size:0.9rem;">${message}</p><div style="display:flex;gap:10px;justify-content:flex-end;"><button class="btn btn-ghost" style="padding:8px 20px;" id="_cCancel">Cancel</button><button class="btn btn-primary" style="padding:8px 20px;" id="_cConfirm">Confirm</button></div></div>`;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#_cCancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.querySelector('#_cConfirm').onclick = () => { overlay.remove(); resolve(true); };
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let currentTemplateId = null;
+let savedTemplates = [];
+
+const SAMPLE_DATA = {
+    school: { name: "Delhi Public School", address: "Sector 45, New Delhi — 110001", affiliation: "CBSE — 2730145", motto: "Service Before Self" },
+    student: { name: "Arjun Sharma", class: "Class 10", section: "A", roll: "15", admission: "DPS25S0015", father: "Mr. Rajesh Sharma", mother: "Mrs. Priya Sharma", dob: "15 Mar 2012" },
+    subjects: [
+        { name: "English", max: 100, obtained: 88, grace: 0, final: 88, grade: "A2" },
+        { name: "Hindi", max: 100, obtained: 72, grace: 0, final: 72, grade: "B1" },
+        { name: "Mathematics", max: 100, obtained: 95, grace: 0, final: 95, grade: "A1" },
+        { name: "Science", max: 100, obtained: 82, grace: 2, final: 84, grade: "A2" },
+        { name: "Social Science", max: 100, obtained: 67, grace: 0, final: 67, grade: "B2" },
+        { name: "Computer", max: 100, obtained: 91, grace: 0, final: 91, grade: "A1" },
+    ],
+    result: { total: 497, max: 600, pct: 82.8, grade: "A2", rank: 3, status: "Promoted" },
+    attendance: { total: 220, present: 205, pct: 93.2 },
+    remarks: "Arjun is a bright student with excellent analytical skills. He should focus more on Hindi and Social Science."
+};
+
+// ═══════════════════════════════════════════════════════════
+// PRESETS
+// ═══════════════════════════════════════════════════════════
+const PRESETS = {
+    standard: { primaryColor: '#4F46E5', schoolNameSize: 18, showLogo: true, showAffiliation: true, showMotto: false, showStudentPhoto: false, showRank: true, showGrade: true, showGraceMarks: false, showAttendance: true, showRemarks: true, showGradingScale: true, showClassTeacherSig: true, showPrincipalSig: true, showParentSig: false, showStamp: false },
+    cbse: { primaryColor: '#1E40AF', schoolNameSize: 20, showLogo: true, showAffiliation: true, showMotto: true, showStudentPhoto: true, showRank: true, showGrade: true, showGraceMarks: true, showAttendance: true, showRemarks: true, showGradingScale: true, showClassTeacherSig: true, showPrincipalSig: true, showParentSig: true, showStamp: true },
+    modern: { primaryColor: '#7C3AED', schoolNameSize: 16, showLogo: true, showAffiliation: false, showMotto: false, showStudentPhoto: false, showRank: true, showGrade: true, showGraceMarks: false, showAttendance: false, showRemarks: true, showGradingScale: false, showClassTeacherSig: true, showPrincipalSig: true, showParentSig: false, showStamp: false },
+    minimal: { primaryColor: '#374151', schoolNameSize: 16, showLogo: false, showAffiliation: false, showMotto: false, showStudentPhoto: false, showRank: false, showGrade: true, showGraceMarks: false, showAttendance: false, showRemarks: false, showGradingScale: false, showClassTeacherSig: true, showPrincipalSig: true, showParentSig: false, showStamp: false },
+};
+
+function applyPreset(name, el) {
+    document.querySelectorAll('.tmpl-card').forEach(c => c.classList.remove('active'));
+    if(el) el.classList.add('active');
+    const p = PRESETS[name];
+    if(!p) return;
+    document.getElementById('primaryColor').value = p.primaryColor;
+    document.getElementById('schoolNameSize').value = p.schoolNameSize;
+    document.getElementById('schoolNameSizeLabel').textContent = p.schoolNameSize + 'px';
+    for(const [key, val] of Object.entries(p)) {
+        const el = document.getElementById(key);
+        if(el && el.type === 'checkbox') el.checked = val;
+        else if(el && el.type !== 'color' && el.type !== 'range') el.value = val;
+    }
+    updatePreview();
+    showToast(`Applied "${name}" preset`, 'info');
+}
+
+// ═══════════════════════════════════════════════════════════
+// PREVIEW RENDERING
+// ═══════════════════════════════════════════════════════════
+function getConfig() {
+    const grading = {};
+    document.querySelectorAll('#gradingScaleEditor input[data-grade]').forEach(inp => {
+        if(!inp.disabled) grading[inp.dataset.grade] = parseInt(inp.value) || 0;
+    });
+    return {
+        primaryColor: document.getElementById('primaryColor').value,
+        schoolNameSize: parseInt(document.getElementById('schoolNameSize').value),
+        showLogo: document.getElementById('showLogo').checked,
+        showAffiliation: document.getElementById('showAffiliation').checked,
+        showMotto: document.getElementById('showMotto').checked,
+        showStudentPhoto: document.getElementById('showStudentPhoto').checked,
+        showRank: document.getElementById('showRank').checked,
+        showGrade: document.getElementById('showGrade').checked,
+        showGraceMarks: document.getElementById('showGraceMarks').checked,
+        showAttendance: document.getElementById('showAttendance').checked,
+        showRemarks: document.getElementById('showRemarks').checked,
+        showGradingScale: document.getElementById('showGradingScale').checked,
+        showClassTeacherSig: document.getElementById('showClassTeacherSig').checked,
+        showPrincipalSig: document.getElementById('showPrincipalSig').checked,
+        showParentSig: document.getElementById('showParentSig').checked,
+        showStamp: document.getElementById('showStamp').checked,
+        gradingScale: grading,
+    };
+}
+
+function updatePreview() {
+    const c = getConfig();
+    const d = SAMPLE_DATA;
+    const pc = c.primaryColor;
+    document.getElementById('schoolNameSizeLabel').textContent = c.schoolNameSize + 'px';
+
+    let html = '';
+
+    // Header
+    html += `<div class="rc-header" style="border-bottom-color:${pc};">`;
+    if(c.showLogo) html += `<div style="width:50px;height:50px;border-radius:50%;background:${pc}15;display:inline-flex;align-items:center;justify-content:center;margin-bottom:4px;"><i class="fas fa-school" style="font-size:22px;color:${pc};"></i></div>`;
+    html += `<div class="rc-school-name" style="font-size:${c.schoolNameSize}px;">${d.school.name}</div>`;
+    html += `<div class="rc-school-addr">${d.school.address}</div>`;
+    if(c.showAffiliation) html += `<div class="rc-school-addr">${d.school.affiliation}</div>`;
+    if(c.showMotto) html += `<div style="font-size:9px;color:${pc};font-style:italic;margin-top:2px;">"${d.school.motto}"</div>`;
+    html += `<div class="rc-exam-title" style="color:${pc};">Mid-Term Examination 2025-26</div>`;
+    html += `</div>`;
+
+    // Student Info
+    html += `<div class="rc-info-grid">`;
+    html += `<div><span class="rc-info-label">Student Name:</span> <span class="rc-info-value">${d.student.name}</span></div>`;
+    html += `<div><span class="rc-info-label">Class / Section:</span> <span class="rc-info-value">${d.student.class} - ${d.student.section}</span></div>`;
+    html += `<div><span class="rc-info-label">Roll Number:</span> <span class="rc-info-value">${d.student.roll}</span></div>`;
+    html += `<div><span class="rc-info-label">Admission No:</span> <span class="rc-info-value">${d.student.admission}</span></div>`;
+    html += `<div><span class="rc-info-label">Father's Name:</span> <span class="rc-info-value">${d.student.father}</span></div>`;
+    html += `<div><span class="rc-info-label">Mother's Name:</span> <span class="rc-info-value">${d.student.mother}</span></div>`;
+    html += `</div>`;
+
+    // Marks Table
+    html += `<table class="rc-marks-table"><thead><tr>`;
+    html += `<th style="background:${pc};">S.No.</th><th style="background:${pc};">Subject</th><th style="background:${pc};">Max Marks</th><th style="background:${pc};">Marks Obtained</th>`;
+    if(c.showGraceMarks) html += `<th style="background:${pc};">Grace</th>`;
+    html += `<th style="background:${pc};">Final Marks</th>`;
+    if(c.showGrade) html += `<th style="background:${pc};">Grade</th>`;
+    html += `</tr></thead><tbody>`;
+    d.subjects.forEach((s, i) => {
+        const passed = s.final >= 33;
+        const mc = passed ? '#1E293B' : '#EF4444';
+        html += `<tr><td>${i+1}</td><td style="text-align:left;">${s.name}</td><td>${s.max}</td><td style="color:${mc};font-weight:600;">${s.obtained}</td>`;
+        if(c.showGraceMarks) html += `<td>${s.grace || '-'}</td>`;
+        html += `<td style="font-weight:700;">${s.final}</td>`;
+        if(c.showGrade) html += `<td><span class="grade-badge" style="background:${getGradeColor(s.grade)};font-size:8px;">${s.grade}</span></td>`;
+        html += `</tr>`;
+    });
+    html += `<tr class="total-row"><td></td><td style="text-align:left;">TOTAL</td><td>${d.result.max}</td><td></td>`;
+    if(c.showGraceMarks) html += `<td></td>`;
+    html += `<td style="font-weight:800;">${d.result.total}</td>`;
+    if(c.showGrade) html += `<td></td>`;
+    html += `</tr></tbody></table>`;
+
+    // Result Box
+    html += `<div class="rc-result-box">`;
+    html += `<div class="rc-result-item"><div class="label">Percentage</div><div class="value" style="color:${pc};">${d.result.pct}%</div></div>`;
+    html += `<div class="rc-result-item"><div class="label">Overall Grade</div><div class="value">${d.result.grade}</div></div>`;
+    if(c.showRank) html += `<div class="rc-result-item"><div class="label">Class Rank</div><div class="value">#${d.result.rank}</div></div>`;
+    html += `<div class="rc-result-item"><div class="label">Result</div><div class="value" style="color:#10B981;">${d.result.status}</div></div>`;
+    html += `</div>`;
+
+    // Attendance
+    if(c.showAttendance) {
+        html += `<div class="rc-attendance">`;
+        html += `<div class="rc-att-item"><div class="att-label">Working Days</div><div class="att-val">${d.attendance.total}</div></div>`;
+        html += `<div class="rc-att-item"><div class="att-label">Days Present</div><div class="att-val">${d.attendance.present}</div></div>`;
+        html += `<div class="rc-att-item"><div class="att-label">Attendance %</div><div class="att-val">${d.attendance.pct}%</div></div>`;
+        html += `</div>`;
+    }
+
+    // Remarks
+    if(c.showRemarks) {
+        html += `<div class="rc-remarks" style="border-left-color:${pc};"><strong>Class Teacher's Remarks:</strong> ${d.remarks}</div>`;
+    }
+
+    // Grading Scale
+    if(c.showGradingScale) {
+        html += `<div class="rc-grade-legend">`;
+        html += `A1 (≥91%) • A2 (≥81%) • B1 (≥71%) • B2 (≥61%) • C1 (≥51%) • C2 (≥41%) • D (≥33%) • E (&lt;33%)`;
+        html += `</div>`;
+    }
+
+    // Signatures
+    html += `<div class="rc-signatures">`;
+    if(c.showClassTeacherSig) html += `<div class="rc-sig"><div class="rc-sig-line"></div>Class Teacher</div>`;
+    if(c.showParentSig) html += `<div class="rc-sig"><div class="rc-sig-line"></div>Parent/Guardian</div>`;
+    if(c.showStamp) html += `<div class="rc-sig"><div style="width:50px;height:50px;border:2px dashed #94A3B8;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:7px;color:#94A3B8;">STAMP</div></div>`;
+    if(c.showPrincipalSig) html += `<div class="rc-sig"><div class="rc-sig-line"></div>Principal</div>`;
+    html += `</div>`;
+
+    document.getElementById('reportCardPreview').innerHTML = html;
+}
+
+function getGradeColor(grade) {
+    const m = {A1:'#D1FAE5',A2:'#D1FAE5',B1:'#DBEAFE',B2:'#DBEAFE',C1:'#FEF3C7',C2:'#FEF3C7',D:'#FFEDD5',E:'#FEE2E2'};
+    return m[grade] || '#F1F5F9';
+}
+
+function setPreviewSize(size, el) {
+    document.querySelectorAll('.preview-toolbar .ptb').forEach(b => b.classList.remove('active'));
+    if(el) el.classList.add('active');
+    const preview = document.getElementById('reportCardPreview');
+    if(size === 'mobile') { preview.style.maxWidth = '375px'; preview.style.fontSize = '90%'; }
+    else { preview.style.maxWidth = '595px'; preview.style.fontSize = '100%'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+// API — SAVE / LOAD TEMPLATES
+// ═══════════════════════════════════════════════════════════
+async function loadTemplates() {
+    try {
+        const res = await fetch('/api/report-card/templates');
+        const data = await res.json();
+        if(data.success) {
+            savedTemplates = data.templates;
+            renderSavedList();
+        }
+    } catch(e) {
+        console.error(e);
+    }
+}
+
+function renderSavedList() {
+    const container = document.getElementById('savedTemplatesList');
+    if(savedTemplates.length === 0) {
+        container.innerHTML = '<div style="color:var(--text-light);font-size:0.78rem;padding:10px;text-align:center;">No saved templates yet</div>';
+        return;
+    }
+    container.innerHTML = savedTemplates.map(t => `
+        <div class="saved-item ${t.id === currentTemplateId ? 'active' : ''}" onclick="loadTemplate('${t.id}')">
+            <div><div class="si-name">${t.name}</div>${t.is_default ? '<div class="si-default">Default</div>' : ''}</div>
+            <div class="si-actions">
+                <button onclick="event.stopPropagation();deleteTemplate('${t.id}')" title="Delete"><i class="fas fa-trash" style="color:var(--danger);font-size:0.65rem;"></i></button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function loadTemplate(id) {
+    const t = savedTemplates.find(x => x.id === id);
+    if(!t) return;
+    currentTemplateId = t.id;
+    document.getElementById('templateName').value = t.name;
+    document.getElementById('pageSize').value = t.page_size || 'A4';
+    document.getElementById('orientation').value = t.orientation || 'portrait';
+    document.getElementById('isDefault').checked = t.is_default;
+
+    const lj = t.layout_json || {};
+    if(lj.primaryColor) document.getElementById('primaryColor').value = lj.primaryColor;
+    if(lj.schoolNameSize) { document.getElementById('schoolNameSize').value = lj.schoolNameSize; document.getElementById('schoolNameSizeLabel').textContent = lj.schoolNameSize + 'px'; }
+    const bools = ['showLogo','showAffiliation','showMotto','showStudentPhoto','showRank','showGrade','showGraceMarks','showAttendance','showRemarks','showGradingScale','showClassTeacherSig','showPrincipalSig','showParentSig','showStamp'];
+    bools.forEach(key => {
+        const el = document.getElementById(key);
+        if(el) el.checked = lj[key] !== undefined ? lj[key] : el.checked;
+    });
+
+    renderSavedList();
+    updatePreview();
+    showToast(`Loaded "${t.name}"`, 'info');
+}
+
+function newTemplate() {
+    currentTemplateId = null;
+    document.getElementById('templateName').value = 'New Report Card';
+    document.getElementById('isDefault').checked = false;
+    applyPreset('standard', document.querySelector('.tmpl-card'));
+    showToast('New template started', 'info');
+}
+
+async function saveTemplate() {
+    const config = getConfig();
+    const payload = {
+        id: currentTemplateId,
+        name: document.getElementById('templateName').value,
+        page_size: document.getElementById('pageSize').value,
+        orientation: document.getElementById('orientation').value,
+        is_default: document.getElementById('isDefault').checked,
+        layout_json: config,
+        show_rank: config.showRank,
+        show_attendance: config.showAttendance,
+        show_remarks: config.showRemarks,
+        show_grade: config.showGrade,
+        grading_scale: config.gradingScale,
+        header_config: {
+            primaryColor: config.primaryColor,
+            schoolNameSize: config.schoolNameSize,
+            showLogo: config.showLogo,
+            showAffiliation: config.showAffiliation,
+            showMotto: config.showMotto,
+        },
+        footer_config: {
+            showClassTeacherSig: config.showClassTeacherSig,
+            showPrincipalSig: config.showPrincipalSig,
+            showParentSig: config.showParentSig,
+            showStamp: config.showStamp,
+        },
+    };
+
+    try {
+        const res = await fetch('/api/report-card/templates', {
+            method: 'POST', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if(data.success) {
+            currentTemplateId = data.id;
+            showToast('Template saved successfully!', 'success');
+            loadTemplates();
+        } else {
+            showToast(data.error || 'Failed to save', 'error');
+        }
+    } catch(e) {
+        showToast('Network error', 'error');
+    }
+}
+
+async function deleteTemplate(id) {
+    const ok = await showConfirm('Are you sure you want to delete this template?', 'Delete Template');
+    if(!ok) return;
+    try {
+        const res = await fetch(`/api/report-card/templates/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if(data.success) {
+            if(currentTemplateId === id) currentTemplateId = null;
+            showToast('Template deleted', 'success');
+            loadTemplates();
+        } else {
+            showToast(data.error || 'Failed to delete', 'error');
+        }
+    } catch(e) {
+        showToast('Network error', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    loadTemplates();
+    updatePreview();
+    // Live update on color/range change
+    document.getElementById('primaryColor').addEventListener('input', updatePreview);
+    document.getElementById('schoolNameSize').addEventListener('input', updatePreview);
+});
+{% endraw %}
+</script>
+{% endblock %}

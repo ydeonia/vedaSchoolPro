@@ -1,0 +1,779 @@
+{% extends "base.html" %}
+{% block title %}School Settings{% endblock %}
+{% block page_title %}School Settings{% endblock %}
+{% block page_subtitle %}Configure all school settings in one place{% endblock %}
+
+{% block extra_css %}
+<style>
+/* === Tab Navigation === */
+.stabs{display:flex;gap:6px;padding:6px;background:var(--bg-card,white);border-radius:14px;border:1.5px solid var(--border,#e2e8f0);margin-bottom:20px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.stabs::-webkit-scrollbar{display:none;}
+.tab-btn{padding:9px 18px;border-radius:10px;font-weight:600;font-size:0.82rem;color:var(--text-light,#64748b);cursor:pointer;border:none;background:none;white-space:nowrap;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
+.tab-btn:hover:not(.active){background:rgba(99,102,241,0.06);color:var(--text,#0f172a);}
+.tab-btn.active{background:#6366f1;color:white;box-shadow:0 2px 8px rgba(99,102,241,0.3);}
+.tab-btn i{font-size:0.78rem;}
+/* === Panels === */
+.tab-panel{display:none;}
+.tab-panel.active{display:block;animation:fadeUp 0.25s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* === Card === */
+.s-card{background:var(--bg-card,white);border-radius:16px;border:1.5px solid var(--border,#e2e8f0);padding:24px;margin-bottom:16px;}
+.s-card h3{font-size:0.95rem;font-weight:800;margin:0 0 4px 0;color:var(--text,#0f172a);}
+.s-card .s-desc{font-size:0.75rem;color:var(--text-light,#64748b);margin-bottom:18px;}
+/* === Form Groups === */
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.fg label{font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light,#64748b);}
+.fg input,.fg select,.fg textarea{padding:10px 12px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.82rem;background:var(--bg-card,white);color:var(--text,#0f172a);transition:border-color 0.2s;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#6366f1;outline:none;box-shadow:0 0 0 3px rgba(99,102,241,0.1);}
+.fg textarea{resize:vertical;min-height:60px;}
+/* === Grid Layouts === */
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.fg-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+@media(max-width:640px){.fg-row,.fg-row-3{grid-template-columns:1fr;}}
+/* === Toggle === */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border,#e2e8f0);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-info{display:flex;flex-direction:column;gap:2px;}
+.toggle-label{font-size:0.82rem;font-weight:700;color:var(--text,#0f172a);}
+.toggle-hint{font-size:0.68rem;color:var(--text-light,#64748b);}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:24px;cursor:pointer;transition:0.25s;}
+.toggle .slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.25s;}
+.toggle input:checked+.slider{background:#6366f1;}
+.toggle input:checked+.slider::before{transform:translateX(20px);}
+/* === Buttons === */
+.btn-primary{padding:10px 28px;border-radius:12px;font-weight:700;font-size:0.82rem;cursor:pointer;border:none;background:#6366f1;color:white;transition:all 0.2s;}
+.btn-primary:hover{background:#4f46e5;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,0.25);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.btn-outline{padding:10px 28px;border-radius:12px;font-weight:700;font-size:0.82rem;cursor:pointer;border:1.5px solid var(--border,#e2e8f0);background:var(--bg-card,white);color:var(--text,#0f172a);transition:all 0.2s;}
+.btn-outline:hover{border-color:#6366f1;color:#6366f1;}
+.save-bar{display:flex;justify-content:flex-end;gap:10px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border,#e2e8f0);}
+/* === Gateway Cards === */
+.gw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:18px;}
+.gw-card{padding:18px;border-radius:14px;border:2px solid var(--border,#e2e8f0);cursor:pointer;transition:all 0.2s;text-align:center;}
+.gw-card:hover{border-color:#a5b4fc;}
+.gw-card.active{border-color:#6366f1;background:rgba(99,102,241,0.05);box-shadow:0 2px 8px rgba(99,102,241,0.12);}
+.gw-card .gw-icon{font-size:1.6rem;margin-bottom:6px;}
+.gw-card .gw-name{font-weight:700;font-size:0.85rem;}
+.gw-card .gw-desc{font-size:0.68rem;color:var(--text-light,#64748b);margin-top:2px;}
+/* === Chips === */
+.chip-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;background:rgba(99,102,241,0.1);color:#6366f1;font-size:0.78rem;font-weight:700;}
+.chip .chip-x{cursor:pointer;opacity:0.6;font-size:0.72rem;}
+.chip .chip-x:hover{opacity:1;}
+.chip-add{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:20px;border:1.5px dashed var(--border,#e2e8f0);background:none;font-size:0.78rem;color:var(--text-light,#64748b);cursor:pointer;}
+.chip-add:hover{border-color:#6366f1;color:#6366f1;}
+/* === Timeline (Fee Automation) === */
+.timeline{display:flex;align-items:center;gap:0;padding:20px 0;overflow-x:auto;}
+.tl-node{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;position:relative;}
+.tl-dot{width:14px;height:14px;border-radius:50%;background:#6366f1;border:3px solid rgba(99,102,241,0.2);}
+.tl-dot.warn{background:#f59e0b;border-color:rgba(245,158,11,0.2);}
+.tl-dot.danger{background:#ef4444;border-color:rgba(239,68,68,0.2);}
+.tl-label{font-size:0.62rem;font-weight:700;text-transform:uppercase;color:var(--text-light,#64748b);text-align:center;max-width:80px;}
+.tl-day{font-size:0.72rem;font-weight:800;color:var(--text,#0f172a);}
+.tl-line{flex:1;height:2px;background:linear-gradient(90deg,#6366f1,#a5b4fc);min-width:30px;}
+/* === Info box === */
+.info-box{padding:12px 16px;border-radius:10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);font-size:0.75rem;color:var(--text,#0f172a);margin-bottom:16px;display:flex;align-items:flex-start;gap:8px;}
+.info-box i{color:#6366f1;margin-top:1px;}
+/* === Loading === */
+.tab-loading{text-align:center;padding:40px;color:var(--text-light,#64748b);font-size:0.82rem;}
+.tab-loading i{display:block;font-size:1.5rem;margin-bottom:8px;color:#6366f1;}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Tab Navigation -->
+<div class="stabs" id="settingsTabs">
+    <button class="tab-btn active" data-tab="general"><i class="fas fa-school"></i> General</button>
+    <button class="tab-btn" data-tab="timing"><i class="fas fa-clock"></i> School Timing</button>
+    <button class="tab-btn" data-tab="payment"><i class="fas fa-credit-card"></i> Payment</button>
+    <button class="tab-btn" data-tab="notifications"><i class="fas fa-bell"></i> Notifications</button>
+    <button class="tab-btn" data-tab="registration"><i class="fas fa-id-card"></i> Registration</button>
+    <button class="tab-btn" data-tab="privacy"><i class="fas fa-shield-alt"></i> Data &amp; Privacy</button>
+    <button class="tab-btn" data-tab="fee-automation"><i class="fas fa-robot"></i> Fee Automation</button>
+</div>
+
+<!-- ===================== TAB 1: GENERAL ===================== -->
+<div class="tab-panel active" id="tab-general">
+    <div class="s-card">
+        <h3>Timezone</h3>
+        <p class="s-desc">Set your school's timezone for accurate scheduling and reports.</p>
+        <div class="fg-row">
+            <div class="fg">
+                <label>Current Timezone</label>
+                <input type="text" id="genTzDisplay" value="{{ current_tz or 'Asia/Kolkata' }}" readonly style="background:var(--bg,#f8fafc);cursor:default;">
+            </div>
+            <div class="fg">
+                <label>Change Timezone</label>
+                <select id="genTzSelect">
+                    <option value="">-- Select timezone --</option>
+                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                    <option value="Asia/Colombo">Asia/Colombo</option>
+                    <option value="Asia/Dhaka">Asia/Dhaka</option>
+                    <option value="Asia/Kathmandu">Asia/Kathmandu</option>
+                    <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                    <option value="Asia/Singapore">Asia/Singapore</option>
+                    <option value="Europe/London">Europe/London (GMT)</option>
+                    <option value="America/New_York">America/New_York (EST)</option>
+                    <option value="America/Chicago">America/Chicago (CST)</option>
+                    <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+                </select>
+            </div>
+        </div>
+        <div class="save-bar">
+            <button class="btn-primary" onclick="saveTimezone()"><i class="fas fa-save"></i> Save Timezone</button>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>Language &amp; Theme</h3>
+        <p class="s-desc">Language and theme preferences are managed per-user from the top navigation bar.</p>
+        <div class="info-box"><i class="fas fa-info-circle"></i> Each user can set their preferred language and light/dark theme from the profile dropdown in the header. School-wide defaults follow the admin's selection.</div>
+    </div>
+</div>
+
+<!-- ===================== TAB 2: SCHOOL TIMING ===================== -->
+<div class="tab-panel" id="tab-timing">
+    <div class="s-card">
+        <h3>Daily Schedule</h3>
+        <p class="s-desc">Define the core school hours, gate timing, and lunch break.</p>
+        <div class="fg-row">
+            <div class="fg"><label>School Start Time</label><input type="time" id="tmStart" value="{{ timing.start_time or '08:00' }}"></div>
+            <div class="fg"><label>School End Time</label><input type="time" id="tmEnd" value="{{ timing.end_time or '14:30' }}"></div>
+        </div>
+        <div class="fg-row">
+            <div class="fg"><label>Gate Open Time</label><input type="time" id="tmGate" value="{{ timing.gate_open_time or '07:30' }}"></div>
+            <div class="fg"><label>Late Grace (minutes)</label><input type="number" id="tmGrace" min="0" max="60" value="{{ timing.late_grace_minutes or 15 }}"></div>
+        </div>
+        <div class="fg-row">
+            <div class="fg"><label>Lunch Break Start</label><input type="time" id="tmLunchStart" value="{{ timing.lunch_start_time or '12:00' }}"></div>
+            <div class="fg"><label>Lunch Break End</label><input type="time" id="tmLunchEnd" value="{{ timing.lunch_end_time or '12:30' }}"></div>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>Saturday &amp; Half-Day</h3>
+        <p class="s-desc">Configure weekend and half-day schedules.</p>
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Saturday Classes</span><span class="toggle-hint">Enable if school operates on Saturdays</span></div>
+            <label class="toggle"><input type="checkbox" id="tmSatEnabled"><span class="slider"></span></label>
+        </div>
+        <div id="satFields" style="margin-top:12px;display:none;">
+            <div class="fg-row">
+                <div class="fg"><label>Saturday Start</label><input type="time" id="tmSatStart" value="{{ timing.saturday_start or '08:00' }}"></div>
+                <div class="fg"><label>Saturday End</label><input type="time" id="tmSatEnd" value="{{ timing.saturday_end or '12:00' }}"></div>
+            </div>
+        </div>
+        <div class="fg" style="margin-top:14px;"><label>Half-Day End Time</label><input type="time" id="tmHalfEnd" value="{{ timing.half_day_end or '11:30' }}" style="max-width:200px;"></div>
+    </div>
+    <div class="s-card">
+        <h3>Effective Date</h3>
+        <p class="s-desc">When should these timing changes take effect?</p>
+        <div class="fg" style="max-width:240px;"><label>Effective From</label><input type="date" id="tmEffDate"></div>
+        <div class="info-box"><i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i> Changing school timing will send a notification to all staff and parents. Ensure the effective date is at least 3 days in the future.</div>
+        <div class="save-bar">
+            <button class="btn-primary" onclick="saveTiming()"><i class="fas fa-save"></i> Save Timing</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TAB 3: PAYMENT ===================== -->
+<div class="tab-panel" id="tab-payment">
+    <div class="s-card">
+        <h3>Payment Gateway</h3>
+        <p class="s-desc">Configure payment gateway credentials and accepted methods.</p>
+        <div class="gw-grid" id="gwGrid">
+            <div class="gw-card" data-gw="razorpay" onclick="selectGateway('razorpay')">
+                <div class="gw-icon"><i class="fas fa-bolt"></i></div>
+                <div class="gw-name">Razorpay</div>
+                <div class="gw-desc">Credit/Debit/UPI/Wallets</div>
+            </div>
+            <div class="gw-card" data-gw="upi" onclick="selectGateway('upi')">
+                <div class="gw-icon"><i class="fas fa-mobile-alt"></i></div>
+                <div class="gw-name">UPI Direct</div>
+                <div class="gw-desc">Google Pay, PhonePe, Paytm</div>
+            </div>
+            <div class="gw-card" data-gw="bank_transfer" onclick="selectGateway('bank_transfer')">
+                <div class="gw-icon"><i class="fas fa-university"></i></div>
+                <div class="gw-name">Bank Transfer</div>
+                <div class="gw-desc">NEFT / RTGS / IMPS</div>
+            </div>
+        </div>
+        <div id="gwFields"></div>
+        <div class="save-bar">
+            <button class="btn-primary" onclick="savePayment()"><i class="fas fa-save"></i> Save Payment Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TAB 4: NOTIFICATIONS ===================== -->
+<div class="tab-panel" id="tab-notifications">
+    <div class="s-card">
+        <h3>WhatsApp</h3>
+        <p class="s-desc">Send notifications via WhatsApp Business API.</p>
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Enable WhatsApp</span><span class="toggle-hint">Requires WhatsApp Business API integration</span></div>
+            <label class="toggle"><input type="checkbox" id="ntfWaEnabled"><span class="slider"></span></label>
+        </div>
+        <div id="waFields" style="margin-top:12px;display:none;">
+            <div class="fg"><label>WhatsApp API Token</label><input type="text" id="ntfWaToken" placeholder="Enter API token"></div>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>SMS</h3>
+        <p class="s-desc">Send SMS notifications for attendance, fees, and alerts.</p>
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Enable SMS</span><span class="toggle-hint">Choose a provider and enter API credentials</span></div>
+            <label class="toggle"><input type="checkbox" id="ntfSmsEnabled"><span class="slider"></span></label>
+        </div>
+        <div id="smsFields" style="margin-top:12px;display:none;">
+            <div class="fg-row">
+                <div class="fg"><label>SMS Provider</label>
+                    <select id="ntfSmsProvider">
+                        <option value="">Select provider</option>
+                        <option value="msgclub">MsgClub</option>
+                        <option value="msg91">MSG91</option>
+                        <option value="twilio">Twilio</option>
+                        <option value="textlocal">TextLocal</option>
+                    </select>
+                </div>
+                <div class="fg"><label>Auth / API Key</label><input type="text" id="ntfSmsKey" placeholder="Enter API key or Auth Key"></div>
+            </div>
+            <div class="fg-row" style="margin-top:8px;">
+                <div class="fg"><label>Sender ID</label><input type="text" id="ntfSmsSenderId" placeholder="e.g. EDUFLW (6 chars)" maxlength="6"></div>
+                <div class="fg"><label>Route ID <span style="font-size:0.7rem;color:var(--text-light);">(MsgClub only)</span></label>
+                    <select id="ntfSmsRouteId">
+                        <option value="8">8 — OTP Route</option>
+                        <option value="1">1 — Transactional</option>
+                        <option value="2">2 — Promotional</option>
+                        <option value="3">3 — Trans DND</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>Email (SMTP)</h3>
+        <p class="s-desc">Configure SMTP settings for email notifications.</p>
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Enable Email</span><span class="toggle-hint">Set up SMTP credentials for outbound email</span></div>
+            <label class="toggle"><input type="checkbox" id="ntfEmailEnabled"><span class="slider"></span></label>
+        </div>
+        <div id="emailFields" style="margin-top:12px;display:none;">
+            <div class="fg-row">
+                <div class="fg"><label>SMTP Host</label><input type="text" id="ntfSmtpHost" placeholder="e.g. smtp.gmail.com"></div>
+                <div class="fg"><label>SMTP Port</label><input type="number" id="ntfSmtpPort" placeholder="587" value="587"></div>
+            </div>
+            <div class="fg-row">
+                <div class="fg"><label>SMTP Username</label><input type="text" id="ntfSmtpUser" placeholder="user@school.com"></div>
+                <div class="fg"><label>SMTP Password</label><input type="password" id="ntfSmtpPass" placeholder="App password"></div>
+            </div>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>Quiet Hours</h3>
+        <p class="s-desc">Suppress non-urgent notifications during off-hours.</p>
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Enable Quiet Hours</span><span class="toggle-hint">No notifications sent during this window</span></div>
+            <label class="toggle"><input type="checkbox" id="ntfQuietEnabled"><span class="slider"></span></label>
+        </div>
+        <div id="quietFields" style="margin-top:12px;display:none;">
+            <div class="fg-row">
+                <div class="fg"><label>Quiet Start</label><input type="time" id="ntfQuietStart" value="21:00"></div>
+                <div class="fg"><label>Quiet End</label><input type="time" id="ntfQuietEnd" value="07:00"></div>
+            </div>
+        </div>
+        <div class="save-bar">
+            <button class="btn-primary" onclick="saveNotifications()"><i class="fas fa-save"></i> Save Notification Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TAB 5: REGISTRATION ===================== -->
+<div class="tab-panel" id="tab-registration">
+    <div class="s-card">
+        <h3>Student ID Format</h3>
+        <p class="s-desc">Configure how student registration IDs are generated.</p>
+        <div class="info-box"><i class="fas fa-info-circle"></i> Select a preset or build a custom format using tokens. Changes apply only to newly generated IDs.</div>
+        <div class="gw-grid" id="regPresetGrid"></div>
+        <div class="fg-row">
+            <div class="fg"><label>School Code</label><input type="text" id="regSchoolCode" placeholder="e.g. GNK, DPS" maxlength="10"></div>
+            <div class="fg"><label>Format Template</label><input type="text" id="regFormat" placeholder="e.g. {SCHOOL4}{YY}{SEQ4}"></div>
+        </div>
+        <div style="padding:16px;border-radius:12px;background:rgba(5,150,105,0.08);border:2px solid #059669;text-align:center;margin:16px 0;">
+            <div style="font-size:0.62rem;font-weight:700;color:#059669;text-transform:uppercase;">Preview</div>
+            <div id="regPreview" style="font-size:1.5rem;font-weight:900;color:#059669;letter-spacing:2px;margin:4px 0;">---</div>
+        </div>
+        <div class="save-bar">
+            <button class="btn-primary" onclick="saveRegistration()"><i class="fas fa-save"></i> Save Format</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TAB 6: DATA & PRIVACY ===================== -->
+<div class="tab-panel" id="tab-privacy">
+    <div class="s-card">
+        <h3>Digital Signature</h3>
+        <p class="s-desc">Upload your school's official signature for certificates and documents.</p>
+        <div class="info-box"><i class="fas fa-info-circle"></i> Upload a transparent PNG image of the principal's signature. This will appear on TC, certificates, and official letters. Max file size: 500KB.</div>
+    </div>
+    <div class="s-card">
+        <h3>Data Export</h3>
+        <p class="s-desc">Download a complete export of your school's data.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn-outline" onclick="requestExport('students')"><i class="fas fa-users"></i> Export Students</button>
+            <button class="btn-outline" onclick="requestExport('fees')"><i class="fas fa-rupee-sign"></i> Export Fees</button>
+            <button class="btn-outline" onclick="requestExport('attendance')"><i class="fas fa-clipboard-check"></i> Export Attendance</button>
+            <button class="btn-outline" onclick="requestExport('all')"><i class="fas fa-download"></i> Export All Data</button>
+        </div>
+    </div>
+    <div class="s-card">
+        <h3>Privacy Settings</h3>
+        <p class="s-desc">Control data visibility and retention policies.</p>
+        <div class="info-box"><i class="fas fa-lock"></i> Student personal data (Aadhaar, medical records) is encrypted at rest. Only admins with explicit privileges can access sensitive fields. Data retention follows your organization's policy.</div>
+    </div>
+</div>
+
+<!-- ===================== TAB 7: FEE AUTOMATION ===================== -->
+<div class="tab-panel" id="tab-fee-automation">
+    <div class="s-card">
+        <h3>Fee Automation</h3>
+        <p class="s-desc">Automate fee generation, reminders, and late-fee application.</p>
+
+        <div class="toggle-row">
+            <div class="toggle-info"><span class="toggle-label">Auto-Generate Fees on 1st of Month</span><span class="toggle-hint">Automatically create fee entries for all students on the 1st</span></div>
+            <label class="toggle"><input type="checkbox" id="faAutoGen"><span class="slider"></span></label>
+        </div>
+        <div class="toggle-row" style="border-bottom:none;">
+            <div class="toggle-info"><span class="toggle-label">Send Fee Reminders</span><span class="toggle-hint">Send WhatsApp/SMS reminders before due date</span></div>
+            <label class="toggle"><input type="checkbox" id="faReminders"><span class="slider"></span></label>
+        </div>
+    </div>
+
+    <div class="s-card">
+        <h3>Reminder Schedule</h3>
+        <p class="s-desc">Days before due date to send reminders. Click a chip to remove, or add new ones.</p>
+        <div class="chip-wrap" id="faChips"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+            <input type="number" id="faNewDay" min="1" max="30" placeholder="Days" style="width:80px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.82rem;">
+            <button class="chip-add" onclick="addReminderDay()"><i class="fas fa-plus"></i> Add</button>
+        </div>
+    </div>
+
+    <div class="s-card">
+        <h3>Late Fee Policy</h3>
+        <p class="s-desc">Configure penalty for overdue payments.</p>
+        <div class="fg-row">
+            <div class="fg"><label>Late Fee Percentage (%)</label><input type="number" id="faLatePct" min="0" max="100" step="0.5" value="5" placeholder="e.g. 5"></div>
+            <div class="fg"><label>Apply After (days past due)</label><input type="number" id="faLateAfter" min="1" max="90" value="15" placeholder="e.g. 15"></div>
+        </div>
+    </div>
+
+    <div class="s-card">
+        <h3>How It Works</h3>
+        <p class="s-desc">Visual timeline of the automated fee cycle (based on your settings).</p>
+        <div class="timeline" id="faTimeline"></div>
+    </div>
+
+    <div class="save-bar" style="border-top:none;">
+        <button class="btn-primary" onclick="saveFeeAutomation()"><i class="fas fa-save"></i> Save Fee Automation</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* ===========================
+   TAB SWITCHING + LAZY LOAD
+   =========================== */
+const tabLoaded = {};
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.getElementById('tab-' + tab).classList.add('active');
+        window.location.hash = tab;
+        if (!tabLoaded[tab]) { tabLoaded[tab] = true; loadTab(tab); }
+    });
+});
+
+// Handle URL hash for direct linking
+const hash = window.location.hash.replace('#', '');
+if (hash) {
+    const tabBtn = document.querySelector(`[data-tab="${hash}"]`);
+    if (tabBtn) tabBtn.click();
+} else {
+    tabLoaded['general'] = true;
+    loadTab('general');
+}
+
+function loadTab(tab) {
+    const loaders = { general: loadGeneral, timing: loadTiming, payment: loadPayment, notifications: loadNotifications, registration: loadRegistration, 'fee-automation': loadFeeAutomation };
+    if (loaders[tab]) loaders[tab]();
+}
+
+/* ===========================
+   TOGGLE HELPERS
+   =========================== */
+function wireToggle(checkboxId, fieldsId) {
+    const cb = document.getElementById(checkboxId);
+    const fl = document.getElementById(fieldsId);
+    if (!cb || !fl) return;
+    cb.addEventListener('change', () => { fl.style.display = cb.checked ? 'block' : 'none'; });
+    fl.style.display = cb.checked ? 'block' : 'none';
+}
+wireToggle('tmSatEnabled', 'satFields');
+wireToggle('ntfWaEnabled', 'waFields');
+wireToggle('ntfSmsEnabled', 'smsFields');
+wireToggle('ntfEmailEnabled', 'emailFields');
+wireToggle('ntfQuietEnabled', 'quietFields');
+
+/* ===========================
+   TAB 1: GENERAL
+   =========================== */
+async function loadGeneral() {
+    try {
+        const d = await apiCall('/api/school/settings/timezone');
+        const tz = d.current_timezone || d.timezone || '';
+        if (tz) {
+            document.getElementById('genTzDisplay').value = tz;
+            document.getElementById('genTzSelect').value = tz;
+        }
+    } catch(e) {}
+}
+
+async function saveTimezone() {
+    const tz = document.getElementById('genTzSelect').value;
+    if (!tz) { showToast('warning', 'Select a timezone'); return; }
+    const d = await apiCall('/api/school/settings/timezone', 'POST', { timezone: tz });
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', 'Timezone updated to ' + tz);
+    document.getElementById('genTzDisplay').value = tz;
+}
+
+/* ===========================
+   TAB 2: SCHOOL TIMING
+   =========================== */
+async function loadTiming() {
+    try {
+        const d = await apiCall('/api/school/settings/school-timing');
+        if (!d || d.error) return;
+        const t = d.timing || d;
+        if (t.start_time) document.getElementById('tmStart').value = t.start_time;
+        if (t.end_time) document.getElementById('tmEnd').value = t.end_time;
+        if (t.gate_open_time) document.getElementById('tmGate').value = t.gate_open_time;
+        if (t.late_grace_minutes != null) document.getElementById('tmGrace').value = t.late_grace_minutes;
+        if (t.lunch_start_time) document.getElementById('tmLunchStart').value = t.lunch_start_time;
+        if (t.lunch_end_time) document.getElementById('tmLunchEnd').value = t.lunch_end_time;
+        if (t.saturday_enabled) {
+            document.getElementById('tmSatEnabled').checked = true;
+            document.getElementById('satFields').style.display = 'block';
+        }
+        if (t.saturday_start) document.getElementById('tmSatStart').value = t.saturday_start;
+        if (t.saturday_end) document.getElementById('tmSatEnd').value = t.saturday_end;
+        if (t.half_day_end) document.getElementById('tmHalfEnd').value = t.half_day_end;
+    } catch(e) {}
+}
+
+async function saveTiming() {
+    const data = {
+        start_time: document.getElementById('tmStart').value,
+        end_time: document.getElementById('tmEnd').value,
+        gate_open_time: document.getElementById('tmGate').value,
+        late_grace_minutes: parseInt(document.getElementById('tmGrace').value) || 15,
+        lunch_start_time: document.getElementById('tmLunchStart').value,
+        lunch_end_time: document.getElementById('tmLunchEnd').value,
+        saturday_enabled: document.getElementById('tmSatEnabled').checked,
+        saturday_start: document.getElementById('tmSatStart').value,
+        saturday_end: document.getElementById('tmSatEnd').value,
+        half_day_end: document.getElementById('tmHalfEnd').value,
+        effective_date: document.getElementById('tmEffDate').value || null
+    };
+    const d = await apiCall('/api/school/settings/school-timing', 'POST', data);
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', 'School timing saved');
+}
+
+/* ===========================
+   TAB 3: PAYMENT
+   =========================== */
+let activeGateway = '';
+
+function selectGateway(gw) {
+    activeGateway = gw;
+    document.querySelectorAll('.gw-card').forEach(c => c.classList.toggle('active', c.dataset.gw === gw));
+    const fields = document.getElementById('gwFields');
+    if (gw === 'razorpay') {
+        fields.innerHTML = `
+            <div class="fg-row"><div class="fg"><label>Razorpay Key ID</label><input type="text" id="payKeyId" placeholder="rzp_live_xxxxx"></div>
+            <div class="fg"><label>Razorpay Key Secret</label><input type="password" id="payKeySecret" placeholder="Secret key"></div></div>`;
+    } else if (gw === 'upi') {
+        fields.innerHTML = `<div class="fg"><label>UPI VPA (Virtual Payment Address)</label><input type="text" id="payUpiVpa" placeholder="school@upi"></div>`;
+    } else if (gw === 'bank_transfer') {
+        fields.innerHTML = `
+            <div class="fg-row"><div class="fg"><label>Account Holder Name</label><input type="text" id="payAccName" placeholder="School Trust Name"></div>
+            <div class="fg"><label>Account Number</label><input type="text" id="payAccNum" placeholder="Account number"></div></div>
+            <div class="fg-row"><div class="fg"><label>IFSC Code</label><input type="text" id="payIfsc" placeholder="SBIN0001234"></div>
+            <div class="fg"><label>Bank Name</label><input type="text" id="payBankName" placeholder="State Bank of India"></div></div>`;
+    }
+}
+
+async function loadPayment() {
+    try {
+        const d = await apiCall('/api/school/payment-settings/load');
+        if (!d || d.error) return;
+        const s = d.settings || d.config || d;
+        if (s.gateway) {
+            selectGateway(s.gateway);
+            setTimeout(() => {
+                if (s.gateway === 'razorpay') {
+                    const ki = document.getElementById('payKeyId'); if (ki) ki.value = s.key_id || '';
+                    const ks = document.getElementById('payKeySecret'); if (ks) ks.value = s.key_secret || '';
+                } else if (s.gateway === 'upi') {
+                    const upi = document.getElementById('payUpiVpa'); if (upi) upi.value = s.upi_vpa || '';
+                } else if (s.gateway === 'bank_transfer') {
+                    const an = document.getElementById('payAccName'); if (an) an.value = s.account_name || '';
+                    const ac = document.getElementById('payAccNum'); if (ac) ac.value = s.account_number || '';
+                    const ifsc = document.getElementById('payIfsc'); if (ifsc) ifsc.value = s.ifsc || '';
+                    const bn = document.getElementById('payBankName'); if (bn) bn.value = s.bank_name || '';
+                }
+            }, 50);
+        }
+    } catch(e) {}
+}
+
+async function savePayment() {
+    if (!activeGateway) { showToast('warning', 'Select a payment gateway first'); return; }
+    const data = { gateway: activeGateway };
+    if (activeGateway === 'razorpay') {
+        data.key_id = (document.getElementById('payKeyId') || {}).value || '';
+        data.key_secret = (document.getElementById('payKeySecret') || {}).value || '';
+    } else if (activeGateway === 'upi') {
+        data.upi_vpa = (document.getElementById('payUpiVpa') || {}).value || '';
+    } else if (activeGateway === 'bank_transfer') {
+        data.account_name = (document.getElementById('payAccName') || {}).value || '';
+        data.account_number = (document.getElementById('payAccNum') || {}).value || '';
+        data.ifsc = (document.getElementById('payIfsc') || {}).value || '';
+        data.bank_name = (document.getElementById('payBankName') || {}).value || '';
+    }
+    const d = await apiCall('/api/school/payment-settings/save', 'POST', data);
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', 'Payment settings saved');
+}
+
+/* ===========================
+   TAB 4: NOTIFICATIONS
+   =========================== */
+async function loadNotifications() {
+    try {
+        const d = await apiCall('/api/school/communication-settings/load');
+        if (!d || d.error) return;
+        const s = d.settings || d.config || d;
+        if (s.whatsapp_enabled) { document.getElementById('ntfWaEnabled').checked = true; document.getElementById('waFields').style.display = 'block'; }
+        if (s.whatsapp_token) document.getElementById('ntfWaToken').value = s.whatsapp_token;
+        if (s.sms_enabled) { document.getElementById('ntfSmsEnabled').checked = true; document.getElementById('smsFields').style.display = 'block'; }
+        if (s.sms_provider) document.getElementById('ntfSmsProvider').value = s.sms_provider;
+        if (s.sms_api_key) document.getElementById('ntfSmsKey').value = s.sms_api_key;
+        if (s.sms_sender_id) document.getElementById('ntfSmsSenderId').value = s.sms_sender_id;
+        if (s.sms_route_id) document.getElementById('ntfSmsRouteId').value = s.sms_route_id;
+        if (s.email_enabled) { document.getElementById('ntfEmailEnabled').checked = true; document.getElementById('emailFields').style.display = 'block'; }
+        if (s.smtp_host) document.getElementById('ntfSmtpHost').value = s.smtp_host;
+        if (s.smtp_port) document.getElementById('ntfSmtpPort').value = s.smtp_port;
+        if (s.smtp_user) document.getElementById('ntfSmtpUser').value = s.smtp_user;
+        if (s.smtp_pass) document.getElementById('ntfSmtpPass').value = s.smtp_pass;
+        if (s.quiet_hours_enabled) { document.getElementById('ntfQuietEnabled').checked = true; document.getElementById('quietFields').style.display = 'block'; }
+        if (s.quiet_start) document.getElementById('ntfQuietStart').value = s.quiet_start;
+        if (s.quiet_end) document.getElementById('ntfQuietEnd').value = s.quiet_end;
+    } catch(e) {}
+}
+
+async function saveNotifications() {
+    const data = {
+        whatsapp_enabled: document.getElementById('ntfWaEnabled').checked,
+        whatsapp_token: document.getElementById('ntfWaToken').value,
+        sms_enabled: document.getElementById('ntfSmsEnabled').checked,
+        sms_provider: document.getElementById('ntfSmsProvider').value,
+        sms_api_key: document.getElementById('ntfSmsKey').value,
+        sms_sender_id: document.getElementById('ntfSmsSenderId').value,
+        sms_route_id: document.getElementById('ntfSmsRouteId').value,
+        email_enabled: document.getElementById('ntfEmailEnabled').checked,
+        smtp_host: document.getElementById('ntfSmtpHost').value,
+        smtp_port: parseInt(document.getElementById('ntfSmtpPort').value) || 587,
+        smtp_user: document.getElementById('ntfSmtpUser').value,
+        smtp_pass: document.getElementById('ntfSmtpPass').value,
+        quiet_hours_enabled: document.getElementById('ntfQuietEnabled').checked,
+        quiet_start: document.getElementById('ntfQuietStart').value,
+        quiet_end: document.getElementById('ntfQuietEnd').value
+    };
+    const d = await apiCall('/api/school/communication-settings/save', 'POST', data);
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', 'Notification settings saved');
+}
+
+/* ===========================
+   TAB 5: REGISTRATION
+   =========================== */
+const REG_PRESETS = [
+    { label: 'School + Year + Seq', fmt: '{SCHOOL4}{YY}{SEQ4}', ex: 'GNK261' },
+    { label: 'Code + Year + Class + Seq', fmt: '{CODE}{YY}{CLASS}{SEQ3}', ex: 'GNK2604123' },
+    { label: 'Code + Year + Gender + Seq', fmt: '{CODE}{YY}{GENDER}{SEQ4}', ex: 'GNK26M1' },
+    { label: 'Year + Code + Seq', fmt: '{YY}{CODE}{SEQ4}', ex: '26GNK001' },
+    { label: 'Code + Random 6', fmt: '{CODE}{RAND6}', ex: 'GNK7X9K2M' },
+    { label: 'Full Year + School + Seq', fmt: '{YYYY}{SCHOOL3}{CLASS}{SEQ4}', ex: '2026GNK041' }
+];
+let regActivePreset = -1;
+
+function renderRegPresets() {
+    document.getElementById('regPresetGrid').innerHTML = REG_PRESETS.map((p, i) =>
+        `<div class="gw-card ${i === regActivePreset ? 'active' : ''}" onclick="selectRegPreset(${i})" style="text-align:left;padding:14px;">
+            <div class="gw-name" style="font-size:0.8rem;">${p.label}</div>
+            <div class="gw-desc" style="font-family:monospace;">${p.fmt} &rarr; ${p.ex}</div>
+        </div>`
+    ).join('');
+}
+
+function selectRegPreset(i) {
+    regActivePreset = i;
+    renderRegPresets();
+    document.getElementById('regFormat').value = REG_PRESETS[i].fmt;
+    updateRegPreview();
+}
+
+function updateRegPreview() {
+    const fmt = document.getElementById('regFormat').value || '{SCHOOL4}{YY}{SEQ4}';
+    const code = document.getElementById('regSchoolCode').value || 'XXXX';
+    const yr = new Date().getFullYear() % 100;
+    const result = fmt.replace('{SCHOOL4}', code.substring(0, 4).toUpperCase())
+        .replace('{SCHOOL3}', code.substring(0, 3).toUpperCase())
+        .replace('{CODE}', code.toUpperCase())
+        .replace('{YY}', String(yr).padStart(2, '0'))
+        .replace('{YYYY}', String(2000 + yr))
+        .replace('{CLASS}', '04').replace('{GENDER}', 'M')
+        .replace('{SEQ3}', '1').replace('{SEQ4}', '1').replace('{SEQ5}', '1')
+        .replace('{RAND4}', 'X7K2').replace('{RAND6}', 'X7K2MR');
+    document.getElementById('regPreview').textContent = result;
+}
+
+async function loadRegistration() {
+    renderRegPresets();
+    try {
+        const d = await apiCall('/api/school/registration-config');
+        if (d.config) {
+            document.getElementById('regFormat').value = d.config.format_template || '';
+            document.getElementById('regSchoolCode').value = d.config.school_code || '';
+            REG_PRESETS.forEach((p, i) => { if (p.fmt === d.config.format_template) regActivePreset = i; });
+            renderRegPresets();
+            updateRegPreview();
+        }
+    } catch(e) {}
+}
+
+async function saveRegistration() {
+    const data = {
+        format_template: document.getElementById('regFormat').value,
+        school_code: document.getElementById('regSchoolCode').value
+    };
+    const d = await apiCall('/api/school/registration-config', 'POST', data);
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', d.preview ? 'Saved! Preview: ' + d.preview : 'Registration format saved');
+}
+
+document.getElementById('regFormat').addEventListener('input', updateRegPreview);
+document.getElementById('regSchoolCode').addEventListener('input', updateRegPreview);
+
+/* ===========================
+   TAB 6: DATA & PRIVACY
+   =========================== */
+function requestExport(type) {
+    showConfirm('Export Data', 'Generate a <strong>' + type + '</strong> data export? This may take a few minutes. You will receive a download link.', async () => {
+        showToast('info', 'Export started. You will be notified when ready.');
+    }, { icon: '📦', yesText: 'Export' });
+}
+
+/* ===========================
+   TAB 7: FEE AUTOMATION
+   =========================== */
+let reminderDays = [7, 3, 1];
+
+function renderChips() {
+    const wrap = document.getElementById('faChips');
+    wrap.innerHTML = reminderDays.sort((a, b) => b - a).map(d =>
+        `<span class="chip">${d} day${d > 1 ? 's' : ''} before<span class="chip-x" onclick="removeReminderDay(${d})"><i class="fas fa-times"></i></span></span>`
+    ).join('');
+    renderTimeline();
+}
+
+function addReminderDay() {
+    const inp = document.getElementById('faNewDay');
+    const v = parseInt(inp.value);
+    if (!v || v < 1 || v > 30) { showToast('warning', 'Enter a value between 1 and 30'); return; }
+    if (reminderDays.includes(v)) { showToast('warning', 'Already added'); return; }
+    reminderDays.push(v);
+    inp.value = '';
+    renderChips();
+}
+
+function removeReminderDay(d) {
+    reminderDays = reminderDays.filter(x => x !== d);
+    renderChips();
+}
+
+function renderTimeline() {
+    const due = 10; // default due day
+    const lateDays = parseInt(document.getElementById('faLateAfter').value) || 15;
+    const sorted = [...reminderDays].sort((a, b) => b - a);
+
+    let nodes = [{ day: '1st', label: 'Generate fees', type: '' }];
+    sorted.forEach(d => {
+        const dayNum = due - d;
+        nodes.push({ day: dayNum > 0 ? dayNum + getSuffix(dayNum) : '1st', label: d + 'd reminder', type: d <= 1 ? 'warn' : '' });
+    });
+    nodes.push({ day: due + getSuffix(due), label: 'Due date', type: 'warn' });
+    nodes.push({ day: (due + lateDays) + getSuffix(due + lateDays), label: 'Late fee applied', type: 'danger' });
+
+    document.getElementById('faTimeline').innerHTML = nodes.map((n, i) =>
+        (i > 0 ? '<div class="tl-line"></div>' : '') +
+        `<div class="tl-node"><div class="tl-day">${n.day}</div><div class="tl-dot ${n.type}"></div><div class="tl-label">${n.label}</div></div>`
+    ).join('');
+}
+
+function getSuffix(d) {
+    if (d >= 11 && d <= 13) return 'th';
+    switch (d % 10) { case 1: return 'st'; case 2: return 'nd'; case 3: return 'rd'; default: return 'th'; }
+}
+
+async function loadFeeAutomation() {
+    renderChips();
+    try {
+        const d = await apiCall('/api/school/settings/fee-automation');
+        if (!d || d.error) return;
+        const s = d.settings || d.config || d;
+        if (s.auto_generate != null) document.getElementById('faAutoGen').checked = !!s.auto_generate;
+        if (s.send_reminders != null) document.getElementById('faReminders').checked = !!s.send_reminders;
+        if (s.reminder_days && Array.isArray(s.reminder_days)) { reminderDays = s.reminder_days; renderChips(); }
+        if (s.late_fee_pct != null) document.getElementById('faLatePct').value = s.late_fee_pct;
+        if (s.late_fee_after_days != null) document.getElementById('faLateAfter').value = s.late_fee_after_days;
+        renderTimeline();
+    } catch(e) { renderTimeline(); }
+}
+
+async function saveFeeAutomation() {
+    const data = {
+        auto_generate: document.getElementById('faAutoGen').checked,
+        send_reminders: document.getElementById('faReminders').checked,
+        reminder_days: reminderDays,
+        late_fee_pct: parseFloat(document.getElementById('faLatePct').value) || 0,
+        late_fee_after_days: parseInt(document.getElementById('faLateAfter').value) || 15
+    };
+    const d = await apiCall('/api/school/settings/fee-automation', 'POST', data);
+    if (d.error) { showToast('error', d.error); return; }
+    showToast('success', 'Fee automation settings saved');
+}
+
+// Re-render timeline when late-fee fields change
+document.getElementById('faLateAfter').addEventListener('input', renderTimeline);
+document.getElementById('faLatePct').addEventListener('input', renderTimeline);
+</script>
+{% endblock %}

@@ -72,6 +72,119 @@ async def student_dashboard(request: Request, db: AsyncSession = Depends(get_db)
         ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).limit(5))
     announcements = ann_result.scalars().all()
 
+    # Today's timetable
+    today_timetable = []
+    try:
+        from models.timetable import TimetableSlot, PeriodDefinition, ClassScheduleAssignment
+        day_names = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        today_day = day_names[today.weekday()]
+
+        assignment_result = await db.execute(
+            select(ClassScheduleAssignment).where(
+                ClassScheduleAssignment.class_id == student.class_id,
+                ClassScheduleAssignment.is_active == True,
+                ClassScheduleAssignment.day_of_week == None,
+            ))
+        assignment = assignment_result.scalar_one_or_none()
+
+        if assignment:
+            periods_result = await db.execute(
+                select(PeriodDefinition).where(
+                    PeriodDefinition.template_id == assignment.template_id,
+                    PeriodDefinition.is_active == True
+                ).order_by(PeriodDefinition.period_number))
+        else:
+            periods_result = await db.execute(
+                select(PeriodDefinition).where(
+                    PeriodDefinition.branch_id == student.branch_id,
+                    PeriodDefinition.is_active == True
+                ).order_by(PeriodDefinition.period_number))
+        periods = periods_result.scalars().all()
+
+        slots_result = await db.execute(
+            select(TimetableSlot).where(
+                TimetableSlot.class_id == student.class_id,
+                TimetableSlot.section_id == student.section_id,
+                TimetableSlot.day_of_week == today_day,
+            ).options(selectinload(TimetableSlot.subject), selectinload(TimetableSlot.teacher)))
+        slots = slots_result.scalars().all()
+        slots_map = {str(s.period_id): s for s in slots}
+
+        for p in periods:
+            slot = slots_map.get(str(p.id))
+            if slot and slot.subject:
+                today_timetable.append({
+                    "period": p.period_number,
+                    "label": p.label or f"Period {p.period_number}",
+                    "start": p.start_time.strftime("%I:%M %p") if p.start_time else "",
+                    "end": p.end_time.strftime("%I:%M %p") if p.end_time else "",
+                    "subject": slot.subject.name if slot.subject else "Free",
+                    "teacher": slot.teacher.full_name if slot.teacher else "",
+                    "room": slot.room or "",
+                    "type": p.period_type.value if p.period_type else "class",
+                })
+    except Exception:
+        today_timetable = []
+
+    # Pending homework (top 5) — with subject names
+    pending_homework = []
+    try:
+        from models.homework import Homework
+        hw_result = await db.execute(
+            select(Homework).where(
+                Homework.class_id == student.class_id,
+                Homework.is_active == True,
+                Homework.due_date >= today,
+            ).order_by(Homework.due_date.asc()).limit(5))
+        hw_list = hw_result.scalars().all()
+
+        # Fetch subject names for homework
+        hw_subject_ids = list({h.subject_id for h in hw_list if h.subject_id})
+        hw_subject_map = {}
+        if hw_subject_ids:
+            sn_result = await db.execute(select(Subject).where(Subject.id.in_(hw_subject_ids)))
+            hw_subject_map = {s.id: s.name for s in sn_result.scalars().all()}
+
+        # Attach subject_name to each homework (as simple dict)
+        for h in hw_list:
+            h._subject_name = hw_subject_map.get(h.subject_id, "—")
+        pending_homework = hw_list
+    except Exception:
+        pending_homework = []
+
+    # Student's subjects via ClassSubject
+    subjects_list = []
+    try:
+        from models.academic import ClassSubject
+        cs_result = await db.execute(
+            select(ClassSubject).where(ClassSubject.class_id == student.class_id)
+            .options(selectinload(ClassSubject.subject)))
+        class_subjects = cs_result.scalars().all()
+        subjects_list = [cs.subject for cs in class_subjects if cs.subject and cs.subject.is_active]
+    except Exception:
+        subjects_list = []
+
+    # Upcoming online classes (next 3)
+    upcoming_online = []
+    try:
+        from models.online_class import OnlineClass, OnlineClassStatus
+        from sqlalchemy import or_
+        oc_query = select(OnlineClass).where(
+            OnlineClass.branch_id == student.branch_id,
+            OnlineClass.class_id == student.class_id,
+            OnlineClass.scheduled_date >= today,
+            OnlineClass.status == OnlineClassStatus.SCHEDULED,
+            OnlineClass.is_active == True,
+        )
+        if student.section_id:
+            oc_query = oc_query.where(
+                or_(OnlineClass.section_id == student.section_id, OnlineClass.section_id == None)
+            )
+        oc_query = oc_query.order_by(OnlineClass.scheduled_date, OnlineClass.start_time).limit(3)
+        upcoming_online = (await db.execute(oc_query)).scalars().all()
+    except Exception:
+        upcoming_online = []
+
     return templates.TemplateResponse("student/dashboard.html", {
         "request": request, "user": user, "active_page": "dashboard",
         "student": student,
@@ -79,6 +192,11 @@ async def student_dashboard(request: Request, db: AsyncSession = Depends(get_db)
         "today_status": today_status.status if today_status else None,
         "pending_fees": round(pending_fees),
         "announcements": announcements,
+        "today_timetable": today_timetable,
+        "pending_homework": pending_homework,
+        "subjects": subjects_list,
+        "today": today,
+        "upcoming_online": upcoming_online,
     })
 
 
@@ -234,13 +352,31 @@ async def student_timetable(request: Request, db: AsyncSession = Depends(get_db)
         return templates.TemplateResponse("student/no_profile.html", {
             "request": request, "user": user, "active_page": "timetable"})
 
-    from models.timetable import TimetableSlot, PeriodDefinition, DayOfWeek
+    from models.timetable import TimetableSlot, PeriodDefinition, DayOfWeek, ClassScheduleAssignment
     import json
 
-    # Load periods
-    periods_result = await db.execute(
-        select(PeriodDefinition).where(PeriodDefinition.branch_id == student.branch_id)
-        .order_by(PeriodDefinition.period_number))
+    # Resolve periods from class's assigned bell schedule template (or fall back to all)
+    assignment_result = await db.execute(
+        select(ClassScheduleAssignment).where(
+            ClassScheduleAssignment.class_id == student.class_id,
+            ClassScheduleAssignment.is_active == True,
+            ClassScheduleAssignment.day_of_week == None,
+        )
+    )
+    assignment = assignment_result.scalar_one_or_none()
+
+    if assignment:
+        periods_result = await db.execute(
+            select(PeriodDefinition).where(
+                PeriodDefinition.template_id == assignment.template_id,
+                PeriodDefinition.is_active == True
+            ).order_by(PeriodDefinition.period_number))
+    else:
+        periods_result = await db.execute(
+            select(PeriodDefinition).where(
+                PeriodDefinition.branch_id == student.branch_id,
+                PeriodDefinition.is_active == True
+            ).order_by(PeriodDefinition.period_number))
     periods = periods_result.scalars().all()
 
     # Load timetable slots
@@ -581,41 +717,10 @@ async def student_report_card_page(request: Request, db: AsyncSession = Depends(
         return templates.TemplateResponse("student/no_profile.html", {
             "request": request, "user": user, "active_page": "report_card"})
 
-    # Reuse the results logic
-    from models.exam import Exam, ExamSubject, Marks
-    from models.academic import Subject
-    exams = (await db.execute(
-        select(Exam).where(Exam.branch_id == student.branch_id, Exam.is_published == True)
-        .order_by(Exam.start_date)
-    )).scalars().all()
-
-    exam_results = []
-    for exam in exams:
-        es_list = (await db.execute(
-            select(ExamSubject).where(ExamSubject.exam_id == exam.id, ExamSubject.class_id == student.class_id)
-        )).scalars().all()
-        if not es_list:
-            continue
-        subj_ids = [e.subject_id for e in es_list]
-        subs = (await db.execute(select(Subject).where(Subject.id.in_(subj_ids)))).scalars().all()
-        smap = {s.id: s.name for s in subs}
-        subject_marks = []
-        total_obt, total_max = 0, 0
-        for es in es_list:
-            m = (await db.execute(select(Marks).where(
-                Marks.exam_subject_id == es.id, Marks.student_id == student.id))).scalar_one_or_none()
-            obt = m.marks_obtained if m and not m.is_absent else 0
-            subject_marks.append({"subject": smap.get(es.subject_id, "?"), "max": es.max_marks,
-                                  "obtained": obt, "grade": m.grade if m else "", "absent": m.is_absent if m else False})
-            total_obt += obt
-            total_max += es.max_marks
-        pct = round((total_obt / total_max * 100) if total_max > 0 else 0)
-        exam_results.append({"name": exam.name, "subjects": subject_marks,
-                             "total": total_obt, "max": total_max, "pct": pct})
-
-    return templates.TemplateResponse("student/report_card.html", {
+    # Use the new Report Card View page (API-driven)
+    return templates.TemplateResponse("student/report_card_view.html", {
         "request": request, "user": user, "active_page": "report_card",
-        "student": student, "exam_results": exam_results,
+        "student": student,
     })
 
 
@@ -707,6 +812,19 @@ async def student_calendar(request: Request, db: AsyncSession = Depends(get_db))
     })
 
 
+@router.get("/online-classes", response_class=HTMLResponse)
+@require_role(UserRole.STUDENT)
+async def student_online_classes(request: Request, db: AsyncSession = Depends(get_db)):
+    student, user = await get_student_profile(request, db)
+    if not student:
+        return templates.TemplateResponse("student/no_profile.html", {
+            "request": request, "user": user, "active_page": "online_classes"})
+    return templates.TemplateResponse("student/online_classes.html", {
+        "request": request, "user": user, "active_page": "online_classes",
+        "student": student,
+    })
+
+
 @router.get("/leave", response_class=HTMLResponse)
 @require_role(UserRole.STUDENT)
 async def student_leave(request: Request, db: AsyncSession = Depends(get_db)):
@@ -757,7 +875,7 @@ async def student_complaints(request: Request, db: AsyncSession = Depends(get_db
     except Exception:
         complaints = []
 
-    return templates.TemplateResponse("student/complaints.html", {
+    return templates.TemplateResponse("student/student_complaints.html", {
         "request": request, "user": user, "active_page": "complaints",
         "student": student, "complaints": complaints,
     })
@@ -781,7 +899,7 @@ async def student_messages(request: Request, db: AsyncSession = Depends(get_db))
     except Exception:
         threads = []
 
-    return templates.TemplateResponse("student/messages.html", {
+    return templates.TemplateResponse("student/student_messages.html", {
         "request": request, "user": user, "active_page": "messages",
         "student": student, "threads": threads,
     })

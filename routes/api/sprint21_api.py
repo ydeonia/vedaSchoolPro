@@ -169,6 +169,9 @@ async def apply_leave(request: Request, db: AsyncSession = Depends(get_db)):
         has_event_conflict=event_conflict,
         event_conflict_details=event_text if event_conflict else None,
         applied_by="student",
+        # Auto-approve parent since parent uses student login (implicit consent)
+        parent_status=ApprovalStatus.APPROVED,
+        parent_approved_at=datetime.utcnow(),
     )
     db.add(leave)
     await db.commit()
@@ -182,7 +185,7 @@ async def apply_leave(request: Request, db: AsyncSession = Depends(get_db)):
     return {
         "success": True, "id": str(leave.id),
         "total_days": total, "warnings": warnings,
-        "message": "Leave applied! Waiting for parent approval." + (f" WARNING: {'; '.join(warnings)}" if warnings else ""),
+        "message": "Leave applied! Waiting for teacher approval." + (f" WARNING: {'; '.join(warnings)}" if warnings else ""),
     }
 
 
@@ -251,6 +254,58 @@ async def approve_leave(request: Request, db: AsyncSession = Depends(get_db)):
         leave.teacher_comment = comment
         leave.teacher_approved_at = now
         leave.teacher_approved_by = uuid.UUID(user["user_id"])
+
+    # ── AUTO-UPDATE ATTENDANCE when BOTH parent + teacher approve ──
+    if (leave.parent_status == ApprovalStatus.APPROVED and
+            leave.teacher_status == ApprovalStatus.APPROVED):
+        try:
+            from models.attendance import Attendance, AttendanceStatus
+            student = (await db.execute(
+                select(Student).where(Student.id == leave.student_id)
+            )).scalar_one_or_none()
+
+            if student:
+                current_date = leave.start_date
+                while current_date <= leave.end_date:
+                    # Skip Sundays
+                    if current_date.weekday() != 6:
+                        # Skip holidays
+                        holiday = (await db.execute(
+                            select(SchoolEvent).where(
+                                SchoolEvent.branch_id == leave.branch_id,
+                                SchoolEvent.is_holiday == True,
+                                SchoolEvent.start_date <= current_date,
+                                or_(SchoolEvent.end_date >= current_date,
+                                    SchoolEvent.end_date == None),
+                            )
+                        )).scalar_one_or_none()
+
+                        if not holiday:
+                            existing_att = (await db.execute(
+                                select(Attendance).where(
+                                    Attendance.student_id == leave.student_id,
+                                    Attendance.date == current_date,
+                                )
+                            )).scalar_one_or_none()
+
+                            if existing_att:
+                                existing_att.status = AttendanceStatus.EXCUSED
+                                existing_att.remarks = f"Leave: {leave.reason_type.value}"
+                            else:
+                                att = Attendance(
+                                    student_id=leave.student_id,
+                                    branch_id=leave.branch_id,
+                                    class_id=student.class_id,
+                                    section_id=student.section_id,
+                                    academic_year_id=getattr(student, 'academic_year_id', None),
+                                    date=current_date,
+                                    status=AttendanceStatus.EXCUSED,
+                                    remarks=f"Leave: {leave.reason_type.value}",
+                                )
+                                db.add(att)
+                    current_date = current_date + timedelta(days=1)
+        except Exception as e:
+            print(f"[WARN] Leave attendance auto-update failed: {e}")
 
     await db.commit()
     return {"success": True, "message": f"Leave {action}d successfully."}

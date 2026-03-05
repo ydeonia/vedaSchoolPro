@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Registration ID Settings{% endblock %}
+{% block page_title %}Registration ID Format{% endblock %}
+{% block page_subtitle %}Configure how student registration/login IDs are generated{% endblock %}
+{% block extra_css %}
+<style>
+.reg-wrap{max-width:720px;margin:0 auto;}
+.reg-card{background:var(--bg-card,white);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:28px;margin-bottom:16px;}
+.reg-card h3{font-size:1rem;font-weight:900;margin-bottom:12px;}
+.preset-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.preset-btn{padding:12px 16px;border-radius:10px;border:2px solid var(--border,#e2e8f0);background:var(--bg-card,white);cursor:pointer;text-align:left;transition:all 0.2s;}
+.preset-btn:hover{border-color:var(--primary);}
+.preset-btn.active{border-color:var(--primary);background:rgba(79,70,229,0.1);}
+.preset-btn .p-label{font-weight:700;font-size:0.82rem;}
+.preset-btn .p-example{font-size:0.72rem;color:var(--text-light);margin-top:2px;}
+.f-grp{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;}
+.f-grp label{font-size:0.62rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);}
+.f-grp input,.f-grp select{padding:10px 12px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.85rem;}
+.f-grp input:focus{border-color:var(--primary);outline:none;}
+.preview-box{padding:16px;border-radius:12px;background:rgba(5,150,105,0.1);border:2px solid #059669;text-align:center;margin:16px 0;}
+.preview-box .label{font-size:0.62rem;font-weight:700;color:#059669;text-transform:uppercase;}
+.preview-box .value{font-size:1.6rem;font-weight:900;color:#059669;letter-spacing:2px;margin:4px 0;}
+.token-ref{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;font-size:0.72rem;margin-top:12px;}
+.token-ref .tk{font-family:monospace;background:var(--bg,#f1f5f9);padding:2px 6px;border-radius:4px;font-weight:700;}
+.token-ref .td{color:var(--text-light);}
+.token-ref .te{font-family:monospace;color:var(--primary);}
+.btn-save{padding:12px 32px;border-radius:12px;font-weight:700;font-size:0.9rem;cursor:pointer;border:none;background:var(--primary);color:white;box-shadow:0 4px 12px rgba(79,70,229,0.2);}
+.btn-save:hover{transform:translateY(-1px);}
+.info-box{padding:12px;border-radius:10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);font-size:0.72rem;color:var(--text);margin-bottom:16px;}
+@media(max-width:768px){.preset-grid{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+{% block content %}
+<div class="reg-wrap">
+    <div class="reg-card">
+        <h3>Choose a Preset Format</h3>
+        <p style="font-size:0.75rem;color:var(--text-light);margin-bottom:12px;">Select a preset or build a custom format using tokens below.</p>
+        <div class="preset-grid" id="presetGrid"></div>
+    </div>
+
+    <div class="reg-card">
+        <h3>Custom Configuration</h3>
+        <div class="f-grp"><label>School Code (used in {CODE} token)</label><input id="schoolCode" placeholder="e.g. GNK, DPS, CNV" maxlength="10"></div>
+        <div class="f-grp"><label>Format Template</label><input id="formatTemplate" placeholder="e.g. {SCHOOL4}{YY}{SEQ4}"></div>
+        <div style="display:flex;gap:12px;align-items:center;margin:8px 0;">
+            <label style="font-size:0.78rem;font-weight:700;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="useBase36"> Use Base36 sequence (shorter IDs: A-Z + 0-9)
+            </label>
+        </div>
+        <div class="preview-box" id="previewBox">
+            <div class="label">Preview</div>
+            <div class="value" id="previewValue">---</div>
+            <div style="font-size:0.62rem;color:var(--text-light);">This is what a new student ID will look like</div>
+        </div>
+        <div style="text-align:center;">
+            <button class="btn-save" onclick="saveConfig()">Save Configuration</button>
+        </div>
+    </div>
+
+    <div class="reg-card">
+        <h3>Token Reference</h3>
+        <div class="info-box">Tokens are replaced with actual values when generating a student ID. Combine them in any order to create your school's unique format.</div>
+        <div class="token-ref" id="tokenRef"></div>
+    </div>
+
+    <div class="reg-card">
+        <h3>Current Status</h3>
+        <div style="font-size:0.82rem;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);"><span style="color:var(--text-light);">Current Sequence</span><span style="font-weight:700;" id="curSeq">0</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;"><span style="color:var(--text-light);">IDs Generated This Year</span><span style="font-weight:700;" id="curYear">—</span></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+const PRESETS=[
+    {label:'School + Year + Sequence',fmt:'{SCHOOL4}{YY}{SEQ4}',ex:'GNK261'},
+    {label:'Code + Year + Class + Seq',fmt:'{CODE}{YY}{CLASS}{SEQ3}',ex:'GNK2604123'},
+    {label:'Code + Year + Gender + Seq',fmt:'{CODE}{YY}{GENDER}{SEQ4}',ex:'GNK26M1'},
+    {label:'Year + Code + Base36 Seq',fmt:'{YY}{CODE}{SEQ4}',ex:'26GNK001',b36:true},
+    {label:'Code + Random 6',fmt:'{CODE}{RAND6}',ex:'GNK7X9K2M'},
+    {label:'Full Year + School + Class + Seq',fmt:'{YYYY}{SCHOOL3}{CLASS}{SEQ4}',ex:'2026GNK041'},
+];
+
+const TOKENS=[
+    ['{SCHOOL4}','First 4 letters of school name','EDUF'],
+    ['{SCHOOL3}','First 3 letters of school name','EDU'],
+    ['{CODE}','Custom school code (set above)','GNK'],
+    ['{YY}','2-digit admission year','26'],
+    ['{YYYY}','4-digit admission year','2026'],
+    ['{CLASS}','Class code (01-12, NUR, LKG, UKG)','04'],
+    ['{GENDER}','Gender: M / F / O','M'],
+    ['{SEQ3}','Running sequence (3+ chars)','123'],
+    ['{SEQ4}','Running sequence (4+ chars)','1234'],
+    ['{SEQ5}','Running sequence (5+ chars)','12345'],
+    ['{RAND4}','4 random alphanumeric chars','X7K2'],
+    ['{RAND6}','6 random alphanumeric chars','X7K2MR'],
+];
+
+let activePreset=-1;
+
+function renderPresets(){
+    document.getElementById('presetGrid').innerHTML=PRESETS.map((p,i)=>`<div class="preset-btn ${i===activePreset?'active':''}" onclick="selectPreset(${i})"><div class="p-label">${p.label}</div><div class="p-example">${p.fmt} &rarr; ${p.ex}</div></div>`).join('');
+}
+
+function selectPreset(i){
+    activePreset=i;renderPresets();
+    document.getElementById('formatTemplate').value=PRESETS[i].fmt;
+    document.getElementById('useBase36').checked=!!PRESETS[i].b36;
+    updatePreview();
+}
+
+function updatePreview(){
+    const fmt=document.getElementById('formatTemplate').value||'{SCHOOL4}{YY}{SEQ4}';
+    const code=document.getElementById('schoolCode').value||'XXXX';
+    const yr=new Date().getFullYear()%100;
+    let result=fmt.replace('{SCHOOL4}',code.substring(0,4).toUpperCase())
+        .replace('{SCHOOL3}',code.substring(0,3).toUpperCase())
+        .replace('{CODE}',code.toUpperCase())
+        .replace('{YY}',String(yr).padStart(2,'0'))
+        .replace('{YYYY}',String(2000+yr))
+        .replace('{CLASS}','04')
+        .replace('{GENDER}','M')
+        .replace('{SEQ3}','1').replace('{SEQ4}','1').replace('{SEQ5}','1')
+        .replace('{RAND4}','X7K2').replace('{RAND6}','X7K2MR');
+    document.getElementById('previewValue').textContent=result;
+}
+
+function renderTokens(){
+    document.getElementById('tokenRef').innerHTML=TOKENS.map(t=>`<span class="tk">${t[0]}</span><span class="td">${t[1]}</span><span class="te">${t[2]}</span>`).join('');
+}
+
+async function loadConfig(){
+    try{
+        const r=await fetch('/api/school/registration-config',{credentials:'same-origin'});
+        const d=await r.json();
+        if(d.config){
+            document.getElementById('formatTemplate').value=d.config.format_template;
+            document.getElementById('schoolCode').value=d.config.school_code||'';
+            document.getElementById('useBase36').checked=d.config.use_base36||false;
+            document.getElementById('curSeq').textContent=d.config.current_sequence||0;
+            // Find matching preset
+            PRESETS.forEach((p,i)=>{if(p.fmt===d.config.format_template){activePreset=i;}});
+            renderPresets();updatePreview();
+        }
+    }catch(e){}
+}
+
+async function saveConfig(){
+    const data={format_template:document.getElementById('formatTemplate').value,school_code:document.getElementById('schoolCode').value,use_base36:document.getElementById('useBase36').checked};
+    try{
+        const r=await fetch('/api/school/registration-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),credentials:'same-origin'});
+        const d=await r.json();
+        if(d.success){showToast('success','Registration format saved! Preview: '+d.preview);}else{showToast('error',d.error||'Failed to save');}
+    }catch(e){showToast('error','Failed: '+e.message);}
+}
+
+document.getElementById('formatTemplate').addEventListener('input',updatePreview);
+document.getElementById('schoolCode').addEventListener('input',updatePreview);
+document.getElementById('useBase36').addEventListener('change',updatePreview);
+
+renderPresets();renderTokens();updatePreview();loadConfig();
+</script>
+{% endblock %}

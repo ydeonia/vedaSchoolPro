@@ -133,6 +133,48 @@ async def teacher_dashboard(request: Request, db: AsyncSession = Depends(get_db)
             }
             schedule.append(entry)
 
+    # Check for substitution assignments today
+    substitutions = []
+    try:
+        from models.timetable import Substitution
+        sub_result = await db.execute(
+            select(Substitution).where(
+                Substitution.substitute_teacher_id == teacher.id,
+                Substitution.date == today,
+                Substitution.status.in_(["pending", "accepted"]),
+            )
+        )
+        subs = sub_result.scalars().all()
+        for sub in subs:
+            # Get the slot details
+            slot_r = await db.execute(select(TimetableSlot).where(TimetableSlot.id == sub.timetable_slot_id))
+            slot_obj = slot_r.scalar_one_or_none()
+            if slot_obj:
+                cls_name = classes_map.get(slot_obj.class_id, "") if slot_obj.class_id in classes_map else ""
+                if not cls_name and slot_obj.class_id:
+                    cr = await db.execute(select(Class).where(Class.id == slot_obj.class_id))
+                    c = cr.scalar_one_or_none()
+                    cls_name = c.name if c else ""
+                sub_name = subjects_map.get(slot_obj.subject_id, "") if slot_obj.subject_id and slot_obj.subject_id in subjects_map else ""
+                if not sub_name and slot_obj.subject_id:
+                    sr = await db.execute(select(Subject).where(Subject.id == slot_obj.subject_id))
+                    s = sr.scalar_one_or_none()
+                    sub_name = s.name if s else ""
+                # Find the period for timing
+                per_r = await db.execute(select(PeriodDefinition).where(PeriodDefinition.id == slot_obj.period_id))
+                per_obj = per_r.scalar_one_or_none()
+                substitutions.append({
+                    "id": str(sub.id),
+                    "class_name": cls_name,
+                    "subject_name": sub_name,
+                    "period_label": per_obj.label if per_obj else "",
+                    "period_time": f"{per_obj.start_time.strftime('%H:%M')}-{per_obj.end_time.strftime('%H:%M')}" if per_obj else "",
+                    "reason": sub.reason or "",
+                    "status": sub.status.value if hasattr(sub.status, 'value') else str(sub.status),
+                })
+    except Exception:
+        pass
+
     # Stats
     total_assigned = sum(1 for s in schedule if s['has_class'])
     total_completed = sum(1 for s in schedule if s['completed'])
@@ -159,6 +201,7 @@ async def teacher_dashboard(request: Request, db: AsyncSession = Depends(get_db)
         "total_assigned": total_assigned,
         "total_completed": total_completed,
         "week_completed": week_completed,
+        "substitutions": substitutions,
     })
 
 
@@ -419,6 +462,15 @@ async def my_students_page(request: Request, db: AsyncSession = Depends(get_db))
     return templates.TemplateResponse("teacher/my_students.html", {"request": request, "user": user, "teacher": teacher, "active_page": "students"})
 
 
+@router.get("/online-classes", response_class=HTMLResponse)
+@require_role(UserRole.TEACHER)
+async def teacher_online_classes(request: Request, db: AsyncSession = Depends(get_db)):
+    teacher, user = await get_teacher_profile(request, db)
+    if not teacher:
+        return templates.TemplateResponse("teacher/no_profile.html", {"request": request, "user": user, "active_page": "online_classes"})
+    return templates.TemplateResponse("teacher/online_classes.html", {"request": request, "user": user, "teacher": teacher, "active_page": "online_classes"})
+
+
 @router.get("/question-papers", response_class=HTMLResponse)
 @require_role(UserRole.TEACHER)
 async def question_papers_page(request: Request, db: AsyncSession = Depends(get_db)):
@@ -443,4 +495,26 @@ async def house_assignment_page(request: Request, db: AsyncSession = Depends(get
     teacher, user = await get_teacher_profile(request, db)
     if not teacher:
         return templates.TemplateResponse("teacher/no_profile.html", {"request": request, "user": user, "active_page": "house_assign"})
-    return templates.TemplateResponse("teacher/house_assign.html", {"request": request, "user": user, "teacher": teacher, "active_page": "house_assign"})
+    return templates.TemplateResponse("teacher/house_assign_teacher.html", {"request": request, "user": user, "teacher": teacher, "active_page": "house_assign"})
+
+
+# ═══════════════════════════════════════════════════════════
+# REPORT CARD: Teacher Upload Marks & Class Teacher Review
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/upload-marks", response_class=HTMLResponse)
+@require_role(UserRole.TEACHER)
+async def upload_marks_page(request: Request, db: AsyncSession = Depends(get_db)):
+    teacher, user = await get_teacher_profile(request, db)
+    if not teacher:
+        return templates.TemplateResponse("teacher/no_profile.html", {"request": request, "user": user, "active_page": "upload_marks"})
+    return templates.TemplateResponse("teacher/upload_marks.html", {"request": request, "user": user, "teacher": teacher, "active_page": "upload_marks"})
+
+
+@router.get("/class-review", response_class=HTMLResponse)
+@require_role(UserRole.TEACHER)
+async def class_review_page(request: Request, db: AsyncSession = Depends(get_db)):
+    teacher, user = await get_teacher_profile(request, db)
+    if not teacher:
+        return templates.TemplateResponse("teacher/no_profile.html", {"request": request, "user": user, "active_page": "class_review"})
+    return templates.TemplateResponse("teacher/class_teacher_review.html", {"request": request, "user": user, "teacher": teacher, "active_page": "class_review"})

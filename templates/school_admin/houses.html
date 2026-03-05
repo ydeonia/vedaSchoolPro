@@ -177,10 +177,14 @@ function renderPointsBoard(){
 
 async function createHouse(){
     const d={name:g('hName'),color:g('hColor'),tagline:g('hTagline'),house_master_id:g('hMaster')||null};
-    if(!d.name){alert('Enter house name');return;}
+    if(!d.name){showToast('warning','Enter house name');return;}
     await apiCall('/api/school/houses','POST',d);showToast('success','House created');loadHouses();
 }
-async function deleteHouse(id){if(!confirm('Delete?'))return;await apiCall('/api/school/houses/'+id,'DELETE');loadHouses();}
+async function deleteHouse(id){
+showConfirm('Confirm','Delete this house?', async () => {
+await apiCall('/api/school/houses/'+id,'DELETE');loadHouses();
+}, {icon:'🗑️', danger:true, yesText:'Delete'});
+}
 
 // Assign students
 async function loadAsSections(){const cid=g('asClass');if(!cid)return;
@@ -198,8 +202,8 @@ document.getElementById('asStudentList').innerHTML=(d.students||[]).map(s=>`<div
 </div>`).join('');}catch(e){}}
 
 async function bulkAssignHouse(){
-    const houseId=g('asHouse');if(!houseId){alert('Select a house');return;}
-    const checks=document.querySelectorAll('.as-check:checked');if(!checks.length){alert('Select students');return;}
+    const houseId=g('asHouse');if(!houseId){showToast('warning','Select a house');return;}
+    const checks=document.querySelectorAll('.as-check:checked');if(!checks.length){showToast('warning','Select students');return;}
     const studentIds=[...checks].map(c=>c.value);
     await apiCall('/api/school/houses/assign','POST',{house_id:houseId,student_ids:studentIds});
     showToast('success',`${studentIds.length} students assigned`);loadAsStudents();loadHouses();
@@ -216,7 +220,7 @@ try{const r=await fetch(url,{credentials:'same-origin'});const d=await r.json();
 document.getElementById('rlStudent').innerHTML='<option value="">Select</option>'+(d.students||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');}catch(e){}}
 
 async function assignRole(){
-    const sid=g('rlStudent');if(!sid){alert('Select student');return;}
+    const sid=g('rlStudent');if(!sid){showToast('warning','Select student');return;}
     const roleType=g('roleType');
     const labels={head_boy:'Head Boy',head_girl:'Head Girl',house_captain:'House Captain',vice_captain:'Vice Captain',class_monitor:'Class Monitor',sports_captain:'Sports Captain',prefect:'Prefect',student_of_year:'Student of the Year'};
     const d={student_id:sid,role_type:roleType,title:labels[roleType]||roleType,house_id:g('rlHouse')||null,class_id:g('rlClass')||null};
@@ -235,11 +239,15 @@ async function loadRoles(){
         <button class="ha-btn" onclick="removeRole('${r.id}')"><i class="fas fa-times" style="color:#DC2626;"></i></button>
     </div>`).join('');}catch(e){}}
 
-async function removeRole(id){if(!confirm('Remove?'))return;await apiCall('/api/school/student-roles/'+id,'DELETE');loadRoles();}
+async function removeRole(id){
+showConfirm('Confirm','Remove this role?', async () => {
+await apiCall('/api/school/student-roles/'+id,'DELETE');loadRoles();
+}, {icon:'🗑️', danger:true, yesText:'Delete'});
+}
 
 async function awardPoints(){
     const hid=g('ptHouse'),pts=parseInt(g('ptPoints'))||0;
-    if(!hid||!pts){alert('Select house and enter points');return;}
+    if(!hid||!pts){showToast('warning','Select house and enter points');return;}
     await apiCall('/api/school/houses/'+hid+'/points','POST',{points:pts});
     showToast('success',`${pts} points awarded`);loadHouses();
 }

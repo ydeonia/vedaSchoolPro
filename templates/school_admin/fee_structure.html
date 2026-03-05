@@ -209,14 +209,9 @@ async function saveEdit(){
 }
 
 async function deleteFee(id,name){
-    if(typeof showConfirm==='function'){
-        showConfirm('Delete Fee','Delete <strong>'+name+'</strong>? Existing fee records are not affected.',async()=>{
-            try{await apiCall('/api/school/fee-structure/'+id,'DELETE');showToast('success','Fee deleted');loadFees();}catch(e){}
-        },{icon:'🗑️'});
-    }else{
-        if(!confirm('Delete "'+name+'"?'))return;
-        try{await apiCall('/api/school/fee-structure/'+id,'DELETE');loadFees();}catch(e){}
-    }
+    showConfirm('Delete Fee','Delete <strong>'+name+'</strong>? Existing fee records are not affected.',async()=>{
+        try{await apiCall('/api/school/fee-structure/'+id,'DELETE');showToast('success','Fee deleted');loadFees();}catch(e){}
+    },{icon:'🗑️',danger:true,yesText:'Delete'});
 }
 
 // Close modal on backdrop click or Escape

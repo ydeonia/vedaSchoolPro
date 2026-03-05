@@ -1,0 +1,2 @@
+This has single quotes like 'hello' and double quotes like "world"
+And backticks like `test`

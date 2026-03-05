@@ -87,7 +87,7 @@ async function payOnline() {
         // Create order on server
         const res = await fetch('/api/student/fees/create-order', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
             body: JSON.stringify({amount: {{ balance }}})});
-        if (!res.ok) { const err = await res.json(); alert(err.detail || err.error || 'Payment not configured. Contact school admin.'); btn.disabled=false; btn.innerHTML='<i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now'; return; }
+        if (!res.ok) { const err = await res.json(); showToast('error', err.detail || err.error || 'Payment not configured. Contact school admin.'); btn.disabled=false; btn.innerHTML='<i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now'; return; }
         const order = await res.json();
 
         if (order.gateway === 'razorpay') {
@@ -103,18 +103,18 @@ async function payOnline() {
                     // Verify payment
                     const vRes = await fetch('/api/student/fees/verify-payment', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
                         body: JSON.stringify({razorpay_order_id: response.razorpay_order_id, razorpay_payment_id: response.razorpay_payment_id, razorpay_signature: response.razorpay_signature})});
-                    if (vRes.ok) { alert('✅ Payment successful! Receipt will be generated shortly.'); location.reload(); }
-                    else { alert('Payment verification failed. Contact school admin with payment ID: ' + response.razorpay_payment_id); }
+                    if (vRes.ok) { showToast('success', 'Payment successful! Receipt will be generated shortly.'); location.reload(); }
+                    else { showToast('error', 'Payment verification failed. Contact school admin with payment ID: ' + response.razorpay_payment_id); }
                 },
                 theme: {color: '#4F46E5'},
             };
             const rzp = new Razorpay(options);
-            rzp.on('payment.failed', function(resp) { alert('Payment failed: ' + resp.error.description); });
+            rzp.on('payment.failed', function(resp) { showToast('error', 'Payment failed: ' + resp.error.description); });
             rzp.open();
         } else {
-            alert('Online payment is not configured for your school yet. Please contact the school admin or pay at the fee counter.');
+            showToast('warning', 'Online payment is not configured for your school yet. Please contact the school admin or pay at the fee counter.');
         }
-    } catch(e) { alert('Could not initiate payment. Please try again or pay at the fee counter.'); }
+    } catch(e) { showToast('error', 'Could not initiate payment. Please try again or pay at the fee counter.'); }
     btn.disabled = false; btn.innerHTML = '<i class="fas fa-lock"></i> Pay ₹{{ "{:,.0f}".format(balance) }} Now';
 }
 </script>
