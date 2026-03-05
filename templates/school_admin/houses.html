@@ -180,6 +180,41 @@ async function createHouse(){
     if(!d.name){showToast('warning','Enter house name');return;}
     await apiCall('/api/school/houses','POST',d);showToast('success','House created');loadHouses();
 }
+let _editHouseId=null;
+function editHouse(id){
+    const h=houses.find(x=>x.id===id);if(!h)return;
+    _editHouseId=id;
+    document.getElementById('hName').value=h.name||'';
+    document.getElementById('hColor').value=h.color||'#DC2626';
+    document.getElementById('hTagline').value=h.tagline||'';
+    document.getElementById('hMaster').value=h.house_master_id||'';
+    // Switch button to Update mode
+    const btn=document.querySelector('#housesTab .btn-primary');
+    btn.innerHTML='<i class="fas fa-save"></i> Update House';
+    btn.onclick=updateHouse;
+    // Show cancel edit link
+    if(!document.getElementById('cancelEditBtn')){
+        const c=document.createElement('button');c.id='cancelEditBtn';c.className='btn-secondary';
+        c.style.cssText='margin-left:8px;padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:0.78rem;';
+        c.innerHTML='<i class="fas fa-times"></i> Cancel';c.onclick=cancelEditHouse;
+        btn.parentElement.appendChild(c);
+    }
+    btn.scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function updateHouse(){
+    if(!_editHouseId)return;
+    const d={name:g('hName'),color:g('hColor'),tagline:g('hTagline'),house_master_id:g('hMaster')||null};
+    if(!d.name){showToast('warning','Enter house name');return;}
+    await apiCall('/api/school/houses/'+_editHouseId,'PUT',d);showToast('success','House updated');cancelEditHouse();loadHouses();
+}
+function cancelEditHouse(){
+    _editHouseId=null;
+    document.getElementById('hName').value='';document.getElementById('hColor').value='#DC2626';
+    document.getElementById('hTagline').value='';document.getElementById('hMaster').value='';
+    const btn=document.querySelector('#housesTab .btn-primary');
+    btn.innerHTML='<i class="fas fa-plus"></i> Create House';btn.onclick=createHouse;
+    const c=document.getElementById('cancelEditBtn');if(c)c.remove();
+}
 async function deleteHouse(id){
 showConfirm('Confirm','Delete this house?', async () => {
 await apiCall('/api/school/houses/'+id,'DELETE');loadHouses();

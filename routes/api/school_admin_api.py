@@ -4754,6 +4754,23 @@ async def create_house(request: Request, db: AsyncSession = Depends(get_db)):
     return {"id": str(h.id)}
 
 
+@router.put("/houses/{house_id}")
+async def update_house(request: Request, house_id: str, db: AsyncSession = Depends(get_db)):
+    from models.mega_modules import House
+    user = await get_current_user(request)
+    data = await request.json()
+    h = await db.scalar(select(House).where(House.id == uuid.UUID(house_id)))
+    if not h:
+        return {"error": "House not found"}
+    if data.get("name"): h.name = data["name"]
+    if "color" in data: h.color = data["color"]
+    if "tagline" in data: h.tagline = data["tagline"]
+    if "house_master_id" in data:
+        h.house_master_id = uuid.UUID(data["house_master_id"]) if data["house_master_id"] else None
+    await db.commit()
+    return {"success": True, "message": "House updated"}
+
+
 @router.delete("/houses/{house_id}")
 async def delete_house(request: Request, house_id: str, db: AsyncSession = Depends(get_db)):
     from models.mega_modules import House

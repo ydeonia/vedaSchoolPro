@@ -130,7 +130,8 @@
       "Bash(python -m py_compile routes/api/account_api.py)",
       "Bash(xargs grep -l \"communication\\\\|sms\\\\|email.*config\")",
       "Bash(xargs grep -l \"super_admin.*admin\\\\|SCHOOL_ADMIN.*first\")",
-      "Bash(python -m py_compile database.py)"
+      "Bash(python -m py_compile database.py)",
+      "Bash(xargs echo \"Root templates:\")"
     ]
   }
 }

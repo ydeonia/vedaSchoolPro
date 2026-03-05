@@ -424,6 +424,10 @@ async def send_platform_email(db, to_email: str, subject: str, body_html: str) -
                 )
     except Exception as e:
         logger.warning(f"PlatformConfig email failed: {e}")
+        try:
+            await db.rollback()  # Reset tainted session so fallback query works
+        except Exception:
+            pass
 
     # 2. Fallback to any CommunicationConfig
     try:
@@ -433,7 +437,10 @@ async def send_platform_email(db, to_email: str, subject: str, body_html: str) -
         if comm:
             return await send_email(comm, to_email, subject, body_html)
     except Exception:
-        pass
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     return {"status": "skipped", "reason": "No email provider configured. Set SMTP in Settings → Email."}
 
@@ -568,6 +575,10 @@ async def get_sms_config(db, branch_id: str = None):
                 )
     except Exception as e:
         logger.warning(f"PlatformConfig SMS lookup failed: {e}")
+        try:
+            await db.rollback()  # Reset tainted session so fallback queries work
+        except Exception:
+            pass
 
     # 2. Branch-specific CommunicationConfig
     import uuid as _uuid
@@ -582,7 +593,10 @@ async def get_sms_config(db, branch_id: str = None):
             if comm:
                 return comm
         except Exception:
-            pass
+            try:
+                await db.rollback()
+            except Exception:
+                pass
 
     # 3. Any CommunicationConfig with SMS enabled (last-resort fallback)
     try:
@@ -592,7 +606,10 @@ async def get_sms_config(db, branch_id: str = None):
         if comm:
             return comm
     except Exception:
-        pass
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     return None
 
