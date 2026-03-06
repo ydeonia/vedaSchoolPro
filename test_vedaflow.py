@@ -23,7 +23,7 @@ BASE_URL = "http://localhost:8000"
 
 # Test users — update these with your actual credentials
 USERS = {
-    "super_admin": {"username": "admin@eduflow.in", "password": "Admin@123"},
+    "super_admin": {"username": "admin@vedaschoolpro.in", "password": "Admin@123"},
     "school_admin": {"username": "schooladmin@armyschool.in", "password": "School@123"},
 }
 

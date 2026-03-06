@@ -86,8 +86,26 @@ async def start_scheduler(app):
             misfire_grace_time=600,
         )
 
+        # Job 7: Nightly branch backup at 2:00 AM
+        _scheduler.add_job(
+            nightly_branch_backup,
+            CronTrigger(hour=2, minute=0),
+            id="nightly_branch_backup",
+            replace_existing=True,
+            misfire_grace_time=7200,
+        )
+
+        # Job 8: Subscription late-fee check at 7:00 AM
+        _scheduler.add_job(
+            subscription_late_fee_check,
+            CronTrigger(hour=7, minute=0),
+            id="subscription_late_fee_check",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+
         _scheduler.start()
-        logger.info("Automation scheduler started with 6 jobs")
+        logger.info("Automation scheduler started with 8 jobs")
     except ImportError:
         logger.warning("apscheduler not installed — scheduler disabled. Run: pip install apscheduler")
     except Exception as e:
@@ -695,3 +713,195 @@ async def platform_health_check():
 
     except Exception as e:
         logger.error(f"[HEALTH] Platform health check failed: {e}")
+
+
+# ═══════════════════════════════════════════════════════════
+# JOB 7: NIGHTLY BRANCH BACKUP — 2:00 AM
+# ═══════════════════════════════════════════════════════════
+
+async def nightly_branch_backup():
+    """
+    Run nightly backups for all active branches.
+    Respects plan backup_frequency (daily/weekly).
+    """
+    from models.subscription import SchoolSubscription
+    from sqlalchemy.orm import selectinload
+
+    try:
+        async with async_session() as db:
+            branch_ids = await get_active_branch_ids()
+            logger.info(f"[BACKUP] Nightly backup starting for {len(branch_ids)} branches")
+
+            today = datetime.now()
+            is_sunday = today.weekday() == 6  # Weekly backups on Sunday
+
+            backed_up = 0
+            skipped = 0
+            failed = 0
+
+            for bid in branch_ids:
+                try:
+                    # Check plan backup_frequency
+                    sub = await db.scalar(
+                        select(SchoolSubscription)
+                        .where(SchoolSubscription.branch_id == bid)
+                        .options(selectinload(SchoolSubscription.plan))
+                    )
+
+                    frequency = "weekly"  # Default
+                    if sub and sub.plan:
+                        frequency = sub.plan.backup_frequency or "weekly"
+
+                    # Skip if weekly and not Sunday
+                    if frequency == "weekly" and not is_sunday:
+                        skipped += 1
+                        continue
+
+                    # Create backup
+                    from utils.backup_manager import create_branch_backup
+                    result = await create_branch_backup(
+                        db, bid,
+                        backup_type_str="scheduled",
+                    )
+
+                    if result.get("success"):
+                        backed_up += 1
+                    else:
+                        failed += 1
+                        logger.warning(f"[BACKUP] Branch {bid} failed: {result.get('error')}")
+
+                except Exception as e:
+                    failed += 1
+                    logger.error(f"[BACKUP] Branch {bid} error: {e}")
+
+            logger.info(
+                f"[BACKUP] Nightly complete — backed up: {backed_up}, "
+                f"skipped: {skipped}, failed: {failed}"
+            )
+
+    except Exception as e:
+        logger.error(f"[BACKUP] Nightly backup job failed: {e}")
+
+
+# ═══════════════════════════════════════════════════════════
+# JOB 8: SUBSCRIPTION LATE FEE CHECK — 7:00 AM
+# ═══════════════════════════════════════════════════════════
+
+async def subscription_late_fee_check():
+    """
+    Check for overdue subscriptions and apply late fees.
+    Runs daily — finds subscriptions past grace period with no late fee yet.
+    """
+    from models.subscription import SchoolSubscription, PaymentHistory, SubscriptionStatus
+    from sqlalchemy.orm import selectinload
+    from decimal import Decimal
+
+    try:
+        async with async_session() as db:
+            # Find subscriptions in GRACE status with next_payment_due past the grace period
+            now = datetime.now()
+
+            result = await db.execute(
+                select(SchoolSubscription)
+                .where(
+                    SchoolSubscription.status == SubscriptionStatus.GRACE,
+                    SchoolSubscription.late_fee_amount == 0,
+                    SchoolSubscription.late_fee_waived == False,
+                    SchoolSubscription.next_payment_due.isnot(None),
+                )
+                .options(selectinload(SchoolSubscription.plan))
+            )
+            subs = result.scalars().all()
+
+            applied = 0
+            for sub in subs:
+                try:
+                    plan = sub.plan
+                    if not plan:
+                        continue
+
+                    grace_days = plan.late_fee_grace_days or 7
+                    late_fee_type = plan.late_fee_type or "percentage"
+                    late_fee_value = float(plan.late_fee_value or 5)
+
+                    # Check if past grace period
+                    if sub.next_payment_due:
+                        days_overdue = (now - sub.next_payment_due).days
+                        if days_overdue < grace_days:
+                            continue  # Still within grace
+                    else:
+                        continue
+
+                    # Calculate late fee
+                    if sub.billing_cycle and sub.billing_cycle.value == "yearly":
+                        plan_price = float(plan.price_yearly or 0)
+                    else:
+                        plan_price = float(plan.price_monthly or 0)
+
+                    if late_fee_type == "percentage":
+                        late_fee = round(plan_price * late_fee_value / 100, 2)
+                    else:
+                        late_fee = late_fee_value
+
+                    if late_fee <= 0:
+                        continue
+
+                    # Apply late fee
+                    sub.late_fee_amount = Decimal(str(late_fee))
+                    sub.late_fee_applied_at = now
+
+                    # Create payment history entry
+                    payment = PaymentHistory(
+                        subscription_id=sub.id,
+                        branch_id=sub.branch_id,
+                        amount=Decimal(str(late_fee)),
+                        currency="INR",
+                        plan_name=plan.name,
+                        billing_cycle=sub.billing_cycle.value if sub.billing_cycle else "monthly",
+                        status="late_fee_pending",
+                        includes_late_fee=True,
+                        late_fee_amount=Decimal(str(late_fee)),
+                        notes=f"Late fee ({late_fee_type}: {late_fee_value}{'%' if late_fee_type == 'percentage' else ''}) — {days_overdue} days overdue",
+                    )
+                    db.add(payment)
+
+                    # Notify branch admin
+                    try:
+                        admins = (await db.execute(
+                            select(User).where(
+                                User.branch_id == sub.branch_id,
+                                User.role == UserRole.SCHOOL_ADMIN,
+                                User.is_active == True,
+                            )
+                        )).scalars().all()
+
+                        for admin in admins:
+                            from utils.notifier import send_notification
+                            try:
+                                await send_notification(
+                                    db, str(sub.branch_id),
+                                    user_id=str(admin.id),
+                                    notification_type="alert",
+                                    title="Late Fee Applied",
+                                    message=f"A late fee of Rs.{late_fee:.2f} has been applied to your {plan.name} subscription. Please renew to avoid service interruption.",
+                                    channels=["in_app", "email"],
+                                    recipient_email=admin.email,
+                                    priority="urgent",
+                                )
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                    applied += 1
+                    logger.info(f"[LATE-FEE] Applied Rs.{late_fee} to branch {sub.branch_id}")
+
+                except Exception as e:
+                    logger.error(f"[LATE-FEE] Error for sub {sub.id}: {e}")
+
+            await db.commit()
+            if applied > 0:
+                logger.info(f"[LATE-FEE] Applied late fees to {applied} subscriptions")
+
+    except Exception as e:
+        logger.error(f"[LATE-FEE] Job failed: {e}")

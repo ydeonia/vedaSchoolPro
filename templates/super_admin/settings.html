@@ -53,14 +53,14 @@
         <h3>🏢 Platform Identity</h3>
         <p>Brand name and contact information displayed across the platform</p>
         <div class="set-row">
-            <div class="set-field"><label>Platform Name</label><input id="sAppName" value="{{ app_name or 'EduFlow' }}"></div>
+            <div class="set-field"><label>Platform Name</label><input id="sAppName" value="{{ app_name or 'VedaSchoolPro' }}"></div>
             <div class="set-field"><label>Version</label><input id="sVersion" value="{{ app_version or '1.0.0' }}" disabled style="opacity:0.6;"></div>
         </div>
         <div class="set-row">
-            <div class="set-field"><label>Support Email</label><input id="sSupportEmail" value="" placeholder="support@eduflow.in"></div>
+            <div class="set-field"><label>Support Email</label><input id="sSupportEmail" value="" placeholder="support@vedaschoolpro.in"></div>
             <div class="set-field"><label>Support Phone</label><input id="sSupportPhone" value="" placeholder="+91 9876543210"></div>
         </div>
-        <div class="set-field"><label>Platform URL</label><input id="sUrl" value="" placeholder="https://app.eduflow.in"></div>
+        <div class="set-field"><label>Platform URL</label><input id="sUrl" value="" placeholder="https://app.vedaschoolpro.in"></div>
     </div>
 
     <div class="set-section">
@@ -115,8 +115,8 @@
             <div class="set-field"><label>Password</label><input id="sSmtpPass" type="password" placeholder="••••••••"></div>
         </div>
         <div class="set-row">
-            <div class="set-field"><label>From Email</label><input id="sFromEmail" placeholder="noreply@eduflow.in"></div>
-            <div class="set-field"><label>From Name</label><input id="sFromName" placeholder="EduFlow Notifications"></div>
+            <div class="set-field"><label>From Email</label><input id="sFromEmail" placeholder="noreply@vedaschoolpro.in"></div>
+            <div class="set-field"><label>From Name</label><input id="sFromName" placeholder="VedaSchoolPro Notifications"></div>
         </div>
         <button class="set-btn set-btn-outline" onclick="testSmtp()"><i class="fas fa-paper-plane"></i> Send Test Email</button>
     </div>
@@ -127,8 +127,8 @@
             <div class="set-field"><label>SMS Provider</label><select id="sSmsProvider"><option value="">— Select Provider —</option><option value="msgclub">MsgClub</option><option value="msg91">MSG91</option><option value="textlocal">Textlocal</option><option value="twilio">Twilio</option></select></div>
             <div class="set-field"><label>API Key</label><input id="sSmsApiKey" type="password" placeholder="Your SMS API key"></div>
         </div>
-        <div class="set-field"><label>Sender ID</label><input id="sSmsSenderId" placeholder="EDUFLW" maxlength="6"></div>
-        <div class="info-banner info-yellow"><i class="fas fa-exclamation-triangle"></i> SMS credits are per-plan. Schools on Starter get 100/month, Growth gets 500/month.</div>
+        <div class="set-field"><label>Sender ID</label><input id="sSmsSenderId" placeholder="VDAPRO" maxlength="6"></div>
+        <div class="info-banner info-yellow"><i class="fas fa-exclamation-triangle"></i> SMS credits are configured per-plan. Check the Plans page to see credits allocated per subscription tier.</div>
     </div>
     <button class="set-btn set-btn-primary" onclick="saveSettings('email')"><i class="fas fa-save"></i> Save Email & SMS Settings</button>
 </div>
@@ -183,7 +183,8 @@
         <h3>🔧 Maintenance Mode</h3>
         <p>When enabled, only super admins can access the platform</p>
         <div class="set-toggle"><div class="set-toggle-info"><h4>Enable Maintenance Mode</h4><p>Shows "Under Maintenance" page to all non-super-admin users</p></div><div class="toggle-sw" id="sMaintMode" onclick="this.classList.toggle('on')"></div></div>
-        <div class="set-field"><label>Maintenance Message</label><textarea id="sMaintMsg" placeholder="We're upgrading our systems. Back in 30 minutes!"></textarea></div>
+        <div class="set-field"><label>Maintenance Message</label><textarea id="sMaintMsg" placeholder="We're upgrading our systems. Back in 30 minutes!" style="width:100%;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;box-sizing:border-box;resize:vertical;" rows="3"></textarea></div>
+        <div class="set-field" style="margin-top:8px;"><label>Expected Completion Time (optional)</label><input id="sMaintETA" type="datetime-local" style="width:250px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.78rem;"></div>
     </div>
     <div class="set-section">
         <h3>🗑️ Data Management</h3>
@@ -209,7 +210,7 @@
     <div class="set-section">
         <h3>ℹ️ Platform Information</h3>
         <div class="about-grid">
-            <div class="about-item"><div class="lbl">Application</div><div class="val">{{ app_name or 'EduFlow' }}</div></div>
+            <div class="about-item"><div class="lbl">Application</div><div class="val">{{ app_name or 'VedaSchoolPro' }}</div></div>
             <div class="about-item"><div class="lbl">Version</div><div class="val">{{ app_version or '1.0.0' }}</div></div>
             <div class="about-item"><div class="lbl">Framework</div><div class="val">FastAPI + PostgreSQL</div></div>
             <div class="about-item"><div class="lbl">Organizations</div><div class="val">{{ org_count }}</div></div>
@@ -221,7 +222,7 @@
     </div>
     <div class="set-section">
         <h3>📋 License</h3>
-        <p>EduFlow — School Management System<br>&copy; {{ "2026" }} All rights reserved.<br>Licensed to: {{ user.first_name }} {{ user.last_name or '' }} ({{ user.email }})</p>
+        <p>{{ app_name or 'VedaSchoolPro' }} — School Management System<br>&copy; <script>document.write(new Date().getFullYear())</script> All rights reserved.<br>Licensed to: {{ user.first_name }} {{ user.last_name or '' }} ({{ user.email }})</p>
     </div>
 </div>
 {% endblock %}
@@ -280,6 +281,10 @@ function collectSection(section){
         data.default_sample_data = tog('sDefSampleData');
         data.default_parent_app = tog('sDefParentApp');
         data.default_teacher_app = tog('sDefTeacherApp');
+    } else if(section === 'maintenance'){
+        data.maintenance_mode = tog('sMaintMode');
+        data.maintenance_message = v('sMaintMsg');
+        data.maintenance_eta = v('sMaintETA');
     }
     return data;
 }
@@ -351,6 +356,7 @@ async function loadSettings(){
         // Maintenance
         setTog('sMaintMode', c.maintenance_mode);
         if(c.maintenance_message) document.getElementById('sMaintMsg').value = c.maintenance_message;
+        if(c.maintenance_eta) document.getElementById('sMaintETA').value = c.maintenance_eta;
     } catch(e){
         console.warn('Could not load settings', e);
     }

@@ -75,7 +75,7 @@ async def create_super_admin():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting EduFlow School Management System...")
+    print("🚀 Starting VedaSchoolPro School Management System...")
     await init_db()
     print("✅ Database tables created")
     # Auto-migrate: add missing enum values to PostgreSQL enum types
@@ -92,6 +92,10 @@ async def lifespan(app: FastAPI):
             ("onlineplatform", ["GOOGLE_MEET", "ZOOM", "TEAMS"]),
             ("onlineclassstatus", ["SCHEDULED", "LIVE", "COMPLETED", "CANCELLED"]),
             ("lectureattendancetype", ["JOINED", "WATCHED"]),
+            ("backupstatus", ["IN_PROGRESS", "COMPLETED", "FAILED"]),
+            ("backuptype", ["FULL", "MANUAL", "SCHEDULED", "UPLOADED"]),
+            ("discounttype", ["PERCENTAGE", "FLAT"]),
+            ("invoicestatus", ["DRAFT", "ISSUED", "PAID", "CANCELLED"]),
         ]
         for enum_name, values in enum_additions:
             for val in values:
@@ -246,6 +250,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️ Branch subdomain migration skipped: {e}")
 
+    # ── Branch maintenance columns ──
+    try:
+        from database import engine as _engine_maint
+        async with _engine_maint.begin() as conn:
+            await conn.execute(sa_text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS maintenance_mode BOOLEAN DEFAULT FALSE;"))
+            await conn.execute(sa_text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS maintenance_message TEXT;"))
+            await conn.execute(sa_text("ALTER TABLE branches ADD COLUMN IF NOT EXISTS maintenance_eta VARCHAR(100);"))
+        print("✅ Branch maintenance columns verified")
+    except Exception as e:
+        print(f"⚠️ Branch maintenance migration skipped: {e}")
+
     # ── PlatformConfig — create table if not exists ──
     try:
         from database import engine as _engine7
@@ -260,6 +275,203 @@ async def lifespan(app: FastAPI):
         print("✅ Platform config table verified")
     except Exception as e:
         print(f"⚠️ Platform config migration skipped: {e}")
+
+    # ── Backup Records table ──
+    try:
+        from database import engine as _engine_bk
+        async with _engine_bk.begin() as conn:
+            await conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS backup_records (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    branch_id UUID NOT NULL REFERENCES branches(id),
+                    org_id UUID NOT NULL REFERENCES organizations(id),
+                    file_path VARCHAR(500),
+                    file_name VARCHAR(200),
+                    file_size_bytes BIGINT DEFAULT 0,
+                    backup_type VARCHAR(20) DEFAULT 'manual',
+                    status VARCHAR(20) DEFAULT 'in_progress',
+                    tables_included JSONB,
+                    record_counts JSONB,
+                    error_message TEXT,
+                    started_at TIMESTAMP DEFAULT NOW(),
+                    completed_at TIMESTAMP,
+                    triggered_by UUID REFERENCES users(id),
+                    is_active BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT NOW()
+                );
+            """))
+        print("✅ Backup records table verified")
+    except Exception as e:
+        print(f"⚠️ Backup records migration skipped: {e}")
+
+    # ── Coupons + Redemptions tables ──
+    try:
+        from database import engine as _engine_cp
+        async with _engine_cp.begin() as conn:
+            await conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS coupons (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    code VARCHAR(50) UNIQUE NOT NULL,
+                    description VARCHAR(300),
+                    discount_type VARCHAR(20) DEFAULT 'percentage',
+                    discount_value NUMERIC(10,2) NOT NULL,
+                    max_discount_amount NUMERIC(10,2),
+                    min_plan_amount NUMERIC(10,2) DEFAULT 0,
+                    applicable_plans JSONB,
+                    applicable_tiers JSONB,
+                    max_uses INTEGER DEFAULT 100,
+                    max_uses_per_branch INTEGER DEFAULT 1,
+                    used_count INTEGER DEFAULT 0,
+                    valid_from TIMESTAMP NOT NULL,
+                    valid_until TIMESTAMP NOT NULL,
+                    is_active BOOLEAN DEFAULT true,
+                    created_by UUID REFERENCES users(id),
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                );
+            """))
+            await conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS coupon_redemptions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    coupon_id UUID NOT NULL REFERENCES coupons(id),
+                    branch_id UUID NOT NULL REFERENCES branches(id),
+                    subscription_id UUID REFERENCES school_subscriptions(id),
+                    payment_id UUID REFERENCES payment_history(id),
+                    original_amount NUMERIC(10,2) NOT NULL,
+                    discount_applied NUMERIC(10,2) NOT NULL,
+                    final_amount NUMERIC(10,2) NOT NULL,
+                    redeemed_at TIMESTAMP DEFAULT NOW(),
+                    redeemed_by UUID REFERENCES users(id)
+                );
+            """))
+        print("✅ Coupons & redemptions tables verified")
+    except Exception as e:
+        print(f"⚠️ Coupons migration skipped: {e}")
+
+    # ── Invoices table ──
+    try:
+        from database import engine as _engine_inv
+        async with _engine_inv.begin() as conn:
+            await conn.execute(sa_text("""
+                CREATE TABLE IF NOT EXISTS invoices (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    invoice_number VARCHAR(50) UNIQUE NOT NULL,
+                    org_id UUID NOT NULL REFERENCES organizations(id),
+                    branch_id UUID NOT NULL REFERENCES branches(id),
+                    subscription_id UUID REFERENCES school_subscriptions(id),
+                    payment_id UUID REFERENCES payment_history(id),
+                    supplier_name VARCHAR(300),
+                    supplier_gstin VARCHAR(15),
+                    supplier_address TEXT,
+                    supplier_state_code VARCHAR(2),
+                    buyer_name VARCHAR(300),
+                    buyer_gstin VARCHAR(15),
+                    buyer_address TEXT,
+                    buyer_state_code VARCHAR(2),
+                    line_items JSONB,
+                    subtotal NUMERIC(10,2) DEFAULT 0,
+                    discount_amount NUMERIC(10,2) DEFAULT 0,
+                    coupon_code VARCHAR(50),
+                    taxable_amount NUMERIC(10,2) DEFAULT 0,
+                    cgst_rate NUMERIC(5,2) DEFAULT 0,
+                    cgst_amount NUMERIC(10,2) DEFAULT 0,
+                    sgst_rate NUMERIC(5,2) DEFAULT 0,
+                    sgst_amount NUMERIC(10,2) DEFAULT 0,
+                    igst_rate NUMERIC(5,2) DEFAULT 0,
+                    igst_amount NUMERIC(10,2) DEFAULT 0,
+                    total_tax NUMERIC(10,2) DEFAULT 0,
+                    total_amount NUMERIC(10,2) DEFAULT 0,
+                    invoice_date DATE DEFAULT CURRENT_DATE,
+                    due_date DATE,
+                    paid_date DATE,
+                    status VARCHAR(20) DEFAULT 'draft',
+                    pdf_path VARCHAR(500),
+                    notes TEXT,
+                    is_active BOOLEAN DEFAULT true,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                );
+            """))
+        print("✅ Invoices table verified")
+    except Exception as e:
+        print(f"⚠️ Invoices migration skipped: {e}")
+
+    # ── Organization billing columns (GST) ──
+    try:
+        from database import engine as _engine_org_gst
+        async with _engine_org_gst.begin() as conn:
+            for col_sql in [
+                "gstin VARCHAR(15)",
+                "billing_name VARCHAR(300)",
+                "billing_address TEXT",
+                "billing_state_code VARCHAR(2)",
+            ]:
+                col_name = col_sql.split()[0]
+                await conn.execute(sa_text(
+                    f"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS {col_sql};"
+                ))
+        print("✅ Organization GST/billing columns verified")
+    except Exception as e:
+        print(f"⚠️ Organization GST migration skipped: {e}")
+
+    # ── SchoolSubscription late-fee columns ──
+    try:
+        from database import engine as _engine_late
+        async with _engine_late.begin() as conn:
+            for col_sql in [
+                "late_fee_amount NUMERIC(10,2) DEFAULT 0",
+                "late_fee_applied_at TIMESTAMP",
+                "late_fee_waived BOOLEAN DEFAULT false",
+                "late_fee_waived_at TIMESTAMP",
+                "late_fee_waived_by UUID",
+            ]:
+                col_name = col_sql.split()[0]
+                await conn.execute(sa_text(
+                    f"ALTER TABLE school_subscriptions ADD COLUMN IF NOT EXISTS {col_sql};"
+                ))
+        print("✅ Subscription late-fee columns verified")
+    except Exception as e:
+        print(f"⚠️ Subscription late-fee migration skipped: {e}")
+
+    # ── Plan late-fee config columns ──
+    try:
+        from database import engine as _engine_plan_late
+        async with _engine_plan_late.begin() as conn:
+            for col_sql in [
+                "late_fee_type VARCHAR(20) DEFAULT 'percentage'",
+                "late_fee_value NUMERIC(10,2) DEFAULT 5",
+                "late_fee_grace_days INTEGER DEFAULT 7",
+            ]:
+                col_name = col_sql.split()[0]
+                await conn.execute(sa_text(
+                    f"ALTER TABLE plans ADD COLUMN IF NOT EXISTS {col_sql};"
+                ))
+        print("✅ Plan late-fee config columns verified")
+    except Exception as e:
+        print(f"⚠️ Plan late-fee config migration skipped: {e}")
+
+    # ── PaymentHistory coupon & late-fee columns ──
+    try:
+        from database import engine as _engine_ph
+        async with _engine_ph.begin() as conn:
+            for col_sql in [
+                "coupon_code VARCHAR(50)",
+                "includes_late_fee BOOLEAN DEFAULT false",
+                "late_fee_amount NUMERIC(10,2) DEFAULT 0",
+            ]:
+                col_name = col_sql.split()[0]
+                await conn.execute(sa_text(
+                    f"ALTER TABLE payment_history ADD COLUMN IF NOT EXISTS {col_sql};"
+                ))
+        print("✅ PaymentHistory coupon/late-fee columns verified")
+    except Exception as e:
+        print(f"⚠️ PaymentHistory migration skipped: {e}")
+
+    # ── Create backups directory ──
+    import os as _os_bk
+    _os_bk.makedirs("backups", exist_ok=True)
+    # ── Create invoices directory ──
+    _os_bk.makedirs("static/invoices", exist_ok=True)
 
     # Initialize i18n
     try:
@@ -292,7 +504,7 @@ async def lifespan(app: FastAPI):
         stop_scheduler()
     except Exception:
         pass
-    print("Shutting down EduFlow...")
+    print("Shutting down VedaSchoolPro...")
 
 
 app = FastAPI(
@@ -331,6 +543,63 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Maintenance Mode Middleware ─────────────────────
+class MaintenanceModeMiddleware(BaseHTTPMiddleware):
+    """Block non-super-admin access when platform OR branch maintenance mode is ON."""
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+        # Always allow: static files, login page, super-admin routes, API auth
+        skip_paths = ("/static", "/login", "/api/auth", "/super-admin", "/api/super-admin", "/maintenance", "/favicon")
+        if any(path.startswith(p) for p in skip_paths):
+            return await call_next(request)
+
+        try:
+            from database import AsyncSessionLocal
+            from models.branch import PlatformConfig
+            async with AsyncSessionLocal() as db:
+                # 1) Platform-level maintenance — blocks everything
+                result = await db.execute(select(PlatformConfig))
+                pc = result.scalar_one_or_none()
+                if pc and pc.config and pc.config.get("maintenance_mode"):
+                    from starlette.responses import HTMLResponse
+                    msg = pc.config.get("maintenance_message", "")
+                    eta = pc.config.get("maintenance_eta", "")
+                    html = templates.get_template("maintenance.html").render(
+                        message=msg, eta=eta,
+                        branch_name="", branch_logo="", branch_motto=""
+                    )
+                    return HTMLResponse(content=html, status_code=503)
+
+                # 2) Branch-level maintenance — check if the logged-in user's branch is in maintenance
+                from utils.auth import decode_access_token
+                token = request.cookies.get("access_token")
+                if token:
+                    payload = decode_access_token(token)
+                    if payload and payload.get("branch_id") and payload.get("role") != "super_admin":
+                        from models.branch import Branch
+                        import uuid as _uuid
+                        branch = await db.scalar(
+                            select(Branch).where(Branch.id == _uuid.UUID(payload["branch_id"]))
+                        )
+                        if branch and branch.maintenance_mode:
+                            from starlette.responses import HTMLResponse
+                            msg = branch.maintenance_message or f"{branch.name} is currently under maintenance."
+                            eta = branch.maintenance_eta or ""
+                            html = templates.get_template("maintenance.html").render(
+                                message=msg, eta=eta,
+                                branch_name=branch.name or "",
+                                branch_logo=branch.logo_url or "",
+                                branch_motto=branch.motto or "",
+                            )
+                            return HTMLResponse(content=html, status_code=503)
+        except Exception:
+            pass  # If DB is unreachable, let the request through
+
+        return await call_next(request)
+
+app.add_middleware(MaintenanceModeMiddleware)
 
 # Include routers
 app.include_router(auth_router)

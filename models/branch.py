@@ -53,6 +53,12 @@ class Branch(Base):
     language = Column(String(20), default="English")
 
     is_active = Column(Boolean, default=True)
+
+    # Maintenance mode (per-branch)
+    maintenance_mode = Column(Boolean, default=False)
+    maintenance_message = Column(Text, nullable=True)
+    maintenance_eta = Column(String(100), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
     updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 

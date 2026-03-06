@@ -4,6 +4,12 @@
 {% block page_title %}School Branches{% endblock %}
 {% block page_subtitle %}Manage all school branches across organizations{% endblock %}
 
+{% block extra_css %}
+<style>
+.data-table tbody tr{transition:background 0.15s;}
+.data-table tbody tr:hover{background:rgba(67,56,202,0.05) !important;}
+</style>
+{% endblock %}
 {% block content %}
 <div class="card">
     <div class="card-header">
@@ -21,6 +27,7 @@
                         <th>Branch</th>
                         <th>Organization</th>
                         <th>Board</th>
+                        <th>Plan</th>
                         <th>Location</th>
                         <th>Status</th>
                         <th>Actions</th>
@@ -28,13 +35,22 @@
                 </thead>
                 <tbody>
                     {% for branch in branches %}
-                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not branch.is_active else '' }}">
+                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not branch.is_active else '' }}cursor:pointer;" onclick="window.location='/super-admin/branches/{{ branch.id }}'" title="Click to view details">
                         <td>
                             <div style="font-weight: 600;">{{ branch.name }}</div>
                             <div class="text-xs text-muted">{{ branch.code or '' }}</div>
                         </td>
                         <td class="text-sm">{{ branch.organization.name if branch.organization else '—' }}</td>
                         <td><span class="badge badge-info">{{ branch.board_type.value | upper }}</span></td>
+                        <td>
+                            {% set bsub = branch_subs.get(branch.id | string, {}) %}
+                            {% if bsub.get('plan_name') %}
+                            <span class="badge badge-purple">{{ bsub.plan_name }}</span>
+                            <div class="text-xs text-muted" style="margin-top:2px;">{{ bsub.get('status', '') | title }}</div>
+                            {% else %}
+                            <span class="badge badge-gray">No Plan</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="text-sm">{{ branch.city or '—' }}</div>
                             <div class="text-xs text-muted">{{ branch.state or '' }}</div>
@@ -46,7 +62,7 @@
                             <span class="badge badge-gray" style="background:#FEE2E2;color:#991B1B;">Inactive</span>
                             {% endif %}
                         </td>
-                        <td>
+                        <td onclick="event.stopPropagation()">
                             <div style="display: flex; gap: 6px;">
                                 <a href="/super-admin/branches/{{ branch.id }}" class="btn btn-secondary btn-sm" title="View Details">
                                     <i class="fas fa-eye"></i>

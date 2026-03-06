@@ -182,3 +182,73 @@ require_fee_access = require_privilege("fee_collection", "fee_structure", "fee_r
 require_exam_access = require_privilege("exam_management", "results")
 require_hr_access = require_privilege("employee_management", "teacher_attendance")
 require_settings = require_privilege("school_settings", "manage_staff")
+
+
+# ═══════════════════════════════════════════════════════════
+# PLAN / SUBSCRIPTION HELPERS
+# ═══════════════════════════════════════════════════════════
+
+async def get_branch_plan(db, branch_id) -> dict:
+    """
+    Load the active plan for a branch. Returns a dict with all plan flags
+    and limits, or a permissive default if no subscription exists.
+
+    Usage:
+        plan = await get_branch_plan(db, branch_id)
+        if plan['transport_module']:  # check feature flag
+        if plan['max_students'] > current_count:  # check limit
+    """
+    try:
+        from models.subscription import SchoolSubscription
+        from sqlalchemy import select
+        from sqlalchemy.orm import selectinload
+        import uuid
+
+        bid = uuid.UUID(str(branch_id)) if not isinstance(branch_id, uuid.UUID) else branch_id
+        sub = await db.scalar(
+            select(SchoolSubscription)
+            .where(SchoolSubscription.branch_id == bid)
+            .options(selectinload(SchoolSubscription.plan))
+        )
+        if sub and sub.plan:
+            p = sub.plan
+            return {
+                "plan_name": p.name,
+                "plan_tier": p.tier.value if p.tier else "starter",
+                "status": sub.status.value if sub.status else "active",
+                "max_students": p.max_students or 99999,
+                "max_teachers": p.max_teachers or 9999,
+                "max_branches": p.max_branches or 1,
+                "max_storage_gb": p.max_storage_gb or 5,
+                "whatsapp_enabled": p.whatsapp_enabled,
+                "online_fee_payment": p.online_fee_payment,
+                "transport_module": p.transport_module,
+                "hostel_module": p.hostel_module,
+                "library_module": p.library_module,
+                "hr_payroll": p.hr_payroll,
+                "advanced_analytics": p.advanced_analytics,
+                "priority_support": p.priority_support,
+                "api_access": p.api_access,
+                "custom_branding": p.custom_branding,
+                "id_card_generator": p.id_card_generator,
+                "complaints_system": p.complaints_system,
+                "data_export": p.data_export,
+                "parent_app": p.parent_app,
+                "teacher_app": p.teacher_app,
+                "messaging_system": p.messaging_system,
+                "email_notifications": p.email_notifications,
+                "has_plan": True,
+            }
+    except Exception:
+        pass
+    # Default: permissive (no plan = allow all, super admin handles assignments)
+    return {
+        "plan_name": "No Plan", "plan_tier": "none", "status": "none",
+        "max_students": 99999, "max_teachers": 9999, "max_branches": 1, "max_storage_gb": 5,
+        "whatsapp_enabled": True, "online_fee_payment": True, "transport_module": True,
+        "hostel_module": True, "library_module": True, "hr_payroll": True,
+        "advanced_analytics": True, "priority_support": False, "api_access": False,
+        "custom_branding": False, "id_card_generator": True, "complaints_system": True,
+        "data_export": True, "parent_app": True, "teacher_app": True,
+        "messaging_system": True, "email_notifications": True, "has_plan": False,
+    }

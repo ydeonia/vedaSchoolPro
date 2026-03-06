@@ -58,6 +58,10 @@ from models.online_class import (
 )
 
 # Report Card Management System
+from models.backup import BackupRecord, BackupStatus, BackupType
+from models.coupon import Coupon, CouponRedemption, DiscountType
+from models.invoice import Invoice, InvoiceStatus
+
 from models.report_card import (
     ReportCardTemplate, ExamGroup, ExamCycle, MarksUploadTracker,
     StudentMarks, StudentResult, MarksAuditLog, ReportCardPDF,

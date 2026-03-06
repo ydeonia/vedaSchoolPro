@@ -47,6 +47,7 @@
     <div class="tab" data-tab="subs"><i class="fas fa-file-invoice"></i> Subscriptions<span class="bcnt" id="subCnt">0</span></div>
     <div class="tab" data-tab="upcoming"><i class="fas fa-clock"></i> Upcoming Payments</div>
     <div class="tab" data-tab="history"><i class="fas fa-receipt"></i> Payment History</div>
+    <div class="tab" data-tab="coupons"><i class="fas fa-ticket-alt"></i> Coupons<span class="bcnt" id="couponCnt">0</span></div>
 </div>
 
 <!-- PLANS -->
@@ -59,13 +60,15 @@
 <div class="pg2">
 {% for p in plans %}
 <div class="pc">
-    {% if p.name == 'Growth' %}<div class="ribbon">Most Popular</div>{% endif %}
+    {% if p.display_order == 2 %}<div class="ribbon">Most Popular</div>{% endif %}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;">
         <h3 class="pn2">{{ p.name }}</h3>
         <button onclick="editPlan({id:'{{ p.id }}',name:'{{ p.name }}',tier:'{{ p.tier.value }}',tagline:'{{ (p.tagline or '')|e }}',display_order:{{ p.display_order or 1 }},price_monthly:{{ p.price_monthly or 0 }},price_yearly:{{ p.price_yearly or 0 }},max_students:{{ p.max_students or 300 }},max_teachers:{{ p.max_teachers or 15 }},max_branches:{{ p.max_branches or 1 }},max_storage_gb:{{ p.max_storage_gb or 5 }},sms_credits_monthly:{{ p.sms_credits_monthly or 0 }},backup_frequency:'{{ p.backup_frequency or 'weekly' }}',whatsapp_enabled:{{ 'true' if p.whatsapp_enabled else 'false' }},online_fee_payment:{{ 'true' if p.online_fee_payment else 'false' }},transport_module:{{ 'true' if p.transport_module else 'false' }},hostel_module:{{ 'true' if p.hostel_module else 'false' }},library_module:{{ 'true' if p.library_module else 'false' }},hr_payroll:{{ 'true' if p.hr_payroll else 'false' }},advanced_analytics:{{ 'true' if p.advanced_analytics else 'false' }},priority_support:{{ 'true' if p.priority_support else 'false' }},api_access:{{ 'true' if p.api_access else 'false' }},custom_branding:{{ 'true' if p.custom_branding else 'false' }},id_card_generator:{{ 'true' if p.id_card_generator else 'false' }},complaints_system:{{ 'true' if p.complaints_system else 'false' }},data_export:{{ 'true' if p.data_export else 'false' }},parent_app:{{ 'true' if p.parent_app else 'false' }},teacher_app:{{ 'true' if p.teacher_app else 'false' }},messaging_system:{{ 'true' if p.messaging_system else 'false' }},email_notifications:{{ 'true' if p.email_notifications else 'false' }}})" style="padding:4px 8px;border-radius:6px;background:#EDE9FE;color:#7C3AED;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;" title="Edit"><i class="fas fa-pen"></i></button>
     </div>
     <p class="pt">{{ p.tagline or '' }}</p>
-    {% if p.price_monthly > 0 %}
+    {% if p.tier.value == 'trial' or p.tier.value == 'free' %}
+    <div class="pp2" style="color:#059669;">Free</div><div class="py2">{{ p.tagline or 'Trial period — no charge' }}</div>
+    {% elif p.price_monthly > 0 %}
     <div><span class="pp2">₹{{ '{:,.0f}'.format(p.price_monthly) }}</span><span class="pps">/month</span></div>
     <div class="py2">or ₹{{ '{:,.0f}'.format(p.price_yearly) }}/year (save 20%)</div>
     {% else %}<div class="pp2" style="color:#059669;">Custom Pricing</div><div class="py2">Contact for enterprise quote</div>{% endif %}
@@ -108,7 +111,7 @@
     <select id="sf2" onchange="fS()"><option value="">All Plans</option>{% for p in plans %}<option value="{{ p.name }}">{{ p.name }}</option>{% endfor %}</select>
     <select id="sf3" onchange="fS()"><option value="">All Cycles</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option></select>
 </div>
-<div class="tw"><table class="dt"><thead><tr><th>Branch</th><th>Organization</th><th>Plan</th><th>Status</th><th>Cycle</th><th>Expires</th><th>Students</th><th>Amount</th></tr></thead><tbody id="sTB"><tr><td colspan="8" class="em">Loading...</td></tr></tbody></table></div>
+<div class="tw"><table class="dt"><thead><tr><th>Branch</th><th>Organization</th><th>Plan</th><th>Status</th><th>Cycle</th><th>Expires</th><th>Students</th><th>Amount</th><th>Actions</th></tr></thead><tbody id="sTB"><tr><td colspan="9" class="em">Loading...</td></tr></tbody></table></div>
 <div class="pn" id="sPn"></div>
 </div>
 
@@ -138,6 +141,71 @@
 <div class="tw"><table class="dt"><thead><tr><th>Date</th><th>Branch</th><th>Plan</th><th>Amount</th><th>Cycle</th><th>Method</th><th>Reference</th><th>Status</th></tr></thead><tbody id="hTB"><tr><td colspan="8" class="em">Payment history appears as subscriptions are renewed</td></tr></tbody></table></div>
 </div>
 
+<!-- COUPONS -->
+<div class="tp" id="tp-coupons">
+<div class="sc">
+    <div><div class="sv" style="color:#7C3AED;" id="cTotal">—</div><div class="sl">Total Coupons</div></div>
+    <div><div class="sv" style="color:#059669;" id="cActive">—</div><div class="sl">Active</div></div>
+    <div><div class="sv" style="color:#D97706;" id="cRedeemed">—</div><div class="sl">Total Redemptions</div></div>
+    <div><div class="sv" style="color:#DC2626;" id="cDiscount">—</div><div class="sl">Total Discount Given</div></div>
+</div>
+<div class="toolbar">
+    <input type="text" id="cSearch" placeholder="Search coupon code..." oninput="filterCoupons()">
+    <select id="cFilter" onchange="filterCoupons()"><option value="">All</option><option value="active">Active</option><option value="expired">Expired</option><option value="used">Fully Used</option></select>
+    <div style="flex:1;"></div>
+    <button onclick="openCouponModal()" style="padding:8px 16px;border-radius:8px;background:#7C3AED;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-plus"></i> Create Coupon</button>
+    <button onclick="openBulkCouponModal()" style="padding:8px 16px;border-radius:8px;background:#4338CA;color:white;font-weight:700;font-size:0.72rem;border:none;cursor:pointer;"><i class="fas fa-layer-group"></i> Bulk Create</button>
+</div>
+<div class="tw"><table class="dt"><thead><tr><th>Code</th><th>Type</th><th>Value</th><th>Max Discount</th><th>Usage</th><th>Discount Given</th><th>Valid From</th><th>Valid Until</th><th>Status</th><th>Actions</th></tr></thead><tbody id="cTB"><tr><td colspan="10" class="em">Loading coupons...</td></tr></tbody></table></div>
+</div>
+
+<!-- CREATE COUPON MODAL -->
+<div id="couponModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;overflow-y:auto;">
+<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:20px auto;">
+    <h3 style="font-weight:900;margin:0 0 14px 0;" id="couponModalTitle"><i class="fas fa-ticket-alt"></i> Create Coupon</h3>
+    <input type="hidden" id="cm_id" value="">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="ef"><label>Coupon Code</label><input id="cm_code" placeholder="e.g. LAUNCH20" style="text-transform:uppercase;"></div>
+        <div class="ef"><label>Description</label><input id="cm_desc" placeholder="20% off for new schools"></div>
+        <div class="ef"><label>Discount Type</label><select id="cm_type"><option value="percentage">Percentage (%)</option><option value="flat">Flat Amount (INR)</option></select></div>
+        <div class="ef"><label>Discount Value</label><input id="cm_value" type="number" step="0.01" value="10" placeholder="e.g. 20 for 20%"></div>
+        <div class="ef"><label>Max Discount (INR)</label><input id="cm_max" type="number" step="0.01" placeholder="Cap for % discount"></div>
+        <div class="ef"><label>Min Plan Amount (INR)</label><input id="cm_min" type="number" step="0.01" value="0"></div>
+        <div class="ef"><label>Max Total Uses</label><input id="cm_uses" type="number" value="100"></div>
+        <div class="ef"><label>Max Per Branch</label><input id="cm_branch_uses" type="number" value="1"></div>
+        <div class="ef"><label>Valid From</label><input id="cm_from" type="date"></div>
+        <div class="ef"><label>Valid Until</label><input id="cm_until" type="date"></div>
+        <div class="ef"><label>Applicable Tiers (comma-sep)</label><input id="cm_tiers" placeholder="starter,growth,pro"></div>
+        <div class="ef"><label>Active</label><select id="cm_active"><option value="true">Yes</option><option value="false">No</option></select></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+        <button onclick="saveCoupon()" style="padding:10px 24px;border-radius:10px;background:#7C3AED;color:white;font-weight:800;border:none;cursor:pointer;flex:1;"><i class="fas fa-save"></i> Save Coupon</button>
+        <button onclick="document.getElementById('couponModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+    </div>
+</div>
+</div>
+
+<!-- BULK CREATE COUPON MODAL -->
+<div id="bulkCouponModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;">
+<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:420px;max-width:90vw;">
+    <h3 style="font-weight:900;margin:0 0 14px 0;"><i class="fas fa-layer-group"></i> Bulk Create Coupons</h3>
+    <div style="display:grid;gap:10px;">
+        <div class="ef"><label>Code Prefix</label><input id="bk_prefix" placeholder="e.g. LAUNCH" style="text-transform:uppercase;"></div>
+        <div class="ef"><label>Count</label><input id="bk_count" type="number" value="10" min="1" max="500"></div>
+        <div class="ef"><label>Discount Type</label><select id="bk_type"><option value="percentage">Percentage (%)</option><option value="flat">Flat Amount (INR)</option></select></div>
+        <div class="ef"><label>Discount Value</label><input id="bk_value" type="number" step="0.01" value="10"></div>
+        <div class="ef"><label>Max Discount (INR, optional)</label><input id="bk_max" type="number" step="0.01"></div>
+        <div class="ef"><label>Valid From</label><input id="bk_from" type="date"></div>
+        <div class="ef"><label>Valid Until</label><input id="bk_until" type="date"></div>
+    </div>
+    <p style="font-size:0.65rem;color:var(--text-light);margin:10px 0 0;">Codes generated: PREFIX01, PREFIX02, ... PREFIX{count}</p>
+    <div style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="doBulkCreate()" style="padding:10px 24px;border-radius:10px;background:#4338CA;color:white;font-weight:800;border:none;cursor:pointer;flex:1;"><i class="fas fa-magic"></i> Generate</button>
+        <button onclick="document.getElementById('bulkCouponModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+    </div>
+</div>
+</div>
+
 <!-- PLAN CREATE/EDIT MODAL -->
 <div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99998;align-items:center;justify-content:center;overflow-y:auto;">
 <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:600px;max-width:95vw;max-height:90vh;overflow-y:auto;margin:20px auto;">
@@ -148,13 +216,13 @@
         <div class="ef"><label>Tier</label><select id="pm_tier"><option value="free">Free</option><option value="trial">Trial</option><option value="starter">Starter</option><option value="growth">Growth</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></div>
         <div class="ef"><label>Tagline</label><input id="pm_tagline" placeholder="Short description"></div>
         <div class="ef"><label>Display Order</label><input id="pm_order" type="number" value="1"></div>
-        <div class="ef"><label>Price Monthly (₹)</label><input id="pm_price_m" type="number" value="999"></div>
-        <div class="ef"><label>Price Yearly (₹)</label><input id="pm_price_y" type="number" value="9590"></div>
-        <div class="ef"><label>Max Students</label><input id="pm_students" type="number" value="300"></div>
-        <div class="ef"><label>Max Teachers</label><input id="pm_teachers" type="number" value="15"></div>
-        <div class="ef"><label>Max Branches</label><input id="pm_branches" type="number" value="1"></div>
-        <div class="ef"><label>Max Storage (GB)</label><input id="pm_storage" type="number" value="5"></div>
-        <div class="ef"><label>SMS Credits/Month</label><input id="pm_sms" type="number" value="100"></div>
+        <div class="ef"><label>Price Monthly (₹)</label><input id="pm_price_m" type="number" value="0" placeholder="0"></div>
+        <div class="ef"><label>Price Yearly (₹)</label><input id="pm_price_y" type="number" value="0" placeholder="0"></div>
+        <div class="ef"><label>Max Students</label><input id="pm_students" type="number" value="100" placeholder="100"></div>
+        <div class="ef"><label>Max Teachers</label><input id="pm_teachers" type="number" value="10" placeholder="10"></div>
+        <div class="ef"><label>Max Branches</label><input id="pm_branches" type="number" value="1" placeholder="1"></div>
+        <div class="ef"><label>Max Storage (GB)</label><input id="pm_storage" type="number" value="1" placeholder="1"></div>
+        <div class="ef"><label>SMS Credits/Month</label><input id="pm_sms" type="number" value="0" placeholder="0"></div>
         <div class="ef"><label>Backup Frequency</label><select id="pm_backup"><option value="weekly">Weekly</option><option value="daily">Daily</option><option value="realtime">Real-time</option></select></div>
     </div>
     <h4 style="font-size:0.72rem;font-weight:800;margin:14px 0 8px 0;">Features</h4>
@@ -183,6 +251,44 @@
     </div>
 </div>
 </div>
+
+<!-- CHANGE PLAN MODAL -->
+<div id="changePlanModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;align-items:center;justify-content:center;">
+<div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:460px;max-width:90vw;">
+    <h3 style="font-weight:900;margin:0 0 4px;font-size:0.95rem;">🔄 Change Plan</h3>
+    <p style="font-size:0.72rem;color:var(--text-light);margin:0 0 14px;" id="cpInfo"></p>
+    <input type="hidden" id="cpBranchId">
+    <div class="ef" style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Select New Plan</label>
+        <select id="cpPlan" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;font-weight:700;">
+            {% for p in plans %}<option value="{{ p.id }}" data-monthly="{{ p.price_monthly }}" data-yearly="{{ p.price_yearly }}">{{ p.name }} — ₹{{ p.price_monthly }}/mo or ₹{{ p.price_yearly }}/yr</option>{% endfor %}
+        </select>
+    </div>
+    <div class="ef" style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Billing Cycle</label>
+        <select id="cpCycle" style="width:100%;padding:10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;font-weight:700;">
+            <option value="monthly">Monthly</option><option value="yearly">Yearly (save 20%)</option>
+        </select>
+    </div>
+    <div class="ef" style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Payment Reference (optional)</label>
+        <input id="cpRef" placeholder="Razorpay ID / manual reference" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);margin-top:4px;box-sizing:border-box;">
+    </div>
+    <div class="ef" style="margin-bottom:10px;"><label style="font-size:0.58rem;font-weight:700;text-transform:uppercase;color:var(--text-light);">Coupon Code (optional)</label>
+        <div style="display:flex;gap:6px;margin-top:4px;">
+            <input id="cpCoupon" placeholder="e.g. LAUNCH20" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);text-transform:uppercase;box-sizing:border-box;">
+            <button type="button" onclick="validateCoupon()" style="padding:8px 14px;border-radius:8px;background:#7C3AED;color:white;font-weight:700;font-size:0.68rem;border:none;cursor:pointer;white-space:nowrap;"><i class="fas fa-tag"></i> Apply</button>
+        </div>
+    </div>
+    <div id="cpDiscountRow" style="display:none;background:#F5F3FF;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:0.75rem;">
+        <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span id="cpSubtotal" style="font-weight:700;">—</span></div>
+        <div style="display:flex;justify-content:space-between;color:#7C3AED;"><span>Discount (<span id="cpCouponLabel"></span>)</span><span id="cpDiscountAmt" style="font-weight:700;">—</span></div>
+        <hr style="border:none;border-top:1px dashed var(--border);margin:6px 0;">
+        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:0.82rem;"><span>Total</span><span id="cpTotal">—</span></div>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button onclick="doChangePlan()" style="padding:10px 24px;border-radius:10px;background:#4338CA;color:white;font-weight:800;border:none;cursor:pointer;flex:1;"><i class="fas fa-check"></i> Apply Plan Change</button>
+        <button onclick="document.getElementById('changePlanModal').style.display='none'" style="padding:10px 20px;border-radius:10px;background:var(--bg);font-weight:700;border:1.5px solid var(--border);cursor:pointer;">Cancel</button>
+    </div>
+</div>
+</div>
 {% endblock %}
 {% block extra_js %}
 <script>
@@ -194,9 +300,10 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',function
     document.getElementById('tp-'+this.dataset.tab).classList.add('active');
     if(this.dataset.tab==='subs')lS();
     if(this.dataset.tab==='upcoming')lU();
+    if(this.dataset.tab==='coupons')loadCoupons();
 }));
 
-async function seedPlans(){showConfirm('Create Plans','Create 4 default plans: Starter, Growth, Pro, Enterprise?',async()=>{const d=await apiCall('/api/super-admin/plans/seed','POST');if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1500);}else showToast('error',d.error||d.message||'Failed');},{icon:'📋',yesText:'Create'});}
+async function seedPlans(){showConfirm('Reset Default Plans','This will create the default subscription plans. Any existing plans will not be affected.',async()=>{const d=await apiCall('/api/super-admin/plans/seed','POST');if(d.success){showToast('success',d.message);setTimeout(()=>location.reload(),1500);}else showToast('error',d.error||d.message||'Failed');},{icon:'📋',yesText:'Create'});}
 
 function openPlanModal(data){
     document.getElementById('planModalTitle').textContent=data?'✏️ Edit Plan':'➕ Create New Plan';
@@ -205,10 +312,10 @@ function openPlanModal(data){
     document.getElementById('pm_tier').value=data?(data.tier||'starter'):'starter';
     document.getElementById('pm_tagline').value=data?data.tagline||'':'';
     document.getElementById('pm_order').value=data?data.display_order||1:1;
-    document.getElementById('pm_price_m').value=data?data.price_monthly||0:999;
-    document.getElementById('pm_price_y').value=data?data.price_yearly||0:9590;
-    document.getElementById('pm_students').value=data?data.max_students||300:300;
-    document.getElementById('pm_teachers').value=data?data.max_teachers||15:15;
+    document.getElementById('pm_price_m').value=data?data.price_monthly||0:0;
+    document.getElementById('pm_price_y').value=data?data.price_yearly||0:0;
+    document.getElementById('pm_students').value=data?data.max_students||100:100;
+    document.getElementById('pm_teachers').value=data?data.max_teachers||10:10;
     document.getElementById('pm_branches').value=data?data.max_branches||1:1;
     document.getElementById('pm_storage').value=data?data.max_storage_gb||5:5;
     document.getElementById('pm_sms').value=data?data.sms_credits_monthly||100:100;
@@ -292,12 +399,18 @@ function fS(){
 }
 function rS(d){
     const tb=document.getElementById('sTB'),s=(sp-1)*PS,e=s+PS,pg=d.slice(s,e);
-    if(!pg.length){tb.innerHTML='<tr><td colspan="8" class="em">No subscriptions found</td></tr>';return;}
-    tb.innerHTML=pg.map(s=>`<tr><td class="sn">${s.branch_name}</td><td>${s.org_name}</td>
-    <td><span class="pill pp">${s.plan_name}</span></td>
-    <td><span class="pill ${s.status==='active'?'pg':s.status==='trial'?'pb':s.status==='grace'?'py':'pr'}">${s.status.toUpperCase()}</span></td>
-    <td>${s.billing_cycle}</td><td>${s.current_period_end||'—'}</td><td>${s.student_count||0}</td>
-    <td style="font-weight:700;">${s.billing_cycle==='yearly'?'₹23,990':'₹999'}</td></tr>`).join('');
+    if(!pg.length){tb.innerHTML='<tr><td colspan="9" class="em">No subscriptions found</td></tr>';return;}
+    tb.innerHTML=pg.map(s=>{
+        const lfBadge=s.late_fee_amount>0?`<span class="pill pr" style="margin-left:4px;" title="Late fee applied">+₹${Number(s.late_fee_amount).toLocaleString()} late fee</span>`:'';
+        const lfBtns=s.late_fee_amount>0?`<button onclick="waiveLateFee('${s.id}')" style="padding:3px 8px;border-radius:5px;background:#FEF3C7;color:#92400E;font-size:0.55rem;font-weight:700;border:none;cursor:pointer;margin-left:3px;" title="Waive late fee"><i class="fas fa-hand-holding-heart"></i></button>`:'';
+        const invBtn=`<button onclick="generateInvoice('${s.branch_id}')" style="padding:3px 8px;border-radius:5px;background:#D1FAE5;color:#065F46;font-size:0.55rem;font-weight:700;border:none;cursor:pointer;margin-left:3px;" title="Generate & Download Invoice"><i class="fas fa-file-invoice-dollar"></i></button>`;
+        return`<tr><td class="sn">${s.branch_name}</td><td>${s.org_name}</td>
+        <td><span class="pill pp">${s.plan_name}</span></td>
+        <td><span class="pill ${s.status==='active'?'pg':s.status==='trial'?'pb':s.status==='grace'?'py':'pr'}">${s.status.toUpperCase()}</span>${lfBadge}</td>
+        <td>${s.billing_cycle}</td><td>${s.current_period_end||'—'}</td><td>${s.student_count||0}</td>
+        <td style="font-weight:700;">₹${(s.last_amount||0).toLocaleString()}</td>
+        <td style="white-space:nowrap;"><button onclick="openChangePlan('${s.branch_id}','${s.branch_name}','${s.plan_id}','${s.billing_cycle}')" style="padding:4px 10px;border-radius:6px;background:#EDE9FE;color:#7C3AED;font-size:0.62rem;font-weight:700;border:none;cursor:pointer;white-space:nowrap;"><i class="fas fa-exchange-alt"></i> Change</button>${invBtn}${lfBtns}</td></tr>`;
+    }).join('');
     const tp=Math.ceil(d.length/PS),pn=document.getElementById('sPn');
     pn.innerHTML=`<span>${s+1}–${Math.min(e,d.length)} of ${d.length}</span><div style="display:flex;gap:4px;">${Array.from({length:Math.min(tp,10)},(_,i)=>`<button class="${i+1===sp?'act':''}" onclick="sp=${i+1};rS(AS)">${i+1}</button>`).join('')}</div>`;
 }
@@ -335,6 +448,276 @@ function rU(d){
     }).join('');
 }
 function fH(){}
+
+/* ═══ Change Plan Modal ═══ */
+function openChangePlan(branchId,branchName,currentPlanId,currentCycle){
+    document.getElementById('cpBranchId').value=branchId;
+    document.getElementById('cpInfo').textContent='Change plan for '+branchName;
+    document.getElementById('cpPlan').value=currentPlanId||'';
+    document.getElementById('cpCycle').value=currentCycle||'monthly';
+    document.getElementById('cpRef').value='';
+    document.getElementById('changePlanModal').style.display='flex';
+}
+async function doChangePlan(){
+    const branchId=document.getElementById('cpBranchId').value;
+    const planId=document.getElementById('cpPlan').value;
+    const cycle=document.getElementById('cpCycle').value;
+    const ref=document.getElementById('cpRef').value.trim();
+    const coupon=document.getElementById('cpCoupon').value.trim();
+    if(!branchId||!planId){showToast('error','Select a plan');return;}
+    const body={branch_id:branchId,plan_id:planId,billing_cycle:cycle,payment_ref:ref};
+    if(coupon)body.coupon_code=coupon;
+    const d=await apiCall('/api/super-admin/subscriptions/assign','POST',body);
+    if(d.success){
+        showToast('success',d.message);
+        document.getElementById('changePlanModal').style.display='none';
+        document.getElementById('cpDiscountRow').style.display='none';
+        document.getElementById('cpCoupon').value='';
+        lS();
+    } else showToast('error',d.error||'Failed');
+}
+
 (async()=>{try{const d=await apiCall('/api/super-admin/subscriptions');document.getElementById('subCnt').textContent=(d.subscriptions||[]).length;}catch(e){}})();
+
+/* ═══ Coupon System ═══ */
+let allCoupons=[];
+async function loadCoupons(){
+    const d=await apiCall('/api/super-admin/coupons');
+    allCoupons=d.coupons||[];
+    document.getElementById('couponCnt').textContent=allCoupons.length;
+    const active=allCoupons.filter(c=>c.is_active);
+    const totalRedemptions=allCoupons.reduce((a,c)=>a+(c.used_count||0),0);
+    const totalDiscount=allCoupons.reduce((a,c)=>a+(c.total_discount||0),0);
+    document.getElementById('cTotal').textContent=allCoupons.length;
+    document.getElementById('cActive').textContent=active.length;
+    document.getElementById('cRedeemed').textContent=totalRedemptions;
+    document.getElementById('cDiscount').textContent='₹'+totalDiscount.toLocaleString();
+    renderCoupons(allCoupons);
+}
+function filterCoupons(){
+    const q=document.getElementById('cSearch').value.toLowerCase();
+    const f=document.getElementById('cFilter').value;
+    const now=new Date();
+    let list=allCoupons.filter(c=>{
+        if(q&&!c.code.toLowerCase().includes(q))return false;
+        if(f==='active'&&!c.is_active)return false;
+        if(f==='expired'&&(c.is_active&&(!c.valid_until||new Date(c.valid_until)>now)))return false;
+        if(f==='used'&&c.used_count<c.max_uses)return false;
+        return true;
+    });
+    renderCoupons(list);
+}
+function renderCoupons(list){
+    const tb=document.getElementById('cTB');
+    if(!list.length){tb.innerHTML='<tr><td colspan="10" class="em">No coupons found</td></tr>';return;}
+    tb.innerHTML=list.map(c=>{
+        const now=new Date();
+        const expired=c.valid_until&&new Date(c.valid_until)<now;
+        const full=c.used_count>=c.max_uses;
+        const st=!c.is_active?'pr':expired?'py':full?'py':'pg';
+        const sl=!c.is_active?'INACTIVE':expired?'EXPIRED':full?'USED UP':'ACTIVE';
+        const totalDisc=c.total_discount||0;
+        return`<tr>
+        <td class="sn" style="font-family:monospace;">${c.code}</td>
+        <td><span class="pill ${c.discount_type==='percentage'?'pb':'pp'}">${c.discount_type==='percentage'?'%':'FLAT'}</span></td>
+        <td style="font-weight:700;">${c.discount_type==='percentage'?c.discount_value+'%':'₹'+Number(c.discount_value).toLocaleString()}</td>
+        <td>${c.max_discount_amount?'₹'+Number(c.max_discount_amount).toLocaleString():'—'}</td>
+        <td>${c.used_count||0} / ${c.max_uses}</td>
+        <td style="font-weight:700;color:#D97706;">₹${totalDisc.toLocaleString()}</td>
+        <td>${c.valid_from?new Date(c.valid_from).toLocaleDateString():'—'}</td>
+        <td>${c.valid_until?new Date(c.valid_until).toLocaleDateString():'—'}</td>
+        <td><span class="pill ${st}">${sl}</span></td>
+        <td style="white-space:nowrap;">
+            ${c.used_count>0?`<button onclick="viewRedemptions('${c.id}')" style="padding:3px 8px;border-radius:5px;background:#DBEAFE;color:#1D4ED8;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;" title="View Redemptions"><i class="fas fa-chart-bar"></i></button>`:''}
+            <button onclick="editCoupon('${c.id}')" style="padding:3px 8px;border-radius:5px;background:#EDE9FE;color:#7C3AED;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;margin-left:3px;"><i class="fas fa-pen"></i></button>
+            <button onclick="deleteCoupon('${c.id}','${c.code}')" style="padding:3px 8px;border-radius:5px;background:#FEE2E2;color:#DC2626;font-size:0.58rem;font-weight:700;border:none;cursor:pointer;margin-left:3px;"><i class="fas fa-ban"></i></button>
+        </td></tr>`;
+    }).join('');
+}
+
+function openCouponModal(data){
+    document.getElementById('couponModalTitle').innerHTML=data?'<i class="fas fa-pen"></i> Edit Coupon':'<i class="fas fa-ticket-alt"></i> Create Coupon';
+    document.getElementById('cm_id').value=data?data.id:'';
+    document.getElementById('cm_code').value=data?data.code:'';
+    document.getElementById('cm_desc').value=data?data.description||'':'';
+    document.getElementById('cm_type').value=data?data.discount_type:'percentage';
+    document.getElementById('cm_value').value=data?data.discount_value:10;
+    document.getElementById('cm_max').value=data&&data.max_discount_amount?data.max_discount_amount:'';
+    document.getElementById('cm_min').value=data?data.min_plan_amount||0:0;
+    document.getElementById('cm_uses').value=data?data.max_uses:100;
+    document.getElementById('cm_branch_uses').value=data?data.max_uses_per_branch:1;
+    document.getElementById('cm_from').value=data&&data.valid_from?data.valid_from.split('T')[0]:'';
+    document.getElementById('cm_until').value=data&&data.valid_until?data.valid_until.split('T')[0]:'';
+    document.getElementById('cm_tiers').value=data&&data.applicable_tiers?data.applicable_tiers.join(','):'';
+    document.getElementById('cm_active').value=data?String(data.is_active):'true';
+    document.getElementById('couponModal').style.display='flex';
+}
+function editCoupon(id){
+    const c=allCoupons.find(x=>x.id===id);
+    if(c)openCouponModal(c);
+}
+async function saveCoupon(){
+    const id=document.getElementById('cm_id').value;
+    const code=document.getElementById('cm_code').value.trim().toUpperCase();
+    if(!code){showToast('error','Coupon code required');return;}
+    const tiers=document.getElementById('cm_tiers').value.trim();
+    const body={
+        code:code,
+        description:document.getElementById('cm_desc').value.trim(),
+        discount_type:document.getElementById('cm_type').value,
+        discount_value:parseFloat(document.getElementById('cm_value').value)||0,
+        max_discount_amount:parseFloat(document.getElementById('cm_max').value)||null,
+        min_plan_amount:parseFloat(document.getElementById('cm_min').value)||0,
+        max_uses:parseInt(document.getElementById('cm_uses').value)||100,
+        max_uses_per_branch:parseInt(document.getElementById('cm_branch_uses').value)||1,
+        valid_from:document.getElementById('cm_from').value||null,
+        valid_until:document.getElementById('cm_until').value||null,
+        applicable_tiers:tiers?tiers.split(',').map(t=>t.trim()):null,
+        is_active:document.getElementById('cm_active').value==='true'
+    };
+    const url=id?`/api/super-admin/coupons/${id}`:'/api/super-admin/coupons';
+    const method=id?'PUT':'POST';
+    const d=await apiCall(url,method,body);
+    if(d.success){showToast('success',d.message||'Coupon saved');document.getElementById('couponModal').style.display='none';loadCoupons();}
+    else showToast('error',d.error||'Failed');
+}
+async function deleteCoupon(id,code){
+    showConfirm('Deactivate Coupon','Deactivate coupon '+code+'?',async()=>{
+        const d=await apiCall(`/api/super-admin/coupons/${id}`,'DELETE');
+        if(d.success){showToast('success','Coupon deactivated');loadCoupons();}
+        else showToast('error',d.error||'Failed');
+    },{icon:'<i class="fas fa-ban"></i>',yesText:'Deactivate'});
+}
+
+function openBulkCouponModal(){
+    document.getElementById('bk_prefix').value='';
+    document.getElementById('bk_count').value=10;
+    document.getElementById('bk_type').value='percentage';
+    document.getElementById('bk_value').value=10;
+    document.getElementById('bk_max').value='';
+    document.getElementById('bk_from').value='';
+    document.getElementById('bk_until').value='';
+    document.getElementById('bulkCouponModal').style.display='flex';
+}
+async function doBulkCreate(){
+    const prefix=document.getElementById('bk_prefix').value.trim().toUpperCase();
+    if(!prefix){showToast('error','Prefix required');return;}
+    const body={
+        prefix:prefix,
+        count:parseInt(document.getElementById('bk_count').value)||10,
+        discount_type:document.getElementById('bk_type').value,
+        discount_value:parseFloat(document.getElementById('bk_value').value)||10,
+        max_discount_amount:parseFloat(document.getElementById('bk_max').value)||null,
+        valid_from:document.getElementById('bk_from').value||null,
+        valid_until:document.getElementById('bk_until').value||null
+    };
+    const d=await apiCall('/api/super-admin/coupons/bulk','POST',body);
+    if(d.success){showToast('success',d.message||'Coupons created');document.getElementById('bulkCouponModal').style.display='none';loadCoupons();}
+    else showToast('error',d.error||'Failed');
+}
+
+/* ═══ Coupon Redemption Details ═══ */
+function viewRedemptions(couponId){
+    const c=allCoupons.find(x=>x.id===couponId);
+    if(!c||!c.redemptions||!c.redemptions.length){showToast('info','No redemptions found for this coupon');return;}
+    let html=`<div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;" id="redemptionModal" onclick="if(event.target===this)this.remove()">
+    <div style="background:var(--bg-card,white);border-radius:16px;padding:24px;width:620px;max-width:95vw;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="font-weight:900;margin:0;"><i class="fas fa-chart-bar" style="color:#1D4ED8;"></i> Redemptions — ${c.code}</h3>
+        <button onclick="document.getElementById('redemptionModal').remove()" style="border:none;background:none;font-size:1.2rem;cursor:pointer;color:var(--text-light);">&times;</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#7C3AED;">${c.used_count||0}</div>
+            <div style="font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Times Used</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#D97706;">₹${(c.total_discount||0).toLocaleString()}</div>
+            <div style="font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Total Discount</div>
+        </div>
+        <div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center;">
+            <div style="font-size:1.3rem;font-weight:900;color:#059669;">${c.max_uses-c.used_count}</div>
+            <div style="font-size:0.55rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Remaining Uses</div>
+        </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
+    <thead><tr style="border-bottom:2px solid var(--border-light);">
+        <th style="text-align:left;padding:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Branch</th>
+        <th style="text-align:right;padding:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Original</th>
+        <th style="text-align:right;padding:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Discount</th>
+        <th style="text-align:right;padding:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Final</th>
+        <th style="text-align:right;padding:8px;font-size:0.58rem;font-weight:800;text-transform:uppercase;color:var(--text-light);">Date</th>
+    </tr></thead><tbody>`;
+    c.redemptions.forEach(r=>{
+        html+=`<tr style="border-bottom:1px solid var(--border-light);">
+            <td style="padding:8px;font-weight:600;">${r.branch_name}</td>
+            <td style="padding:8px;text-align:right;">₹${r.original_amount.toLocaleString()}</td>
+            <td style="padding:8px;text-align:right;color:#DC2626;font-weight:700;">-₹${r.discount_applied.toLocaleString()}</td>
+            <td style="padding:8px;text-align:right;font-weight:700;">₹${r.final_amount.toLocaleString()}</td>
+            <td style="padding:8px;text-align:right;color:var(--text-light);font-size:0.65rem;">${r.redeemed_at}</td>
+        </tr>`;
+    });
+    html+=`</tbody></table></div></div>`;
+    document.body.insertAdjacentHTML('beforeend',html);
+}
+
+/* ═══ Coupon Validation in Change Plan Modal ═══ */
+async function validateCoupon(){
+    const code=document.getElementById('cpCoupon').value.trim().toUpperCase();
+    if(!code){showToast('error','Enter a coupon code');return;}
+    const planId=document.getElementById('cpPlan').value;
+    const cycle=document.getElementById('cpCycle').value;
+    const sel=document.getElementById('cpPlan');
+    const opt=sel.options[sel.selectedIndex];
+    const price=cycle==='yearly'?parseFloat(opt.dataset.yearly):parseFloat(opt.dataset.monthly);
+    const d=await apiCall('/api/super-admin/coupons/validate','POST',{code:code,plan_id:planId,amount:price});
+    if(d.success&&d.valid){
+        document.getElementById('cpSubtotal').textContent='₹'+price.toLocaleString();
+        document.getElementById('cpCouponLabel').textContent=code;
+        document.getElementById('cpDiscountAmt').textContent='-₹'+Number(d.discount_amount).toLocaleString();
+        document.getElementById('cpTotal').textContent='₹'+Number(d.final_amount).toLocaleString();
+        document.getElementById('cpDiscountRow').style.display='block';
+        showToast('success','Coupon applied: -₹'+Number(d.discount_amount).toLocaleString());
+    } else {
+        document.getElementById('cpDiscountRow').style.display='none';
+        showToast('error',d.message||d.error||'Invalid coupon');
+    }
+}
+
+/* ═══ Invoice Generate & Download ═══ */
+async function generateInvoice(branchId){
+    showToast('info','Generating invoice...');
+    try{
+        const d=await apiCall('/api/super-admin/invoices/generate','POST',{branch_id:branchId});
+        if(d.success&&d.invoice_id){
+            showToast('success','Invoice generated: '+d.invoice_number);
+            window.open(`/api/super-admin/invoices/download/${d.invoice_id}`,'_blank');
+        } else if(d.error){
+            showToast('error',d.error);
+        } else {
+            /* Fallback: try to download latest existing invoice */
+            const list=await apiCall(`/api/super-admin/invoices/${branchId}`);
+            const invoices=list.invoices||[];
+            if(invoices.length){window.open(`/api/super-admin/invoices/download/${invoices[0].id}`,'_blank');}
+            else showToast('info','No invoice could be generated for this branch');
+        }
+    }catch(e){showToast('error','Invoice generation failed: '+e.message);}
+}
+
+/* ═══ Late Fee Actions ═══ */
+async function waiveLateFee(subId){
+    showConfirm('Waive Late Fee','Remove the late fee for this subscription?',async()=>{
+        const d=await apiCall(`/api/super-admin/subscriptions/${subId}/waive-late-fee`,'POST');
+        if(d.success){showToast('success','Late fee waived');lS();}
+        else showToast('error',d.error||'Failed');
+    },{icon:'<i class="fas fa-hand-holding-heart"></i>',yesText:'Waive'});
+}
+async function revertLateFee(subId){
+    showConfirm('Revert Late Fee','Revert the late fee for this subscription?',async()=>{
+        const d=await apiCall(`/api/super-admin/subscriptions/${subId}/revert-late-fee`,'POST');
+        if(d.success){showToast('success','Late fee reverted');lS();}
+        else showToast('error',d.error||'Failed');
+    },{icon:'<i class="fas fa-undo"></i>',yesText:'Revert'});
+}
 </script>
 {% endblock %}

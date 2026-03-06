@@ -120,17 +120,17 @@ HELP_ARTICLES = [
     # ─── GENERAL ───
     {
         "id": "gen-1", "page": "all", "title": "What does 'trust-first' mean?",
-        "content": "EduFlow is designed to reduce anxiety. Every action can be undone, nothing is final until you confirm, data is never deleted without warning, and we tell you 'You can edit this later' everywhere. Schools judge software by how safe it feels.",
+        "content": "VedaSchoolPro is designed to reduce anxiety. Every action can be undone, nothing is final until you confirm, data is never deleted without warning, and we tell you 'You can edit this later' everywhere. Schools judge software by how safe it feels.",
         "roles": ["school_admin", "teacher"], "tags": ["trust", "undo", "safe", "philosophy"]
     },
     {
         "id": "gen-2", "page": "all", "title": "Can I use this on my phone?",
-        "content": "Yes! EduFlow is fully responsive and works on any phone browser. Teachers can mark attendance from their phone. Parents can check results and fees on mobile. No app download needed.",
+        "content": "Yes! VedaSchoolPro is fully responsive and works on any phone browser. Teachers can mark attendance from their phone. Parents can check results and fees on mobile. No app download needed.",
         "roles": ["school_admin", "teacher", "student", "parent"], "tags": ["mobile", "phone", "responsive", "app"]
     },
     {
         "id": "gen-3", "page": "all", "title": "What if the internet is slow?",
-        "content": "EduFlow is optimized for low-bandwidth. Pages are lightweight (no heavy frameworks). If a save fails due to connectivity, you'll see a clear error with a retry button. Your data isn't lost — just retry when connected.",
+        "content": "VedaSchoolPro is optimized for low-bandwidth. Pages are lightweight (no heavy frameworks). If a save fails due to connectivity, you'll see a clear error with a retry button. Your data isn't lost — just retry when connected.",
         "roles": ["school_admin", "teacher"], "tags": ["internet", "slow", "offline", "bandwidth", "retry"]
     },
 ]

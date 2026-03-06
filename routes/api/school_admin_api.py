@@ -28,6 +28,20 @@ def get_branch_id(user: dict) -> uuid.UUID:
     return uuid.UUID(user["branch_id"])
 
 
+# ═══════════════════════════════════════════════════════════
+# PLAN FEATURES — Sidebar gating + limit checks
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/my-plan")
+async def get_my_plan(request: Request, db: AsyncSession = Depends(get_db)):
+    """Return current plan features for the logged-in school admin's branch."""
+    user = await verify_school_admin(request)
+    branch_id = get_branch_id(user)
+    from utils.permissions import get_branch_plan
+    plan = await get_branch_plan(db, branch_id)
+    return plan
+
+
 # ─── ACADEMIC YEAR ────────────────────────────────────────
 
 class AcademicYearCreate(BaseModel):
@@ -297,6 +311,19 @@ async def create_teacher(data: TeacherCreate, request: Request, db: AsyncSession
     user = await verify_school_admin(request)
     branch_id = get_branch_id(user)
     org_id = uuid.UUID(user["org_id"])
+
+    # ─── Plan limit check: max teachers ───
+    from utils.permissions import get_branch_plan
+    plan = await get_branch_plan(db, branch_id)
+    if plan.get("has_plan"):
+        current_count = await db.scalar(
+            select(func.count(Teacher.id)).where(Teacher.branch_id == branch_id, Teacher.is_active == True)
+        ) or 0
+        if current_count >= plan["max_teachers"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Teacher limit reached ({plan['max_teachers']} on {plan['plan_name']} plan). Upgrade your plan to add more teachers."
+            )
 
     # Check duplicate email
     if data.email:
@@ -817,6 +844,20 @@ async def list_students(request: Request, class_id: str = "", section_id: str = 
 async def create_student(request: Request, data: StudentCreate, db: AsyncSession = Depends(get_db)):
     user = await verify_school_admin(request)
     branch_id = get_branch_id(user)
+
+    # ─── Plan limit check: max students ───
+    from utils.permissions import get_branch_plan
+    plan = await get_branch_plan(db, branch_id)
+    if plan.get("has_plan"):
+        from models.student import Student as StudentModel
+        current_count = await db.scalar(
+            select(func.count(Student.id)).where(Student.branch_id == branch_id, Student.is_active == True)
+        ) or 0
+        if current_count >= plan["max_students"]:
+            raise HTTPException(
+                status_code=402,
+                detail=f"Student limit reached ({plan['max_students']} on {plan['plan_name']} plan). Upgrade your plan to add more students."
+            )
 
     # Check duplicate admission number
     if data.admission_number:

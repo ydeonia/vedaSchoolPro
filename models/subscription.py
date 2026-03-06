@@ -97,6 +97,11 @@ class Plan(Base):
     messaging_system = Column(Boolean, default=True)
     complaints_system = Column(Boolean, default=False)
 
+    # Late fee config (per-plan)
+    late_fee_type = Column(String(20), default="percentage")    # "percentage" or "flat"
+    late_fee_value = Column(Numeric(10, 2), default=5)          # 5% or Rs.500 flat
+    late_fee_grace_days = Column(Integer, default=7)            # Days after due before late fee kicks in
+
     is_active = Column(Boolean, default=True)
     display_order = Column(Integer, default=0)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
@@ -142,6 +147,13 @@ class SchoolSubscription(Base):
     current_teacher_count = Column(Integer, default=0)
     storage_used_mb = Column(Integer, default=0)
 
+    # Late fee tracking
+    late_fee_amount = Column(Numeric(10, 2), default=0)
+    late_fee_applied_at = Column(DateTime, nullable=True)
+    late_fee_waived = Column(Boolean, default=False)
+    late_fee_waived_at = Column(DateTime, nullable=True)
+    late_fee_waived_by = Column(UUID(as_uuid=True), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
     updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow())
 
@@ -171,8 +183,13 @@ class PaymentHistory(Base):
     period_start = Column(DateTime, nullable=True)
     period_end = Column(DateTime, nullable=True)
 
-    status = Column(String(50), default="completed")        # completed, pending, failed, refunded
+    status = Column(String(50), default="completed")        # completed, pending, failed, refunded, late_fee_pending
     notes = Column(Text, nullable=True)
+
+    # Coupon & late fee tracking
+    coupon_code = Column(String(50), nullable=True)
+    includes_late_fee = Column(Boolean, default=False)
+    late_fee_amount = Column(Numeric(10, 2), default=0)
 
     created_at = Column(DateTime, default=lambda: datetime.utcnow())
 

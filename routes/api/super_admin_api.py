@@ -368,9 +368,22 @@ async def system_analytics(request: Request, db: AsyncSession = Depends(get_db))
 
     server["python_version"] = f"Python {sys.version.split()[0]} / FastAPI"
 
-    # Per-school stats
+    # Per-school stats — include plan & storage from subscriptions
     schools = []
     from models.teacher import Teacher
+    # Pre-load subscriptions for all branches
+    sub_map = {}
+    try:
+        from models.subscription import SchoolSubscription, Plan
+        from sqlalchemy.orm import selectinload
+        subs = (await db.execute(
+            select(SchoolSubscription).options(selectinload(SchoolSubscription.plan))
+        )).scalars().all()
+        for s in subs:
+            sub_map[str(s.branch_id)] = s
+    except Exception:
+        pass
+
     for b in branches_list:
         stu_count = await db.scalar(select(func.count(Student.id)).where(Student.branch_id == b.id)) or 0
         teacher_count = await db.scalar(select(func.count(Teacher.id)).where(Teacher.branch_id == b.id)) or 0
@@ -380,9 +393,16 @@ async def system_analytics(request: Request, db: AsyncSession = Depends(get_db))
             org_name = org.name if org else ""
         except:
             pass
+        # Get subscription/plan info
+        sub = sub_map.get(str(b.id))
+        plan_name = sub.plan.name if sub and sub.plan else "—"
+        storage_used = f"{sub.storage_used_mb} MB" if sub and sub.storage_used_mb else "0 MB"
+        max_storage = f"{sub.plan.max_storage_gb} GB" if sub and sub.plan else "—"
         schools.append({
             "name": b.name, "org": org_name, "students": stu_count, "teachers": teacher_count,
-            "storage": "N/A", "db_rows": stu_count, "active": b.is_active if hasattr(b, 'is_active') else True,
+            "storage": storage_used, "max_storage": max_storage,
+            "plan": plan_name, "db_rows": stu_count,
+            "active": b.is_active if hasattr(b, 'is_active') else True,
             "branch_id": str(b.id),
             "subdomain": getattr(b, 'subdomain', None),
             "url": f"https://{b.subdomain}.vedaschoolpro.com" if getattr(b, 'subdomain', None) else None,
@@ -447,7 +467,16 @@ async def toggle_branch(request: Request, branch_id: str, db: AsyncSession = Dep
     branch = await db.scalar(select(Branch).where(Branch.id == uuid.UUID(branch_id)))
     if not branch:
         return {"error": "Branch not found"}
-    branch.is_active = not branch.is_active
+
+    want_active = not branch.is_active
+
+    # If reactivating, check that org is active first
+    if want_active:
+        org = await db.get(Organization, branch.org_id)
+        if org and not org.is_active:
+            return {"error": f"Cannot activate branch — parent organization '{org.name}' is deactivated. Activate the organization first."}
+
+    branch.is_active = want_active
     # Also deactivate users of this branch
     if not branch.is_active:
         users = (await db.execute(select(User).where(User.branch_id == branch.id, User.role != UserRole.SUPER_ADMIN))).scalars().all()
@@ -461,6 +490,24 @@ async def toggle_branch(request: Request, branch_id: str, db: AsyncSession = Dep
     await db.commit()
     status = "activated" if branch.is_active else "deactivated"
     return {"success": True, "message": f"Branch '{branch.name}' {status}", "is_active": branch.is_active}
+
+
+@router.put("/branches/{branch_id}/maintenance")
+async def toggle_branch_maintenance(request: Request, branch_id: str, db: AsyncSession = Depends(get_db)):
+    """Toggle maintenance mode for a branch. Blocks school login when enabled."""
+    user = await verify_super_admin(request)
+    data = await request.json()
+    branch = await db.scalar(select(Branch).where(Branch.id == uuid.UUID(branch_id)))
+    if not branch:
+        return {"error": "Branch not found"}
+
+    branch.maintenance_mode = data.get("maintenance_mode", False)
+    branch.maintenance_message = data.get("maintenance_message", "")
+    branch.maintenance_eta = data.get("maintenance_eta", "")
+    await db.commit()
+
+    status = "enabled" if branch.maintenance_mode else "disabled"
+    return {"success": True, "message": f"Maintenance mode {status} for '{branch.name}'", "maintenance_mode": branch.maintenance_mode}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -539,8 +586,25 @@ async def update_plan(request: Request, plan_id: str, db: AsyncSession = Depends
             if f in data: setattr(plan, f, data[f])
         for f in ["price_monthly","price_yearly"]:
             if f in data: setattr(plan, f, float(data[f]))
-        for f in ["max_students","max_teachers","max_branches","max_storage_gb","sms_credits_monthly","display_order"]:
+        for f in ["max_students","max_teachers","max_branches","max_storage_gb","sms_credits_monthly"]:
             if f in data: setattr(plan, f, int(data[f]))
+        # Auto-reorder: if display_order changed, shift others
+        if "display_order" in data:
+            new_order = int(data["display_order"])
+            old_order = plan.display_order or 999
+            if new_order != old_order:
+                all_plans = (await db.execute(
+                    select(Plan).where(Plan.id != plan.id).order_by(Plan.display_order)
+                )).scalars().all()
+                if new_order < old_order:
+                    for p in all_plans:
+                        if p.display_order is not None and new_order <= p.display_order < old_order:
+                            p.display_order += 1
+                else:
+                    for p in all_plans:
+                        if p.display_order is not None and old_order < p.display_order <= new_order:
+                            p.display_order -= 1
+                plan.display_order = new_order
         if "tier" in data:
             plan.tier = PlanTier(data["tier"])
         for f in ["whatsapp_enabled","online_fee_payment","transport_module","hostel_module",
@@ -622,6 +686,7 @@ async def list_subscriptions(request: Request, db: AsyncSession = Depends(get_db
             "branch_id": str(s.branch_id),
             "branch_name": branch.name if branch else "Unknown",
             "org_name": org.name if org else "Unknown",
+            "plan_id": str(s.plan_id),
             "plan_name": s.plan.name if s.plan else "No Plan",
             "plan_tier": s.plan.tier.value if s.plan else "",
             "status": s.status.value if s.status else "unknown",
@@ -629,6 +694,7 @@ async def list_subscriptions(request: Request, db: AsyncSession = Depends(get_db
             "current_period_end": s.current_period_end.strftime("%d %b %Y") if s.current_period_end else "—",
             "student_count": s.current_student_count or 0,
             "teacher_count": s.current_teacher_count or 0,
+            "last_amount": float(s.last_payment_amount) if s.last_payment_amount else 0,
             "auto_deactivated": s.auto_deactivated,
         })
     return {"subscriptions": result}
@@ -811,9 +877,18 @@ async def update_branch(request: Request, branch_id: str, db: AsyncSession = Dep
         return {"error": "Branch not found"}
 
     # Update fields
-    for field in ["name", "code", "email", "phone", "address", "city", "state", "pincode", "website_url", "affiliation_number", "motto", "timezone", "currency", "language"]:
+    for field in ["name", "code", "email", "phone", "address", "city", "state", "pincode",
+                   "website_url", "affiliation_number", "motto", "tagline", "logo_url",
+                   "principal_name", "landline", "accreditation",
+                   "principal_signature_url", "school_stamp_url",
+                   "timezone", "currency", "language"]:
         if field in data and data[field] is not None:
             setattr(branch, field, data[field])
+
+    # Established year (integer)
+    if "established_year" in data:
+        val = data["established_year"]
+        branch.established_year = int(val) if val else None
 
     # Board type
     if "board_type" in data and data["board_type"]:
@@ -1262,3 +1337,960 @@ async def get_admin_detail(request: Request, admin_id: str, db: AsyncSession = D
         },
         "login_logs": login_logs,
     }
+
+
+# ═══════════════════════════════════════════════════════════
+# BACKUP MANAGEMENT — Real pg_dump/pg_restore
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/backups/stats")
+@require_role(UserRole.SUPER_ADMIN)
+async def backup_stats(request: Request, db: AsyncSession = Depends(get_db)):
+    """Global backup statistics."""
+    from utils.backup_manager import get_backup_stats
+    stats = await get_backup_stats(db)
+    return stats
+
+
+@router.get("/backups/{branch_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def list_branch_backups(
+    request: Request, branch_id: str, db: AsyncSession = Depends(get_db)
+):
+    """List backup records for a branch."""
+    from models.backup import BackupRecord
+    bid = uuid.UUID(branch_id)
+    result = await db.execute(
+        select(BackupRecord)
+        .where(BackupRecord.branch_id == bid, BackupRecord.is_active == True)
+        .order_by(BackupRecord.created_at.desc())
+        .limit(100)
+    )
+    records = result.scalars().all()
+    return {
+        "backups": [
+            {
+                "id": str(r.id),
+                "file_name": r.file_name or "",
+                "file_size_bytes": r.file_size_bytes or 0,
+                "file_size_display": _fmt_size(r.file_size_bytes or 0),
+                "backup_type": r.backup_type.value if r.backup_type else "manual",
+                "status": r.status.value if r.status else "unknown",
+                "record_counts": r.record_counts or {},
+                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "created_at": r.created_at.strftime("%Y-%m-%d") if r.created_at else "",
+                "time": r.started_at.strftime("%H:%M") if r.started_at else "",
+                "error_message": r.error_message or "",
+            }
+            for r in records
+        ]
+    }
+
+
+def _fmt_size(b):
+    if b < 1024: return f"{b} B"
+    if b < 1024*1024: return f"{b/1024:.1f} KB"
+    if b < 1024*1024*1024: return f"{b/(1024*1024):.1f} MB"
+    return f"{b/(1024*1024*1024):.1f} GB"
+
+
+@router.post("/backups/{branch_id}/trigger")
+@require_role(UserRole.SUPER_ADMIN)
+async def trigger_backup(
+    request: Request, branch_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Trigger a manual backup for a branch."""
+    from utils.backup_manager import create_branch_backup
+    user = request.state.user
+    result = await create_branch_backup(db, branch_id, triggered_by=user["user_id"])
+    return result
+
+
+@router.get("/backups/download/{backup_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def download_backup(
+    request: Request, backup_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Download a backup .sql.gz file."""
+    from models.backup import BackupRecord
+    from fastapi.responses import FileResponse
+    from utils.backup_manager import get_backup_file_path
+    import os
+
+    record = await db.get(BackupRecord, uuid.UUID(backup_id))
+    if not record or not record.file_path:
+        raise HTTPException(status_code=404, detail="Backup not found")
+
+    file_path = get_backup_file_path(record.file_path)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Backup file not found on disk")
+
+    return FileResponse(
+        path=file_path,
+        filename=record.file_name or "backup.sql.gz",
+        media_type="application/gzip",
+    )
+
+
+@router.post("/backups/upload/{branch_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def upload_backup(
+    request: Request, branch_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Upload a .sql.gz backup file for a branch."""
+    from models.backup import BackupRecord, BackupStatus, BackupType
+    import os
+
+    form = await request.form()
+    file = form.get("file")
+    if not file:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+
+    bid = uuid.UUID(branch_id)
+    # Get org_id
+    branch = await db.get(Branch, bid)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    # Save file
+    branch_dir = os.path.join("backups", str(bid))
+    os.makedirs(branch_dir, exist_ok=True)
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H%M%S")
+    file_name = f"uploaded_{timestamp}.sql.gz"
+    file_path = os.path.join(branch_dir, file_name)
+
+    content = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    record = BackupRecord(
+        branch_id=bid,
+        org_id=branch.org_id,
+        file_name=file_name,
+        file_path=file_path,
+        file_size_bytes=len(content),
+        backup_type=BackupType.UPLOADED,
+        status=BackupStatus.COMPLETED,
+        started_at=datetime.utcnow(),
+        completed_at=datetime.utcnow(),
+        triggered_by=request.state.user.get("user_id"),
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+
+    return {"success": True, "backup_id": str(record.id), "file_name": file_name, "size": len(content)}
+
+
+@router.post("/backups/restore/{backup_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def restore_backup(
+    request: Request, backup_id: str, db: AsyncSession = Depends(get_db)
+):
+    """Restore a branch from a backup file."""
+    from utils.backup_manager import restore_branch_backup
+    result = await restore_branch_backup(db, backup_id)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════
+# EASY SETUP — Bulk school import from Excel
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/easy-setup/template/{template_type}")
+@require_role(UserRole.SUPER_ADMIN)
+async def download_setup_template(
+    request: Request, template_type: str
+):
+    """Download Excel template for easy setup."""
+    from fastapi.responses import Response
+    from utils.bulk_import import (
+        generate_admin_template, generate_teacher_template,
+        generate_student_template, generate_transport_template,
+    )
+
+    generators = {
+        "admin": (generate_admin_template, "Admin_Principal_Template.xlsx"),
+        "teacher": (generate_teacher_template, "Teacher_Template.xlsx"),
+        "student": (generate_student_template, "Student_Template.xlsx"),
+        "transport": (generate_transport_template, "Transport_Template.xlsx"),
+    }
+
+    if template_type not in generators:
+        raise HTTPException(status_code=400, detail=f"Invalid template type: {template_type}")
+
+    gen_func, filename = generators[template_type]
+    content = gen_func()
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.post("/easy-setup/validate")
+@require_role(UserRole.SUPER_ADMIN)
+async def validate_setup_data(
+    request: Request, db: AsyncSession = Depends(get_db)
+):
+    """Validate Excel uploads for easy setup. No DB writes."""
+    from utils.bulk_import import (
+        parse_admin_excel, parse_teacher_excel,
+        parse_student_excel, parse_transport_excel,
+    )
+    import json
+
+    form = await request.form()
+    org_data_str = form.get("org_data", "{}")
+    branch_data_str = form.get("branch_data", "{}")
+
+    try:
+        org_data = json.loads(org_data_str)
+        branch_data = json.loads(branch_data_str)
+    except (json.JSONDecodeError, TypeError):
+        org_data = {}
+        branch_data = {}
+
+    results = {"org_data": org_data, "branch_data": branch_data}
+
+    # Validate org name
+    org_errors = []
+    if not org_data.get("name"):
+        org_errors.append("Organization name is required")
+    results["org_errors"] = org_errors
+
+    # Parse each uploaded Excel
+    for key, parser in [("admin_file", parse_admin_excel), ("teacher_file", parse_teacher_excel),
+                         ("student_file", parse_student_excel), ("transport_file", parse_transport_excel)]:
+        file = form.get(key)
+        if file:
+            content = await file.read()
+            if content:
+                parsed = parser(content)
+                results[key.replace("_file", "")] = parsed
+            else:
+                results[key.replace("_file", "")] = {"valid": False, "data": [], "errors": [{"row": 0, "errors": ["Empty file"]}], "count": 0}
+        else:
+            results[key.replace("_file", "")] = {"valid": True, "data": [], "errors": [], "count": 0}
+
+    # Overall validation
+    all_valid = (
+        len(org_errors) == 0 and
+        results.get("admin", {}).get("valid", True) and
+        results.get("teacher", {}).get("valid", True) and
+        results.get("student", {}).get("valid", True) and
+        results.get("transport", {}).get("valid", True)
+    )
+    results["all_valid"] = all_valid
+
+    return results
+
+
+@router.post("/easy-setup/execute")
+@require_role(UserRole.SUPER_ADMIN)
+async def execute_setup(
+    request: Request, db: AsyncSession = Depends(get_db)
+):
+    """Execute school setup — create all records in transaction."""
+    from utils.bulk_import import execute_school_setup
+
+    data = await request.json()
+    result = await execute_school_setup(db, data)
+    return result
+
+
+@router.post("/easy-setup/send-credentials")
+@require_role(UserRole.SUPER_ADMIN)
+async def send_setup_credentials(
+    request: Request, db: AsyncSession = Depends(get_db)
+):
+    """Mass-send login credentials via email."""
+    from utils.bulk_import import mass_send_credentials
+
+    data = await request.json()
+    branch_id = data.get("branch_id", "")
+    credentials = data.get("credentials", [])
+
+    if not branch_id or not credentials:
+        raise HTTPException(status_code=400, detail="branch_id and credentials required")
+
+    result = await mass_send_credentials(db, branch_id, credentials)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════
+# COUPON / DISCOUNT SYSTEM
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/coupons")
+@require_role(UserRole.SUPER_ADMIN)
+async def list_coupons(request: Request, db: AsyncSession = Depends(get_db)):
+    """List all coupons with usage stats."""
+    from models.coupon import Coupon, CouponRedemption
+    result = await db.execute(
+        select(Coupon).where(Coupon.is_active == True).order_by(Coupon.created_at.desc())
+    )
+    coupons = result.scalars().all()
+
+    # Build per-coupon total_discount from redemptions
+    coupon_ids = [c.id for c in coupons]
+    discount_map = {}
+    redemption_details = {}
+    if coupon_ids:
+        from sqlalchemy import func as sa_func
+        # Aggregate discount per coupon
+        agg = (await db.execute(
+            select(
+                CouponRedemption.coupon_id,
+                sa_func.sum(CouponRedemption.discount_applied),
+                sa_func.count(CouponRedemption.id)
+            ).where(CouponRedemption.coupon_id.in_(coupon_ids))
+            .group_by(CouponRedemption.coupon_id)
+        )).all()
+        for coupon_id, total_disc, cnt in agg:
+            discount_map[str(coupon_id)] = float(total_disc or 0)
+
+        # Get recent redemptions for details
+        from models.branch import Branch
+        redemptions = (await db.execute(
+            select(CouponRedemption)
+            .where(CouponRedemption.coupon_id.in_(coupon_ids))
+            .order_by(CouponRedemption.redeemed_at.desc())
+            .limit(500)
+        )).scalars().all()
+        # Build branch name lookup
+        branch_ids = list(set(str(r.branch_id) for r in redemptions if r.branch_id))
+        branch_names = {}
+        if branch_ids:
+            import uuid as _uuid
+            branches = (await db.execute(
+                select(Branch).where(Branch.id.in_([_uuid.UUID(bid) for bid in branch_ids]))
+            )).scalars().all()
+            branch_names = {str(b.id): b.name for b in branches}
+        for r in redemptions:
+            cid = str(r.coupon_id)
+            if cid not in redemption_details:
+                redemption_details[cid] = []
+            redemption_details[cid].append({
+                "branch_name": branch_names.get(str(r.branch_id), "Unknown"),
+                "original_amount": float(r.original_amount or 0),
+                "discount_applied": float(r.discount_applied or 0),
+                "final_amount": float(r.final_amount or 0),
+                "redeemed_at": r.redeemed_at.strftime("%d %b %Y %H:%M") if r.redeemed_at else "",
+            })
+
+    return {
+        "coupons": [
+            {
+                "id": str(c.id),
+                "code": c.code,
+                "description": c.description or "",
+                "discount_type": c.discount_type.value if c.discount_type else "percentage",
+                "discount_value": float(c.discount_value or 0),
+                "max_discount_amount": float(c.max_discount_amount) if c.max_discount_amount else None,
+                "min_plan_amount": float(c.min_plan_amount or 0),
+                "applicable_plans": c.applicable_plans,
+                "applicable_tiers": c.applicable_tiers,
+                "max_uses": c.max_uses or 0,
+                "max_uses_per_branch": c.max_uses_per_branch or 1,
+                "used_count": c.used_count or 0,
+                "total_discount": discount_map.get(str(c.id), 0),
+                "redemptions": redemption_details.get(str(c.id), []),
+                "valid_from": c.valid_from.isoformat() if c.valid_from else None,
+                "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                "is_active": c.is_active,
+                "created_at": c.created_at.strftime("%d %b %Y") if c.created_at else "",
+            }
+            for c in coupons
+        ]
+    }
+
+
+@router.post("/coupons")
+@require_role(UserRole.SUPER_ADMIN)
+async def create_coupon(request: Request, db: AsyncSession = Depends(get_db)):
+    """Create a new coupon."""
+    from models.coupon import Coupon, DiscountType
+    data = await request.json()
+
+    code = data.get("code", "").upper().strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Coupon code is required")
+
+    # Check unique
+    existing = await db.scalar(select(Coupon).where(Coupon.code == code))
+    if existing:
+        raise HTTPException(status_code=400, detail=f"Coupon code '{code}' already exists")
+
+    coupon = Coupon(
+        code=code,
+        description=data.get("description", ""),
+        discount_type=DiscountType(data.get("discount_type", "percentage")),
+        discount_value=data.get("discount_value", 0),
+        max_discount_amount=data.get("max_discount_amount"),
+        min_plan_amount=data.get("min_plan_amount", 0),
+        applicable_plans=data.get("applicable_plans"),
+        applicable_tiers=data.get("applicable_tiers"),
+        max_uses=data.get("max_uses", 100),
+        max_uses_per_branch=data.get("max_uses_per_branch", 1),
+        valid_from=datetime.fromisoformat(data["valid_from"]) if data.get("valid_from") else datetime.utcnow(),
+        valid_until=datetime.fromisoformat(data["valid_until"]) if data.get("valid_until") else datetime.utcnow() + timedelta(days=90),
+        created_by=request.state.user.get("user_id"),
+    )
+    db.add(coupon)
+    await db.commit()
+    await db.refresh(coupon)
+    return {"success": True, "coupon_id": str(coupon.id), "code": coupon.code}
+
+
+@router.post("/coupons/bulk")
+@require_role(UserRole.SUPER_ADMIN)
+async def create_bulk_coupons(request: Request, db: AsyncSession = Depends(get_db)):
+    """Generate batch of coupons with sequential numbering."""
+    from models.coupon import Coupon, DiscountType
+    data = await request.json()
+
+    prefix = data.get("prefix", "PROMO").upper().strip()
+    count = min(int(data.get("count", 10)), 100)  # Max 100 at a time
+
+    created = []
+    for i in range(1, count + 1):
+        code = f"{prefix}{str(i).zfill(3)}"
+        existing = await db.scalar(select(Coupon).where(Coupon.code == code))
+        if existing:
+            continue
+
+        coupon = Coupon(
+            code=code,
+            description=data.get("description", f"Bulk coupon {prefix}"),
+            discount_type=DiscountType(data.get("discount_type", "percentage")),
+            discount_value=data.get("discount_value", 10),
+            max_discount_amount=data.get("max_discount_amount"),
+            max_uses=data.get("max_uses", 1),
+            max_uses_per_branch=1,
+            valid_from=datetime.fromisoformat(data["valid_from"]) if data.get("valid_from") else datetime.utcnow(),
+            valid_until=datetime.fromisoformat(data["valid_until"]) if data.get("valid_until") else datetime.utcnow() + timedelta(days=90),
+            created_by=request.state.user.get("user_id"),
+        )
+        db.add(coupon)
+        created.append(code)
+
+    await db.commit()
+    return {"success": True, "created_count": len(created), "codes": created}
+
+
+@router.put("/coupons/{coupon_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def update_coupon(request: Request, coupon_id: str, db: AsyncSession = Depends(get_db)):
+    """Update a coupon."""
+    from models.coupon import Coupon
+    coupon = await db.get(Coupon, uuid.UUID(coupon_id))
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    data = await request.json()
+    for field in ["description", "max_uses", "max_uses_per_branch"]:
+        if field in data:
+            setattr(coupon, field, data[field])
+    if "valid_until" in data:
+        coupon.valid_until = datetime.fromisoformat(data["valid_until"])
+    if "is_active" in data:
+        coupon.is_active = data["is_active"]
+
+    await db.commit()
+    return {"success": True}
+
+
+@router.delete("/coupons/{coupon_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def deactivate_coupon(request: Request, coupon_id: str, db: AsyncSession = Depends(get_db)):
+    """Deactivate a coupon."""
+    from models.coupon import Coupon
+    coupon = await db.get(Coupon, uuid.UUID(coupon_id))
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    coupon.is_active = False
+    await db.commit()
+    return {"success": True}
+
+
+@router.post("/coupons/validate")
+@require_role(UserRole.SUPER_ADMIN)
+async def validate_coupon(request: Request, db: AsyncSession = Depends(get_db)):
+    """Validate a coupon code for a specific plan & branch."""
+    from models.coupon import Coupon, CouponRedemption
+    data = await request.json()
+    code = data.get("code", "").upper().strip()
+    plan_id = data.get("plan_id", "")
+    branch_id = data.get("branch_id", "")
+    plan_amount = float(data.get("plan_amount", 0))
+
+    if not code:
+        return {"valid": False, "error": "Coupon code is required"}
+
+    coupon = await db.scalar(select(Coupon).where(Coupon.code == code, Coupon.is_active == True))
+    if not coupon:
+        return {"valid": False, "error": "Invalid coupon code"}
+
+    now = datetime.utcnow()
+    if coupon.valid_from and now < coupon.valid_from:
+        return {"valid": False, "error": "Coupon not yet valid"}
+    if coupon.valid_until and now > coupon.valid_until:
+        return {"valid": False, "error": "Coupon has expired"}
+    if coupon.used_count >= (coupon.max_uses or 0):
+        return {"valid": False, "error": "Coupon usage limit reached"}
+
+    # Check per-branch usage
+    if branch_id:
+        branch_uses = await db.scalar(
+            select(func.count(CouponRedemption.id)).where(
+                CouponRedemption.coupon_id == coupon.id,
+                CouponRedemption.branch_id == uuid.UUID(branch_id),
+            )
+        ) or 0
+        if branch_uses >= (coupon.max_uses_per_branch or 1):
+            return {"valid": False, "error": "Coupon already used for this branch"}
+
+    # Check plan eligibility
+    if coupon.applicable_plans and plan_id:
+        if plan_id not in coupon.applicable_plans:
+            return {"valid": False, "error": "Coupon not applicable for this plan"}
+
+    # Check minimum amount
+    if plan_amount < float(coupon.min_plan_amount or 0):
+        return {"valid": False, "error": f"Minimum plan amount: Rs.{coupon.min_plan_amount}"}
+
+    # Calculate discount
+    if coupon.discount_type and coupon.discount_type.value == "percentage":
+        discount = plan_amount * float(coupon.discount_value or 0) / 100
+        if coupon.max_discount_amount:
+            discount = min(discount, float(coupon.max_discount_amount))
+    else:
+        discount = float(coupon.discount_value or 0)
+
+    discount = min(discount, plan_amount)  # Can't exceed plan amount
+    final_amount = plan_amount - discount
+
+    return {
+        "valid": True,
+        "coupon_id": str(coupon.id),
+        "code": coupon.code,
+        "discount_type": coupon.discount_type.value if coupon.discount_type else "percentage",
+        "discount_value": float(coupon.discount_value or 0),
+        "discount_amount": round(discount, 2),
+        "final_amount": round(final_amount, 2),
+        "description": coupon.description or "",
+    }
+
+
+@router.post("/coupons/apply")
+@require_role(UserRole.SUPER_ADMIN)
+async def apply_coupon(request: Request, db: AsyncSession = Depends(get_db)):
+    """Apply a coupon to a subscription/payment. Called after subscription assign."""
+    from models.coupon import Coupon, CouponRedemption
+    data = await request.json()
+
+    coupon_id = data.get("coupon_id")
+    branch_id = data.get("branch_id")
+    subscription_id = data.get("subscription_id")
+    payment_id = data.get("payment_id")
+    original_amount = float(data.get("original_amount", 0))
+    discount_applied = float(data.get("discount_applied", 0))
+    final_amount = float(data.get("final_amount", 0))
+
+    if not coupon_id or not branch_id:
+        raise HTTPException(status_code=400, detail="coupon_id and branch_id required")
+
+    coupon = await db.get(Coupon, uuid.UUID(coupon_id))
+    if not coupon:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+
+    # Record redemption
+    redemption = CouponRedemption(
+        coupon_id=coupon.id,
+        branch_id=uuid.UUID(branch_id),
+        subscription_id=uuid.UUID(subscription_id) if subscription_id else None,
+        payment_id=uuid.UUID(payment_id) if payment_id else None,
+        original_amount=original_amount,
+        discount_applied=discount_applied,
+        final_amount=final_amount,
+        redeemed_by=request.state.user.get("user_id"),
+    )
+    db.add(redemption)
+
+    # Increment used count
+    coupon.used_count = (coupon.used_count or 0) + 1
+    await db.commit()
+
+    return {"success": True, "redemption_id": str(redemption.id)}
+
+
+# ═══════════════════════════════════════════════════════════
+# INVOICE GENERATION — GST-compliant
+# ═══════════════════════════════════════════════════════════
+
+async def _get_next_invoice_number(db: AsyncSession) -> str:
+    """Generate next invoice number in format EF-YYMM-NNNN."""
+    from models.invoice import Invoice
+    now = datetime.utcnow()
+    # Financial year: Apr-Mar
+    fy_start_year = now.year if now.month >= 4 else now.year - 1
+    fy_suffix = f"{str(fy_start_year)[-2:]}{str(fy_start_year + 1)[-2:]}"
+    prefix = f"VSP-{fy_suffix}-"
+
+    # Find max invoice number for this FY
+    result = await db.scalar(
+        select(func.max(Invoice.invoice_number)).where(
+            Invoice.invoice_number.like(f"{prefix}%")
+        )
+    )
+
+    if result:
+        try:
+            seq = int(result.split("-")[-1]) + 1
+        except (ValueError, IndexError):
+            seq = 1
+    else:
+        seq = 1
+
+    return f"{prefix}{str(seq).zfill(4)}"
+
+
+def _determine_tax_split(platform_state_code: str, buyer_state_code: str) -> dict:
+    """Determine CGST/SGST vs IGST based on state codes."""
+    if platform_state_code and buyer_state_code and platform_state_code == buyer_state_code:
+        # Intra-state: CGST + SGST
+        return {"cgst_rate": 9, "sgst_rate": 9, "igst_rate": 0}
+    else:
+        # Inter-state (or state unknown): IGST
+        return {"cgst_rate": 0, "sgst_rate": 0, "igst_rate": 18}
+
+
+@router.post("/invoices/generate")
+@require_role(UserRole.SUPER_ADMIN)
+async def generate_invoice(request: Request, db: AsyncSession = Depends(get_db)):
+    """Generate an invoice for a subscription payment."""
+    from models.invoice import Invoice, InvoiceStatus
+    from models.subscription import SchoolSubscription, Plan
+    from utils.pdf_generator import generate_subscription_invoice_pdf
+    from config import settings
+    from sqlalchemy.orm import selectinload
+    import os
+
+    data = await request.json()
+    branch_id = data.get("branch_id")
+    subscription_id = data.get("subscription_id")
+    discount_amount = float(data.get("discount_amount", 0))
+    coupon_code = data.get("coupon_code", "")
+
+    if not branch_id:
+        raise HTTPException(status_code=400, detail="branch_id is required")
+
+    bid = uuid.UUID(branch_id)
+    branch = await db.get(Branch, bid)
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    org = await db.get(Organization, branch.org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Organization not found")
+
+    # Get subscription + plan
+    sub = None
+    plan = None
+    if subscription_id:
+        sub = await db.scalar(
+            select(SchoolSubscription)
+            .where(SchoolSubscription.id == uuid.UUID(subscription_id))
+            .options(selectinload(SchoolSubscription.plan))
+        )
+        if sub:
+            plan = sub.plan
+
+    if not plan:
+        # Try to find subscription by branch_id
+        sub = await db.scalar(
+            select(SchoolSubscription)
+            .where(SchoolSubscription.branch_id == bid)
+            .options(selectinload(SchoolSubscription.plan))
+        )
+        if sub:
+            plan = sub.plan
+
+    if not plan:
+        raise HTTPException(status_code=400, detail="No subscription/plan found for this branch")
+
+    # Calculate amounts
+    billing_cycle = sub.billing_cycle.value if sub and sub.billing_cycle else "monthly"
+    if billing_cycle == "yearly":
+        plan_price = float(plan.price_yearly or 0)
+        description = f"{plan.name} Plan - Yearly"
+    else:
+        plan_price = float(plan.price_monthly or 0)
+        description = f"{plan.name} Plan - Monthly"
+
+    subtotal = plan_price
+    taxable_amount = subtotal - discount_amount
+
+    # Tax split
+    platform_state = settings.PLATFORM_STATE_CODE
+    buyer_state = org.billing_state_code or ""
+    tax_split = _determine_tax_split(platform_state, buyer_state)
+
+    cgst_amount = round(taxable_amount * tax_split["cgst_rate"] / 100, 2)
+    sgst_amount = round(taxable_amount * tax_split["sgst_rate"] / 100, 2)
+    igst_amount = round(taxable_amount * tax_split["igst_rate"] / 100, 2)
+    total_tax = cgst_amount + sgst_amount + igst_amount
+    total_amount = taxable_amount + total_tax
+
+    # Generate invoice number
+    inv_number = await _get_next_invoice_number(db)
+
+    # Create invoice record
+    from datetime import date as date_type
+    invoice = Invoice(
+        invoice_number=inv_number,
+        org_id=org.id,
+        branch_id=bid,
+        subscription_id=sub.id if sub else None,
+        supplier_name=settings.PLATFORM_BILLING_NAME,
+        supplier_gstin=settings.PLATFORM_GSTIN,
+        supplier_address=settings.PLATFORM_BILLING_ADDRESS,
+        supplier_state_code=settings.PLATFORM_STATE_CODE,
+        buyer_name=org.billing_name or org.name,
+        buyer_gstin=org.gstin or "",
+        buyer_address=org.billing_address or org.address or "",
+        buyer_state_code=org.billing_state_code or "",
+        line_items=[{
+            "description": description,
+            "sac": "998315",
+            "qty": 1,
+            "rate": plan_price,
+            "amount": plan_price,
+        }],
+        subtotal=subtotal,
+        discount_amount=discount_amount,
+        coupon_code=coupon_code if coupon_code else None,
+        taxable_amount=taxable_amount,
+        cgst_rate=tax_split["cgst_rate"],
+        cgst_amount=cgst_amount,
+        sgst_rate=tax_split["sgst_rate"],
+        sgst_amount=sgst_amount,
+        igst_rate=tax_split["igst_rate"],
+        igst_amount=igst_amount,
+        total_tax=total_tax,
+        total_amount=total_amount,
+        invoice_date=date_type.today(),
+        due_date=date_type.today() + timedelta(days=15),
+        status=InvoiceStatus.ISSUED,
+    )
+    db.add(invoice)
+    await db.flush()
+
+    # Generate PDF
+    invoice_data = {
+        "invoice_number": inv_number,
+        "invoice_date": date_type.today().strftime("%d %b %Y"),
+        "due_date": (date_type.today() + timedelta(days=15)).strftime("%d %b %Y"),
+        "supplier_name": settings.PLATFORM_BILLING_NAME,
+        "supplier_gstin": settings.PLATFORM_GSTIN,
+        "supplier_address": settings.PLATFORM_BILLING_ADDRESS,
+        "supplier_state_code": settings.PLATFORM_STATE_CODE,
+        "buyer_name": org.billing_name or org.name,
+        "buyer_gstin": org.gstin or "",
+        "buyer_address": org.billing_address or org.address or "",
+        "buyer_state_code": org.billing_state_code or "",
+        "line_items": invoice.line_items,
+        "subtotal": float(subtotal),
+        "discount_amount": float(discount_amount),
+        "coupon_code": coupon_code,
+        "taxable_amount": float(taxable_amount),
+        "cgst_rate": tax_split["cgst_rate"],
+        "cgst_amount": float(cgst_amount),
+        "sgst_rate": tax_split["sgst_rate"],
+        "sgst_amount": float(sgst_amount),
+        "igst_rate": tax_split["igst_rate"],
+        "igst_amount": float(igst_amount),
+        "total_tax": float(total_tax),
+        "total_amount": float(total_amount),
+        "status": "Issued",
+    }
+
+    try:
+        pdf_bytes = generate_subscription_invoice_pdf(invoice_data)
+        pdf_filename = f"{inv_number.replace('-', '_')}.pdf"
+        pdf_path = os.path.join("static", "invoices", pdf_filename)
+        os.makedirs(os.path.dirname(pdf_path), exist_ok=True)
+        with open(pdf_path, "wb") as f:
+            f.write(pdf_bytes)
+        invoice.pdf_path = pdf_path
+    except Exception as e:
+        invoice.notes = f"PDF generation failed: {e}"
+
+    await db.commit()
+    await db.refresh(invoice)
+
+    return {
+        "success": True,
+        "invoice_id": str(invoice.id),
+        "invoice_number": inv_number,
+        "total_amount": float(total_amount),
+        "pdf_path": invoice.pdf_path or "",
+    }
+
+
+@router.get("/invoices/{branch_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def list_invoices(request: Request, branch_id: str, db: AsyncSession = Depends(get_db)):
+    """List invoices for a branch."""
+    from models.invoice import Invoice
+    bid = uuid.UUID(branch_id)
+    result = await db.execute(
+        select(Invoice)
+        .where(Invoice.branch_id == bid, Invoice.is_active == True)
+        .order_by(Invoice.created_at.desc())
+    )
+    invoices = result.scalars().all()
+    return {
+        "invoices": [
+            {
+                "id": str(inv.id),
+                "invoice_number": inv.invoice_number,
+                "invoice_date": inv.invoice_date.strftime("%d %b %Y") if inv.invoice_date else "",
+                "due_date": inv.due_date.strftime("%d %b %Y") if inv.due_date else "",
+                "buyer_name": inv.buyer_name or "",
+                "subtotal": float(inv.subtotal or 0),
+                "discount_amount": float(inv.discount_amount or 0),
+                "total_tax": float(inv.total_tax or 0),
+                "total_amount": float(inv.total_amount or 0),
+                "status": inv.status.value if inv.status else "draft",
+                "pdf_path": inv.pdf_path or "",
+                "coupon_code": inv.coupon_code or "",
+            }
+            for inv in invoices
+        ]
+    }
+
+
+@router.get("/invoices/download/{invoice_id}")
+@require_role(UserRole.SUPER_ADMIN)
+async def download_invoice(request: Request, invoice_id: str, db: AsyncSession = Depends(get_db)):
+    """Download invoice PDF."""
+    from models.invoice import Invoice
+    from fastapi.responses import FileResponse
+    import os
+
+    invoice = await db.get(Invoice, uuid.UUID(invoice_id))
+    if not invoice or not invoice.pdf_path:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not os.path.exists(invoice.pdf_path):
+        raise HTTPException(status_code=404, detail="Invoice PDF not found on disk")
+
+    return FileResponse(
+        path=invoice.pdf_path,
+        filename=f"Invoice_{invoice.invoice_number}.pdf",
+        media_type="application/pdf",
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# LATE PAYMENT / SUBSCRIPTION OVERDUE
+# ═══════════════════════════════════════════════════════════
+
+@router.get("/subscriptions/overdue")
+@require_role(UserRole.SUPER_ADMIN)
+async def list_overdue_subscriptions(request: Request, db: AsyncSession = Depends(get_db)):
+    """List subscriptions with outstanding late fees."""
+    from models.subscription import SchoolSubscription, SubscriptionStatus
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(SchoolSubscription)
+        .where(
+            SchoolSubscription.late_fee_amount > 0,
+            SchoolSubscription.late_fee_waived == False,
+        )
+        .options(selectinload(SchoolSubscription.plan))
+    )
+    subs = result.scalars().all()
+
+    overdue_list = []
+    for s in subs:
+        branch = await db.get(Branch, s.branch_id)
+        overdue_list.append({
+            "id": str(s.id),
+            "branch_id": str(s.branch_id),
+            "branch_name": branch.name if branch else "",
+            "plan_name": s.plan.name if s.plan else "",
+            "status": s.status.value if s.status else "",
+            "late_fee_amount": float(s.late_fee_amount or 0),
+            "late_fee_applied_at": s.late_fee_applied_at.strftime("%d %b %Y") if s.late_fee_applied_at else "",
+            "next_payment_due": s.next_payment_due.strftime("%d %b %Y") if s.next_payment_due else "",
+        })
+
+    return {"overdue": overdue_list}
+
+
+@router.post("/subscriptions/{sub_id}/waive-late-fee")
+@require_role(UserRole.SUPER_ADMIN)
+async def waive_late_fee(request: Request, sub_id: str, db: AsyncSession = Depends(get_db)):
+    """Waive/revert late fee on a subscription."""
+    from models.subscription import SchoolSubscription, PaymentHistory
+
+    sub = await db.get(SchoolSubscription, uuid.UUID(sub_id))
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    sub.late_fee_amount = 0
+    sub.late_fee_waived = True
+    sub.late_fee_waived_at = datetime.utcnow()
+    sub.late_fee_waived_by = request.state.user.get("user_id")
+
+    # Remove pending late fee payment history entries
+    result = await db.execute(
+        select(PaymentHistory).where(
+            PaymentHistory.subscription_id == sub.id,
+            PaymentHistory.includes_late_fee == True,
+            PaymentHistory.status == "late_fee_pending",
+        )
+    )
+    for ph in result.scalars().all():
+        ph.status = "waived"
+
+    await db.commit()
+    return {"success": True, "message": "Late fee waived successfully"}
+
+
+@router.post("/subscriptions/{sub_id}/revert-late-fee")
+@require_role(UserRole.SUPER_ADMIN)
+async def revert_late_fee(request: Request, sub_id: str, db: AsyncSession = Depends(get_db)):
+    """Revert late fee — same as waive but explicitly named for clarity."""
+    from models.subscription import SchoolSubscription, PaymentHistory
+
+    sub = await db.get(SchoolSubscription, uuid.UUID(sub_id))
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    original_amount = float(sub.late_fee_amount or 0)
+    sub.late_fee_amount = 0
+    sub.late_fee_applied_at = None
+    sub.late_fee_waived = False  # Not waived, reverted
+    sub.late_fee_waived_at = None
+    sub.late_fee_waived_by = None
+
+    # Remove pending late fee payment entries
+    result = await db.execute(
+        select(PaymentHistory).where(
+            PaymentHistory.subscription_id == sub.id,
+            PaymentHistory.includes_late_fee == True,
+            PaymentHistory.status == "late_fee_pending",
+        )
+    )
+    for ph in result.scalars().all():
+        await db.delete(ph)
+
+    await db.commit()
+    return {"success": True, "message": f"Late fee of Rs.{original_amount:.2f} reverted"}

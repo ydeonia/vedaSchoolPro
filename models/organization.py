@@ -33,6 +33,12 @@ class Organization(Base):
     max_branches = Column(Integer, default=1)
     max_students = Column(Integer, default=500)
 
+    # GST / Billing details (for invoices)
+    gstin = Column(String(15), nullable=True)                  # 15-char GSTIN
+    billing_name = Column(String(300), nullable=True)          # Legal entity name
+    billing_address = Column(Text, nullable=True)              # Registered address
+    billing_state_code = Column(String(2), nullable=True)      # Indian state code (01-37)
+
     is_active = Column(Boolean, default=True)
     trial_ends_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.utcnow())

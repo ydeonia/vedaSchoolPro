@@ -10,7 +10,7 @@ load_dotenv()
 
 class Settings:
     # ── App Identity ──────────────────────────────────────
-    APP_NAME: str = "EduFlow — School Management System"
+    APP_NAME: str = "VedaSchoolPro — School Management System"
     APP_VERSION: str = "1.1.0"
     APP_TAGLINE: str = "Beautiful School Management, Simplified."
 
@@ -31,7 +31,7 @@ class Settings:
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 
     # ── Super Admin (initial bootstrap) ───────────────────
-    SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "admin@eduflow.in")
+    SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "admin@vedaschoolpro.in")
     SUPER_ADMIN_PASSWORD: str = os.getenv("SUPER_ADMIN_PASSWORD", "Admin@123")
     SUPER_ADMIN_PHONE: str = os.getenv("SUPER_ADMIN_PHONE", "9999999999")
 
@@ -51,6 +51,14 @@ class Settings:
     GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
     TEAMS_CLIENT_ID: str = os.getenv("TEAMS_CLIENT_ID", "")
     TEAMS_CLIENT_SECRET: str = os.getenv("TEAMS_CLIENT_SECRET", "")
+
+    # ── Platform Billing (Invoices / GST) ─────────────
+    PLATFORM_GSTIN: str = os.getenv("PLATFORM_GSTIN", "")
+    PLATFORM_BILLING_NAME: str = os.getenv("PLATFORM_BILLING_NAME", "VedaSchoolPro Technologies Pvt Ltd")
+    PLATFORM_BILLING_ADDRESS: str = os.getenv("PLATFORM_BILLING_ADDRESS", "")
+    PLATFORM_STATE_CODE: str = os.getenv("PLATFORM_STATE_CODE", "")  # e.g. "07" for Delhi
+    PLATFORM_PAN: str = os.getenv("PLATFORM_PAN", "")
+    PLATFORM_BILLING_EMAIL: str = os.getenv("PLATFORM_BILLING_EMAIL", "billing@vedaschoolpro.in")
 
     # ── Scheduler / Automation ──────────────────────────
     SCHEDULER_ENABLED: bool = os.getenv("SCHEDULER_ENABLED", "true").lower() == "true"

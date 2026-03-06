@@ -4,146 +4,224 @@
 {% block page_title %}My Account{% endblock %}
 {% block page_subtitle %}Manage your profile, password, phone & email{% endblock %}
 
+{% block extra_css %}
+<style>
+.acct-grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+@media(max-width:900px){.acct-grid{grid-template-columns:1fr;}}
+.profile-hero{background:var(--bg-card);border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06);overflow:hidden;position:sticky;top:20px;}
+.profile-banner{height:100px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 40%,#a78bfa 100%);position:relative;}
+.profile-banner::after{content:'';position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,rgba(0,0,0,0.08));}
+.profile-avatar{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:900;color:white;border:4px solid var(--bg-card);margin:-40px auto 0;position:relative;z-index:2;box-shadow:0 4px 12px rgba(99,102,241,0.3);}
+.profile-body{padding:16px 24px 24px;text-align:center;}
+.profile-name{font-size:1.3rem;font-weight:800;margin:12px 0 2px;color:var(--text);}
+.profile-role{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7C3AED;background:#EDE9FE;padding:3px 12px;border-radius:20px;display:inline-block;margin-bottom:16px;}
+.profile-info{list-style:none;padding:0;margin:0;}
+.profile-info li{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border-light);font-size:0.8rem;color:var(--text-secondary);}
+.profile-info li i{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;}
+.profile-info li .pi-val{font-weight:600;color:var(--text);word-break:break-all;}
+.pi-email{background:#FEF3C7;color:#D97706;}.pi-phone{background:#D1FAE5;color:#059669;}.pi-role{background:#EDE9FE;color:#7C3AED;}.pi-id{background:#DBEAFE;color:#1D4ED8;}
+.settings-col{display:flex;flex-direction:column;gap:18px;}
+.setting-card{background:var(--bg-card);border-radius:14px;box-shadow:0 1px 8px rgba(0,0,0,0.04);overflow:hidden;transition:box-shadow 0.2s;}
+.setting-card:hover{box-shadow:0 2px 16px rgba(0,0,0,0.08);}
+.setting-header{padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px;}
+.setting-header .sh-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:0.82rem;flex-shrink:0;}
+.setting-header h3{margin:0;font-size:0.88rem;font-weight:700;flex:1;}
+.sh-pwd{background:#EDE9FE;color:#7C3AED;}.sh-phone{background:#D1FAE5;color:#059669;}.sh-email{background:#FEF3C7;color:#D97706;}
+.setting-body{padding:20px;}
+.acct-alert{padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:0.78rem;font-weight:600;display:none;}
+.acct-alert-ok{background:#D1FAE5;color:#065F46;}.acct-alert-err{background:#FEE2E2;color:#991B1B;}
+.acct-label{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-light);display:block;margin-bottom:4px;}
+.acct-input{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg-card);color:var(--text);font-size:0.82rem;box-sizing:border-box;transition:border-color 0.2s;}
+.acct-input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.1);}
+.acct-btn{width:100%;padding:10px 16px;border-radius:10px;border:none;font-weight:700;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;}
+.acct-btn-primary{background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;}.acct-btn-primary:hover{opacity:0.9;transform:translateY(-1px);box-shadow:0 4px 12px rgba(99,102,241,0.3);}
+.acct-btn-secondary{background:transparent;border:1.5px solid var(--border);color:var(--text-secondary);margin-top:8px;font-size:0.75rem;}.acct-btn-secondary:hover{background:var(--bg);}
+.acct-btn:disabled{opacity:0.6;cursor:not-allowed;}
+.pwd-meter{height:4px;border-radius:4px;margin-top:5px;background:#e2e8f0;overflow:hidden;}.pwd-fill{height:100%;width:0;transition:all .3s;border-radius:4px;}
+.pwd-text{font-size:0.65rem;font-weight:700;margin-top:2px;color:var(--text-light);}
+.input-wrap{position:relative;}.input-wrap .toggle-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);padding:4px;}
+.input-row{display:flex;gap:6px;align-items:center;}
+.mini-btn{border:none;background:var(--primary-light,#e0e7ff);color:var(--primary);padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;white-space:nowrap;transition:all 0.2s;}.mini-btn:hover{opacity:0.8;}
+.phone-prefix{display:flex;align-items:center;padding:0 12px;background:var(--bg,#f1f5f9);border:1.5px solid var(--border);border-right:none;border-radius:8px 0 0 8px;font-size:0.82rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;}
+.otp-input{text-align:center;font-size:1.15rem;letter-spacing:8px;font-weight:700;}
+.otp-center{text-align:center;margin-bottom:12px;font-size:0.8rem;color:var(--text-secondary);}
+.otp-hint{padding:6px 12px;background:#fef3c7;border-radius:6px;font-size:0.72rem;color:#92400e;font-weight:600;margin-top:6px;display:none;}
+.current-val{font-size:0.78rem;color:var(--text-light);margin:0 0 14px;}.current-val strong{color:var(--text);}
+.verified-badge{font-size:0.6rem;background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:4px;font-weight:700;margin-left:4px;}
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="max-width: 720px; margin: 0 auto;">
-
-    <!-- Profile Card -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="display: flex; align-items: center; gap: 16px; padding: 20px;">
-            <div style="width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; color: white; flex-shrink: 0;" id="profileAvatar">
-                {{ user.first_name[0] }}{{ (user.last_name or ' ')[0] }}
+<div class="acct-grid">
+    <!-- LEFT: Profile Hero Card -->
+    <div class="profile-hero">
+        <div class="profile-banner"></div>
+        <div class="profile-avatar" id="profileAvatar">
+            {{ user.first_name[0] }}{{ (user.last_name or ' ')[0] }}
+        </div>
+        <div class="profile-body">
+            <div class="profile-name">{{ user.first_name }} {{ user.last_name or '' }}</div>
+            <div class="profile-role">
+                {{ user.role | replace('_', ' ') | title }}
+                {% if user.designation %} &middot; {{ user.designation }}{% endif %}
             </div>
-            <div>
-                <h2 style="margin: 0; font-size: 1.2rem; font-weight: 700;">{{ user.first_name }} {{ user.last_name or '' }}</h2>
-                <p style="margin: 4px 0 0; font-size: 0.82rem; color: var(--text-secondary);">
-                    {{ user.role | replace('_', ' ') | title }}
-                    {% if user.designation %} &middot; {{ user.designation }}{% endif %}
-                </p>
-                <div style="display: flex; gap: 16px; margin-top: 8px; font-size: 0.78rem; color: var(--text-light);">
-                    {% if user.email %}<span><i class="fas fa-envelope" style="width: 14px;"></i> {{ user.email }}</span>{% endif %}
-                    {% if user.phone %}<span><i class="fas fa-phone" style="width: 14px;"></i> +91 {{ user.phone }}</span>{% endif %}
-                </div>
-            </div>
+            <ul class="profile-info">
+                {% if user.email %}
+                <li>
+                    <i class="fas fa-envelope pi-email"></i>
+                    <span class="pi-val">{{ user.email }}</span>
+                </li>
+                {% endif %}
+                {% if user.phone %}
+                <li>
+                    <i class="fas fa-phone pi-phone"></i>
+                    <span class="pi-val">+91 {{ user.phone }}</span>
+                </li>
+                {% endif %}
+                <li>
+                    <i class="fas fa-user-shield pi-role"></i>
+                    <span class="pi-val">{{ user.role | replace('_', ' ') | title }}</span>
+                </li>
+                <li>
+                    <i class="fas fa-calendar pi-id"></i>
+                    <span class="pi-val" style="font-size:0.72rem;color:var(--text-light);">Member since account creation</span>
+                </li>
+            </ul>
         </div>
     </div>
 
-    <!-- Change Password Section -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
-            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-lock" style="color: var(--primary); margin-right: 8px;"></i>Change Password</h3>
-        </div>
-        <div style="padding: 20px;">
-            <div id="pwdSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-            <div id="pwdError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-            <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-size: 0.8rem;">Current Password</label>
-                <div style="position:relative;"><input type="password" id="currentPassword" class="form-input" placeholder="Enter current password" style="padding-right:40px;">
-                <button type="button" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('currentPassword'),this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);"><i class="fas fa-eye"></i></button></div>
-            </div>
-            <div class="form-group" style="margin-bottom: 10px;">
-                <label class="form-label" style="font-size: 0.8rem;">New Password</label>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <div style="position:relative;flex:1;"><input type="password" id="newPassword" class="form-input" placeholder="Min 6 characters" oninput="_acctPwdStr(this.value)" style="padding-right:40px;">
-                    <button type="button" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('newPassword'),this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-light);"><i class="fas fa-eye"></i></button></div>
-                    <button type="button" onclick="_acctAutoGen()" style="border:none;background:var(--primary-light,#e0e7ff);color:var(--primary);padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;white-space:nowrap;" title="Auto-generate"><i class="fas fa-magic"></i></button>
-                    <button type="button" onclick="_acctCopyPwd()" style="border:none;background:var(--primary-light,#e0e7ff);color:var(--primary);padding:8px 10px;border-radius:8px;cursor:pointer;font-size:0.72rem;" title="Copy"><i class="fas fa-copy"></i></button>
-                </div>
-                <div style="height:4px;border-radius:4px;margin-top:5px;background:#e2e8f0;overflow:hidden;"><div id="acctPwdFill" style="height:100%;width:0;transition:all .3s;border-radius:4px;"></div></div>
-                <div id="acctPwdText" style="font-size:0.68rem;font-weight:700;margin-top:2px;color:var(--text-light);"></div>
-            </div>
-            <div class="form-group" style="margin-bottom: 14px;">
-                <label class="form-label" style="font-size: 0.8rem;">Confirm New Password</label>
-                <input type="password" id="confirmPassword" class="form-input" placeholder="Re-enter new password">
-            </div>
-            <button class="btn btn-primary" onclick="changePassword()" id="changePwdBtn" style="width: 100%;">
-                <i class="fas fa-key"></i> Update Password
-            </button>
-        </div>
-    </div>
+    <!-- RIGHT: Settings Cards -->
+    <div class="settings-col">
 
-    <!-- Change Phone Section -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
-            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-mobile-alt" style="color: #059669; margin-right: 8px;"></i>Change Phone Number</h3>
-        </div>
-        <div style="padding: 20px;">
-            <p style="font-size: 0.78rem; color: var(--text-light); margin: 0 0 14px;">Current: <strong>+91 {{ user.phone or 'Not set' }}</strong></p>
-            <div id="phoneSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-            <div id="phoneError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-
-            <!-- Step 1: Enter new phone -->
-            <div id="phoneStep1">
-                <div class="form-group" style="margin-bottom: 14px;">
-                    <label class="form-label" style="font-size: 0.8rem;">New Phone Number</label>
-                    <div style="display: flex; gap: 0;">
-                        <span style="display: flex; align-items: center; padding: 0 12px; background: var(--bg, #f1f5f9); border: 1.5px solid var(--border); border-right: none; border-radius: 8px 0 0 8px; font-size: 0.82rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap;">+91</span>
-                        <input type="tel" id="newPhone" class="form-input" placeholder="Enter 10-digit number" maxlength="10" inputmode="numeric" style="border-radius: 0 8px 8px 0;">
+        <!-- Change Password -->
+        <div class="setting-card">
+            <div class="setting-header">
+                <div class="sh-icon sh-pwd"><i class="fas fa-lock"></i></div>
+                <h3>Change Password</h3>
+            </div>
+            <div class="setting-body">
+                <div class="acct-alert acct-alert-ok" id="pwdSuccess"></div>
+                <div class="acct-alert acct-alert-err" id="pwdError"></div>
+                <div style="margin-bottom:12px;">
+                    <label class="acct-label">Current Password</label>
+                    <div class="input-wrap">
+                        <input type="password" id="currentPassword" class="acct-input" placeholder="Enter current password" style="padding-right:36px;">
+                        <button type="button" class="toggle-eye" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('currentPassword'),this)"><i class="fas fa-eye"></i></button>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="sendPhoneOtp()" id="sendPhoneOtpBtn" style="width: 100%;">
-                    <i class="fas fa-paper-plane"></i> Send OTP to New Number
-                </button>
-            </div>
-
-            <!-- Step 2: Enter OTP -->
-            <div id="phoneStep2" style="display: none;">
-                <div style="text-align: center; margin-bottom: 12px;">
-                    <p style="font-size: 0.82rem; color: var(--text-secondary);">OTP sent to <strong id="phoneOtpDisplay">******1234</strong></p>
-                    <div id="phoneDevHint" style="display: none; padding: 6px 12px; background: #fef3c7; border-radius: 6px; font-size: 0.75rem; color: #92400e; font-weight: 600; margin-top: 6px;"></div>
+                <div style="margin-bottom:8px;">
+                    <label class="acct-label">New Password</label>
+                    <div class="input-row">
+                        <div class="input-wrap" style="flex:1;">
+                            <input type="password" id="newPassword" class="acct-input" placeholder="Min 6 characters" oninput="_acctPwdStr(this.value)" style="padding-right:36px;">
+                            <button type="button" class="toggle-eye" onclick="(function(f,b){var s=f.type==='password';f.type=s?'text':'password';b.innerHTML=s?'<i class=\'fas fa-eye-slash\'></i>':'<i class=\'fas fa-eye\'></i>';})(document.getElementById('newPassword'),this)"><i class="fas fa-eye"></i></button>
+                        </div>
+                        <button type="button" class="mini-btn" onclick="_acctAutoGen()" title="Auto-generate"><i class="fas fa-magic"></i></button>
+                        <button type="button" class="mini-btn" onclick="_acctCopyPwd()" title="Copy"><i class="fas fa-copy"></i></button>
+                    </div>
+                    <div class="pwd-meter"><div class="pwd-fill" id="acctPwdFill"></div></div>
+                    <div class="pwd-text" id="acctPwdText"></div>
                 </div>
-                <div class="form-group" style="margin-bottom: 14px;">
-                    <label class="form-label" style="font-size: 0.8rem;">Enter 6-digit OTP</label>
-                    <input type="text" id="phoneOtpInput" class="form-input" placeholder="Enter OTP" maxlength="6" inputmode="numeric" style="text-align: center; font-size: 1.2rem; letter-spacing: 8px; font-weight: 700;">
+                <div style="margin-bottom:14px;">
+                    <label class="acct-label">Confirm New Password</label>
+                    <input type="password" id="confirmPassword" class="acct-input" placeholder="Re-enter new password">
                 </div>
-                <button class="btn btn-primary" onclick="verifyPhoneOtp()" id="verifyPhoneOtpBtn" style="width: 100%;">
-                    <i class="fas fa-check-circle"></i> Verify & Update Phone
-                </button>
-                <button class="btn" onclick="resetPhoneFlow()" style="width: 100%; margin-top: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem;">
-                    <i class="fas fa-arrow-left"></i> Change Number
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Change Email Section -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="padding: 16px 20px; border-bottom: 1px solid var(--border-light);">
-            <h3 style="margin: 0; font-size: 0.92rem; font-weight: 700;"><i class="fas fa-envelope" style="color: #D97706; margin-right: 8px;"></i>Change Email Address</h3>
-        </div>
-        <div style="padding: 20px;">
-            <p style="font-size: 0.78rem; color: var(--text-light); margin: 0 0 14px;">Current: <strong>{{ user.email or 'Not set' }}</strong> {% if user.email %}<span style="font-size:0.65rem;background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;">Verified</span>{% endif %}</p>
-            <div id="emailSuccess" style="display: none; background: var(--success-light); color: var(--success); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-            <div id="emailError" style="display: none; background: var(--danger-light); color: var(--danger); padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
-
-            <!-- Step 1: Enter new email -->
-            <div id="emailStep1">
-                <div class="form-group" style="margin-bottom: 14px;">
-                    <label class="form-label" style="font-size: 0.8rem;">New Email Address</label>
-                    <input type="email" id="newEmail" class="form-input" placeholder="Enter new email address">
-                </div>
-                <button class="btn btn-primary" onclick="sendEmailCode()" id="sendEmailCodeBtn" style="width: 100%;">
-                    <i class="fas fa-paper-plane"></i> Send Verification Code
-                </button>
-            </div>
-
-            <!-- Step 2: Enter Code -->
-            <div id="emailStep2" style="display: none;">
-                <div style="text-align: center; margin-bottom: 12px;">
-                    <p style="font-size: 0.82rem; color: var(--text-secondary);">Code sent to <strong id="emailCodeDisplay">abc***@mail.com</strong></p>
-                    <div id="emailDevHint" style="display: none; padding: 6px 12px; background: #fef3c7; border-radius: 6px; font-size: 0.75rem; color: #92400e; font-weight: 600; margin-top: 6px;"></div>
-                </div>
-                <div class="form-group" style="margin-bottom: 14px;">
-                    <label class="form-label" style="font-size: 0.8rem;">Enter 6-digit Code</label>
-                    <input type="text" id="emailCodeInput" class="form-input" placeholder="Enter code" maxlength="6" inputmode="numeric" style="text-align: center; font-size: 1.2rem; letter-spacing: 8px; font-weight: 700;">
-                </div>
-                <button class="btn btn-primary" onclick="verifyEmailCode()" id="verifyEmailCodeBtn" style="width: 100%;">
-                    <i class="fas fa-check-circle"></i> Verify & Update Email
-                </button>
-                <button class="btn" onclick="resetEmailFlow()" style="width: 100%; margin-top: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.8rem;">
-                    <i class="fas fa-arrow-left"></i> Change Email
+                <button class="acct-btn acct-btn-primary" onclick="changePassword()" id="changePwdBtn">
+                    <i class="fas fa-key"></i> Update Password
                 </button>
             </div>
         </div>
+
+        <!-- Change Phone & Email in a two-column grid on wider screens -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+            <!-- Change Phone -->
+            <div class="setting-card">
+                <div class="setting-header">
+                    <div class="sh-icon sh-phone"><i class="fas fa-mobile-alt"></i></div>
+                    <h3>Change Phone</h3>
+                </div>
+                <div class="setting-body">
+                    <p class="current-val">Current: <strong>+91 {{ user.phone or 'Not set' }}</strong></p>
+                    <div class="acct-alert acct-alert-ok" id="phoneSuccess"></div>
+                    <div class="acct-alert acct-alert-err" id="phoneError"></div>
+
+                    <!-- Step 1 -->
+                    <div id="phoneStep1">
+                        <div style="margin-bottom:14px;">
+                            <label class="acct-label">New Phone Number</label>
+                            <div style="display:flex;gap:0;">
+                                <span class="phone-prefix">+91</span>
+                                <input type="tel" id="newPhone" class="acct-input" placeholder="10-digit number" maxlength="10" inputmode="numeric" style="border-radius:0 8px 8px 0;">
+                            </div>
+                        </div>
+                        <button class="acct-btn acct-btn-primary" onclick="sendPhoneOtp()" id="sendPhoneOtpBtn">
+                            <i class="fas fa-paper-plane"></i> Send OTP
+                        </button>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div id="phoneStep2" style="display:none;">
+                        <div class="otp-center">
+                            <p>OTP sent to <strong id="phoneOtpDisplay">******1234</strong></p>
+                            <div class="otp-hint" id="phoneDevHint"></div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label class="acct-label">Enter 6-digit OTP</label>
+                            <input type="text" id="phoneOtpInput" class="acct-input otp-input" placeholder="— — — — — —" maxlength="6" inputmode="numeric">
+                        </div>
+                        <button class="acct-btn acct-btn-primary" onclick="verifyPhoneOtp()" id="verifyPhoneOtpBtn">
+                            <i class="fas fa-check-circle"></i> Verify & Update
+                        </button>
+                        <button class="acct-btn acct-btn-secondary" onclick="resetPhoneFlow()">
+                            <i class="fas fa-arrow-left"></i> Change Number
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Change Email -->
+            <div class="setting-card">
+                <div class="setting-header">
+                    <div class="sh-icon sh-email"><i class="fas fa-envelope"></i></div>
+                    <h3>Change Email</h3>
+                </div>
+                <div class="setting-body">
+                    <p class="current-val">Current: <strong>{{ user.email or 'Not set' }}</strong> {% if user.email %}<span class="verified-badge">Verified</span>{% endif %}</p>
+                    <div class="acct-alert acct-alert-ok" id="emailSuccess"></div>
+                    <div class="acct-alert acct-alert-err" id="emailError"></div>
+
+                    <!-- Step 1 -->
+                    <div id="emailStep1">
+                        <div style="margin-bottom:14px;">
+                            <label class="acct-label">New Email Address</label>
+                            <input type="email" id="newEmail" class="acct-input" placeholder="Enter new email">
+                        </div>
+                        <button class="acct-btn acct-btn-primary" onclick="sendEmailCode()" id="sendEmailCodeBtn">
+                            <i class="fas fa-paper-plane"></i> Send Code
+                        </button>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div id="emailStep2" style="display:none;">
+                        <div class="otp-center">
+                            <p>Code sent to <strong id="emailCodeDisplay">abc***@mail.com</strong></p>
+                            <div class="otp-hint" id="emailDevHint"></div>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label class="acct-label">Enter 6-digit Code</label>
+                            <input type="text" id="emailCodeInput" class="acct-input otp-input" placeholder="— — — — — —" maxlength="6" inputmode="numeric">
+                        </div>
+                        <button class="acct-btn acct-btn-primary" onclick="verifyEmailCode()" id="verifyEmailCodeBtn">
+                            <i class="fas fa-check-circle"></i> Verify & Update
+                        </button>
+                        <button class="acct-btn acct-btn-secondary" onclick="resetEmailFlow()">
+                            <i class="fas fa-arrow-left"></i> Change Email
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -249,7 +327,7 @@
         }).catch(function() {
             setText('phoneError', 'Connection failed');
         }).finally(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP to New Number'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP'; }
         });
     };
 
@@ -264,7 +342,6 @@
         apiCall('/api/account/change-phone/verify', { new_phone: newPhoneVal, otp: otp })
         .then(function(data) {
             if (data.success) {
-                /* Update cookie with new token */
                 if (data.new_token) {
                     document.cookie = 'access_token=' + data.new_token + ';path=/;max-age=' + (60*60*24) + ';SameSite=Lax';
                 }
@@ -272,7 +349,6 @@
                 hide('phoneStep2'); show('phoneStep1');
                 $('phoneOtpInput').value = '';
                 $('newPhone').value = '';
-                /* Reload to reflect changes */
                 setTimeout(function() { window.location.reload(); }, 1500);
             } else {
                 setText('phoneError', data.error || 'Verification failed');
@@ -280,7 +356,7 @@
         }).catch(function() {
             setText('phoneError', 'Connection failed');
         }).finally(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update Phone'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update'; }
         });
     };
 
@@ -319,7 +395,7 @@
         }).catch(function() {
             setText('emailError', 'Connection failed');
         }).finally(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Verification Code'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Code'; }
         });
     };
 
@@ -348,7 +424,7 @@
         }).catch(function() {
             setText('emailError', 'Connection failed');
         }).finally(function() {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update Email'; }
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check-circle"></i> Verify & Update'; }
         });
     };
 

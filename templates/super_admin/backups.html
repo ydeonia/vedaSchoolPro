@@ -97,6 +97,9 @@
             <div><span class="bk-status ok" id="status_{{ b.id }}">Loading...</span></div>
             <div class="bk-actions">
                 <button class="bk-btn primary" onclick="triggerBackup('{{ b.id }}','{{ b.name }}')"><i class="fas fa-download"></i> Now</button>
+                <label class="bk-btn ghost" style="cursor:pointer;" title="Upload backup"><i class="fas fa-upload"></i>
+                    <input type="file" accept=".gz,.sql" style="display:none;" onchange="uploadBackup('{{ b.id }}','{{ b.name }}',this)">
+                </label>
                 <button class="bk-btn ghost" onclick="toggleDetail('{{ b.id }}')"><i class="fas fa-calendar-alt"></i></button>
             </div>
         </div>
@@ -139,47 +142,40 @@
 {% endblock %}
 {% block extra_js %}
 <script>
-// ═══ SIMULATED BACKUP DATA ═══
-// In production: fetch from /api/super-admin/backups/{branch_id}
+// ═══ REAL BACKUP DATA (API-driven) ═══
 const allBackups={};
 const branchIds=[{% for item in org_data %}{% for b in item.branches %}'{{ b.id }}',{% endfor %}{% endfor %}];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
-const dpState={};// per-branch calendar month/year
+const dpState={};
 
-function initBackups(){
+async function initBackups(){
+    // Load global stats
+    try{
+        const stats=await apiCall('/api/super-admin/backups/stats');
+        document.getElementById('gTotalBk').textContent=(stats.total_backups||0).toLocaleString();
+        document.getElementById('gSuccess').textContent=stats.success_30d||0;
+        document.getElementById('gFailed').textContent=stats.failed_30d||0;
+        document.getElementById('gSize').textContent=stats.total_size_display||'0 B';
+    }catch(e){ console.warn('Stats load failed:',e); }
+
+    // Load per-branch backups
     const now=new Date();
-    let totalBk=0, success30=0, failed30=0, totalSize=0;
-    const thirtyAgo=new Date();thirtyAgo.setDate(thirtyAgo.getDate()-30);
-
-    branchIds.forEach(bid=>{
-        allBackups[bid]={};
+    for(const bid of branchIds){
         dpState[bid]={month:now.getMonth(),year:now.getFullYear()};
-        for(let i=0;i<90;i++){
-            const d=new Date(now);d.setDate(d.getDate()-i);
-            const key=d.toISOString().slice(0,10);
-            if(Math.random()>0.12){
-                const size=+(1.5+Math.random()*8).toFixed(1);
-                const ok=Math.random()>0.05;
-                allBackups[bid][key]={
-                    time:d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
-                    size:size+'MB',sizeNum:size,
-                    type:i%7===0?'Full':'Incremental',
-                    status:ok?'success':'failed'
+        allBackups[bid]={};
+        try{
+            const d=await apiCall(`/api/super-admin/backups/${bid}`);
+            (d.backups||[]).forEach(bk=>{
+                allBackups[bid][bk.created_at]={
+                    id:bk.id,time:bk.time||'',size:bk.file_size_display||'',
+                    sizeNum:(bk.file_size_bytes||0)/(1024*1024),
+                    type:bk.backup_type||'manual',status:bk.status==='completed'?'success':'failed',
+                    error:bk.error_message||'',
                 };
-                totalBk++;totalSize+=size;
-                if(d>=thirtyAgo){ok?success30++:failed30++;}
-            }
-        }
-        renderStrip(bid);
-        renderStatus(bid);
-        renderDpCal(bid);
-        renderDpHist(bid);
-    });
-
-    document.getElementById('gTotalBk').textContent=totalBk.toLocaleString();
-    document.getElementById('gSuccess').textContent=success30;
-    document.getElementById('gFailed').textContent=failed30;
-    document.getElementById('gSize').textContent=totalSize>1024?(totalSize/1024).toFixed(1)+'GB':Math.round(totalSize)+'MB';
+            });
+        }catch(e){ console.warn('Branch backup load failed:',bid,e); }
+        renderStrip(bid);renderStatus(bid);renderDpCal(bid);renderDpHist(bid);
+    }
 }
 
 function renderStrip(bid){
@@ -191,7 +187,7 @@ function renderStrip(bid){
         const bk=allBackups[bid][key];
         const cls=bk?(bk.status==='success'?'success':'fail'):'none';
         const h=bk?(bk.status==='success'?Math.min(28,12+bk.sizeNum*1.5):6):4;
-        const tip=bk?`${key} · ${bk.time} · ${bk.size} · ${bk.status==='success'?'✅':'❌'}`:`${key} · No backup`;
+        const tip=bk?`${key} | ${bk.time} | ${bk.size} | ${bk.status==='success'?'OK':'FAIL'}`:`${key} | No backup`;
         html+=`<div class="cal-dot ${cls}" style="height:${h}px;"><div class="cal-tip">${tip}</div></div>`;
     }
     el.innerHTML=html;
@@ -201,21 +197,17 @@ function renderStatus(bid){
     const el=document.getElementById('status_'+bid);if(!el)return;
     const today=new Date().toISOString().slice(0,10);
     const bk=allBackups[bid][today];
-    if(bk&&bk.status==='success'){el.className='bk-status ok';el.textContent='✅ Today OK';}
-    else if(bk&&bk.status==='failed'){el.className='bk-status fail';el.textContent='❌ Failed';}
+    if(bk&&bk.status==='success'){el.className='bk-status ok';el.innerHTML='<i class="fas fa-check-circle"></i> Today OK';}
+    else if(bk&&bk.status==='failed'){el.className='bk-status fail';el.innerHTML='<i class="fas fa-times-circle"></i> Failed';}
     else{
-        // Check yesterday
         const y=new Date();y.setDate(y.getDate()-1);
         const ybk=allBackups[bid][y.toISOString().slice(0,10)];
-        if(ybk&&ybk.status==='success'){el.className='bk-status warn';el.textContent='⏳ Pending';}
-        else{el.className='bk-status fail';el.textContent='⚠️ Missed';}
+        if(ybk&&ybk.status==='success'){el.className='bk-status warn';el.innerHTML='<i class="fas fa-clock"></i> Pending';}
+        else{el.className='bk-status fail';el.innerHTML='<i class="fas fa-exclamation-triangle"></i> Missed';}
     }
 }
 
-function toggleDetail(bid){
-    const el=document.getElementById('detail_'+bid);
-    el.classList.toggle('open');
-}
+function toggleDetail(bid){document.getElementById('detail_'+bid).classList.toggle('open');}
 
 function renderDpCal(bid){
     const s=dpState[bid];
@@ -233,7 +225,7 @@ function renderDpCal(bid){
         if(bk&&bk.status==='success') cls+=' has-backup';
         else if(bk&&bk.status==='failed') cls+=' has-fail';
         if(key===today) cls+=' today';
-        html+=`<div class="${cls}" title="${bk?bk.time+' · '+bk.size+' · '+bk.status:'No backup'}">${d}</div>`;
+        html+=`<div class="${cls}" title="${bk?bk.time+' | '+bk.size+' | '+bk.status:'No backup'}">${d}</div>`;
     }
     grid.innerHTML=html;
 }
@@ -244,25 +236,85 @@ function renderDpHist(bid){
     const hist=Object.entries(allBackups[bid]||{}).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,15);
     document.getElementById('dpHist_'+bid).innerHTML=hist.map(([k,v])=>`<tr>
         <td style="font-weight:700;">${k}</td><td>${v.time}</td><td>${v.size}</td>
-        <td><span class="bk-status ${v.status==='success'?'ok':'fail'}">${v.status==='success'?'✅ OK':'❌ Fail'}</span></td>
-        <td><button class="bk-btn ghost" style="padding:2px 6px;font-size:0.55rem;" onclick="restoreBackup('${bid}','${k}')"><i class="fas fa-undo"></i></button></td>
+        <td><span class="bk-status ${v.status==='success'?'ok':'fail'}">${v.status==='success'?'<i class="fas fa-check"></i> OK':'<i class="fas fa-times"></i> Fail'}</span></td>
+        <td>
+            <button class="bk-btn ghost" style="padding:2px 6px;font-size:0.55rem;" onclick="downloadBackup('${v.id}')" title="Download"><i class="fas fa-download"></i></button>
+            <button class="bk-btn ghost" style="padding:2px 6px;font-size:0.55rem;" onclick="restoreBackup('${v.id}','${k}')" title="Restore"><i class="fas fa-undo"></i></button>
+        </td>
     </tr>`).join('');
 }
 
 function triggerBackup(bid,name){
     showConfirm('Take Backup Now','Create a full backup of <strong>'+name+'</strong> right now?<br><br>Includes: students, teachers, fees, attendance, exams, and all records.',async()=>{
-        showToast('info','Backup started...');
-        const key=new Date().toISOString().slice(0,10);
-        allBackups[bid][key]={time:new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),size:(2+Math.random()*5).toFixed(1)+'MB',sizeNum:+(2+Math.random()*5).toFixed(1),type:'Full (Manual)',status:'success'};
-        renderStrip(bid);renderStatus(bid);renderDpCal(bid);renderDpHist(bid);
-        showToast('success','Backup completed for '+name);
-    },{icon:'💾',yesText:'Start Backup'});
+        showToast('info','Backup started... this may take a moment.');
+        try{
+            const result=await apiCall(`/api/super-admin/backups/${bid}/trigger`,'POST');
+            if(result.success){
+                showToast('success','Backup completed for '+name+' ('+_fmtSize(result.file_size)+')');
+                // Reload this branch's data
+                const d=await apiCall(`/api/super-admin/backups/${bid}`);
+                allBackups[bid]={};
+                (d.backups||[]).forEach(bk=>{
+                    allBackups[bid][bk.created_at]={id:bk.id,time:bk.time||'',size:bk.file_size_display||'',sizeNum:(bk.file_size_bytes||0)/(1024*1024),type:bk.backup_type||'manual',status:bk.status==='completed'?'success':'failed'};
+                });
+                renderStrip(bid);renderStatus(bid);renderDpCal(bid);renderDpHist(bid);
+                // Refresh global stats
+                const stats=await apiCall('/api/super-admin/backups/stats');
+                document.getElementById('gTotalBk').textContent=(stats.total_backups||0).toLocaleString();
+                document.getElementById('gSuccess').textContent=stats.success_30d||0;
+                document.getElementById('gFailed').textContent=stats.failed_30d||0;
+                document.getElementById('gSize').textContent=stats.total_size_display||'0 B';
+            }else{
+                showToast('error','Backup failed: '+(result.error||'Unknown error'));
+            }
+        }catch(e){showToast('error','Backup failed: '+e.message);}
+    },{icon:'<i class="fas fa-database"></i>',yesText:'Start Backup'});
 }
 
-function restoreBackup(bid,key){
-    showConfirm('⚠️ Restore Backup','Restore to <strong>'+key+'</strong>?<br><br><strong style="color:#DC2626;">WARNING: This overwrites ALL current data. This cannot be undone.</strong>',()=>{
-        showToast('info','Restore would run pg_restore in production.');
-    },{icon:'🔄',yesText:'Restore Now',danger:true});
+function restoreBackup(backupId,dateKey){
+    showConfirm('Restore Backup','Restore to <strong>'+dateKey+'</strong>?<br><br><strong style="color:#DC2626;">WARNING: This overwrites ALL current data for this branch. This cannot be undone.</strong>',async()=>{
+        showToast('info','Restoring backup...');
+        try{
+            const result=await apiCall(`/api/super-admin/backups/restore/${backupId}`,'POST');
+            if(result.success){showToast('success',result.message||'Restore completed');}
+            else{showToast('error','Restore failed: '+(result.error||'Unknown'));}
+        }catch(e){showToast('error','Restore failed: '+e.message);}
+    },{icon:'<i class="fas fa-undo"></i>',yesText:'Restore Now',danger:true});
+}
+
+function downloadBackup(backupId){
+    window.open(`/api/super-admin/backups/download/${backupId}`,'_blank');
+}
+
+async function uploadBackup(bid,name,input){
+    const file=input.files[0];
+    if(!file)return;
+    input.value='';
+    showToast('info','Uploading backup for '+name+'...');
+    const fd=new FormData();
+    fd.append('file',file);
+    try{
+        const res=await fetch(`/api/super-admin/backups/upload/${bid}`,{method:'POST',body:fd,credentials:'same-origin'});
+        const result=await res.json();
+        if(result.success){
+            showToast('success','Backup uploaded: '+result.file_name+' ('+_fmtSize(result.size)+')');
+            // Reload
+            const d=await apiCall(`/api/super-admin/backups/${bid}`);
+            allBackups[bid]={};
+            (d.backups||[]).forEach(bk=>{
+                allBackups[bid][bk.created_at]={id:bk.id,time:bk.time||'',size:bk.file_size_display||'',sizeNum:(bk.file_size_bytes||0)/(1024*1024),type:bk.backup_type||'manual',status:bk.status==='completed'?'success':'failed'};
+            });
+            renderStrip(bid);renderStatus(bid);renderDpCal(bid);renderDpHist(bid);
+        }else{showToast('error','Upload failed: '+(result.error||result.detail||'Unknown'));}
+    }catch(e){showToast('error','Upload failed: '+e.message);}
+}
+
+function _fmtSize(b){
+    if(!b)return '0 B';
+    if(b<1024)return b+' B';
+    if(b<1024*1024)return (b/1024).toFixed(1)+' KB';
+    if(b<1024*1024*1024)return (b/(1024*1024)).toFixed(1)+' MB';
+    return (b/(1024*1024*1024)).toFixed(1)+' GB';
 }
 
 initBackups();

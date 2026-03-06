@@ -375,7 +375,7 @@ async def create_payment_link(request: Request, db: AsyncSession = Depends(get_d
 
     # Get branch for callback URL
     branch = await db.scalar(select(Branch).where(Branch.id == uuid.UUID(branch_id)))
-    base_url = branch.website_url or "https://school.eduflow.in"
+    base_url = branch.website_url or "https://school.vedaschoolpro.in"
 
     try:
         link_result = await provider.create_payment_link(

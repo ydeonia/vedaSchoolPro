@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}EduFlow{% endblock %} — School Management</title>
+    <title>{% block title %}VedaSchoolPro{% endblock %} — School Management</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded',translatePage);
                 <div class="logo">
                     <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
                     <div class="logo-text">
-                        <span class="logo-name">EduFlow</span>
+                        <span class="logo-name">VedaSchoolPro</span>
                         <span class="logo-tagline">School Management</span>
                     </div>
                 </div>
@@ -64,6 +64,7 @@ document.addEventListener('DOMContentLoaded',translatePage);
                     <span class="nav-section-title" data-i18n="nav.system">{{ t('nav.system') }}</span>
                     <a href="/super-admin/plans" class="nav-item {% if active_page == 'plans' %}active{% endif %}"><i class="fas fa-tags"></i><span data-i18n="nav.plans_billing">{{ t('nav.plans_billing') }}</span></a>
                     <a href="/super-admin/backups" class="nav-item {% if active_page == 'backups' %}active{% endif %}"><i class="fas fa-database"></i><span data-i18n="nav.backups">{{ t('nav.backups') }}</span></a>
+                    <a href="/super-admin/easy-setup" class="nav-item {% if active_page == 'easy_setup' %}active{% endif %}"><i class="fas fa-magic"></i><span>Easy Setup</span></a>
                     <a href="/super-admin/audit-logs" class="nav-item {% if active_page == 'audit_logs' %}active{% endif %}"><i class="fas fa-clipboard-list"></i><span data-i18n="nav.audit_logs">{{ t('nav.audit_logs') }}</span></a>
                     <a href="/super-admin/system-analytics" class="nav-item {% if active_page == 'system_analytics' %}active{% endif %}"><i class="fas fa-server"></i><span data-i18n="nav.system_analytics">{{ t('nav.system_analytics') }}</span></a>
                     <a href="/super-admin/settings" class="nav-item {% if active_page == 'settings' %}active{% endif %}"><i class="fas fa-cog"></i><span data-i18n="nav.settings">{{ t('nav.settings') }}</span></a>
@@ -144,34 +145,34 @@ document.addEventListener('DOMContentLoaded',translatePage);
                     {{ nav('/school/academic-years', 'calendar-alt', 'Academic Year', 'academic_years', ['school_settings']) }}
                     {{ nav('/school/subjects', 'book', 'Subjects', 'subjects', ['class_management']) }}
                 </div>
-                <div class="nav-section">
+                <div class="nav-section" data-plan-features="transport_module,hostel_module">
                     <span class="nav-section-title">Transport & Hostel</span>
                     {{ nav('/school/transport/vehicles', 'bus', 'Vehicles', 'transport_vehicles', ['transport'], 'bus van car auto driver fleet') }}
                     {{ nav('/school/transport/routes', 'route', 'Routes & Stops', 'transport_routes', ['transport'], 'bus stop pickup drop location area') }}
                     {{ nav('/school/transport/assignments', 'user-friends', 'Assignments', 'transport_assignments', ['transport']) }}
                     {{ nav('/school/hostel', 'bed', 'Hostel', 'hostel', ['hostel'], 'boarding room dormitory residential mess warden') }}
                 </div>
-                <div class="nav-section">
+                <div class="nav-section" data-plan-features="hr_payroll,id_card_generator">
                     <span class="nav-section-title">HR & Staff</span>
                     {{ nav('/school/hr/employees', 'users-cog', 'Non-Teaching Staff', 'employees', ['employee_management'], 'staff peon driver guard clerk worker non-teaching employee') }}
                     {{ nav('/school/hr/payroll', 'money-bill-wave', 'Payroll', 'payroll', ['salary_payroll'], 'salary pay slip wages deduction epf esi') }}
                     {{ nav('/school/hr/id-cards', 'id-card', 'ID Cards', 'id_cards', ['id_cards']) }}
                     {{ nav('/school/id-card-designer', 'palette', 'ID Card Designer', 'id_card_designer', ['id_cards']) }}
                 </div>
-                <div class="nav-section">
+                <div class="nav-section" data-plan-features="library_module">
                     <span class="nav-section-title">More Modules</span>
                     {{ nav('/school/admissions', 'user-plus', 'Admissions', 'admissions', ['student_admission']) }}
                     {{ nav('/school/library', 'book-reader', 'Library', 'library', ['library'], 'book issue return borrow read catalog') }}
                     {{ nav('/school/digital-library', 'cloud-upload-alt', 'Digital Library', 'digital_library', ['library']) }}
                     {{ nav('/school/certificates', 'certificate', 'Certificates', 'certificates', ['student_documents','id_cards'], 'tc bonafide character letter document') }}
                 </div>
-                <div class="nav-section">
+                <div class="nav-section" data-plan-features="messaging_system,complaints_system">
                     <span class="nav-section-title">Communication</span>
                     {{ nav('/school/announcements', 'bullhorn', 'Announcements', 'announcements', ['announcements'], 'notice circular news broadcast alert event annual function tournament') }}
                     {{ nav('/school/messages', 'comments', 'Messages', 'messages', ['parent_comm','complaints','announcements'], 'chat sms whatsapp email inbox send') }}
                     {{ nav('/school/notifications', 'bell', 'Notifications', 'notifications', ['announcements']) }}
                 </div>
-                <div class="nav-section">
+                <div class="nav-section" data-plan-features="data_export,advanced_analytics">
                     <span class="nav-section-title">Reports & Data</span>
                     {{ nav('/school/reports/center', 'file-export', 'Report Center', 'reports_center', ['analytics','reports'], 'generate download export csv print attendance fee academic transport house alumni tc leave student teacher directory login performance') }}
                     {{ nav('/school/data-export', 'download', 'Data Export', 'data_export', ['reports']) }}
@@ -536,6 +537,26 @@ async function deleteItem(url,name){showConfirm('Delete '+name,'Are you sure you
 </script>
 <style>@keyframes toastIn{from{transform:translateX(60px);opacity:0}to{transform:translateX(0);opacity:1}}</style>
     {% block extra_js %}{% endblock %}
+{% if user and user.role == 'school_admin' %}
+<script>
+/* ═══ Plan-based sidebar gating ═══ */
+(async function(){
+    try{
+        const r=await fetch('/api/school/my-plan',{credentials:'same-origin'});
+        if(!r.ok)return;
+        const plan=await r.json();
+        if(!plan.has_plan)return; // No plan assigned — show all (super admin handles)
+        window._branchPlan=plan; // Make available globally for other pages
+        // Hide sidebar sections whose plan features are ALL disabled
+        document.querySelectorAll('.nav-section[data-plan-features]').forEach(sec=>{
+            const features=sec.dataset.planFeatures.split(',');
+            const anyEnabled=features.some(f=>plan[f.trim()]);
+            if(!anyEnabled){sec.style.display='none';}
+        });
+    }catch(e){}
+})();
+</script>
+{% endif %}
 <div id="teacherHoverCard" style="display:none;position:fixed;z-index:9999;background:var(--bg-card, white);border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,0.15);padding:16px;width:280px;pointer-events:none;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
         <div id="thcPhoto" style="width:50px;height:50px;border-radius:12px;background:var(--primary-50);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;flex-shrink:0;overflow:hidden;"></div>
@@ -553,7 +574,7 @@ document.addEventListener('mouseover',async function(e){const el=e.target.closes
 document.addEventListener('mouseout',function(e){const el=e.target.closest('[data-teacher-id]');if(el)thc.style.display='none';});
 </script>
 <script>
-(function(){const searchInput=document.getElementById('sidebarSearch');if(!searchInput)return;const pinnedDiv=document.getElementById('pinnedNav');const PINNED_KEY='eduflow_pinned_nav';function getPinned(){try{return JSON.parse(localStorage.getItem(PINNED_KEY)||'[]')}catch(e){return[]}}function savePinned(arr){localStorage.setItem(PINNED_KEY,JSON.stringify(arr))}function renderPinned(){const pinned=getPinned();if(!pinned.length){pinnedDiv.style.display='none';return;}pinnedDiv.style.display='block';let html='<span class="nav-section-title" style="color:#D97706;">📌 Pinned <span style="font-size:0.5rem;cursor:pointer;opacity:0.6;" onclick="clearAllPins()">(reset)</span></span>';document.querySelectorAll('.sidebar-nav .nav-item').forEach(a=>{a.classList.remove('pinned');if(pinned.includes(a.getAttribute('href'))){a.classList.add('pinned');html+=`<a href="${a.getAttribute('href')}" class="nav-item ${a.classList.contains('active')?'active':''}">${a.innerHTML}</a>`;}});pinnedDiv.innerHTML=html;}window.togglePin=function(el){const href=el.getAttribute('href');if(!href)return;let pinned=getPinned();if(pinned.includes(href)){pinned=pinned.filter(h=>h!==href);}else{if(pinned.length>=6){showToast&&showToast('error','Max 6 pinned items');return;}pinned.push(href);}savePinned(pinned);renderPinned();};window.clearAllPins=function(){savePinned([]);renderPinned();};searchInput.addEventListener('input',function(){const q=this.value.toLowerCase().trim();document.querySelectorAll('.sidebar-nav .nav-item').forEach(a=>{if(!q){a.classList.remove('search-hidden','search-match');return;}const label=(a.querySelector('span')||{}).textContent||'';const kw=a.getAttribute('data-keywords')||'';const match=label.toLowerCase().includes(q)||kw.toLowerCase().includes(q);a.classList.toggle('search-hidden',!match);a.classList.toggle('search-match',match);});document.querySelectorAll('.sidebar-nav .nav-section').forEach(sec=>{if(!q){sec.classList.remove('search-hidden');return;}const visible=sec.querySelectorAll('.nav-item:not(.search-hidden)');sec.classList.toggle('search-hidden',visible.length===0);});});document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();searchInput.focus();searchInput.select();}if(e.key==='Escape'&&document.activeElement===searchInput){searchInput.value='';searchInput.dispatchEvent(new Event('input'));searchInput.blur();}});renderPinned();})();
+(function(){const searchInput=document.getElementById('sidebarSearch');if(!searchInput)return;const pinnedDiv=document.getElementById('pinnedNav');const PINNED_KEY='vsp_pinned_nav';function getPinned(){try{return JSON.parse(localStorage.getItem(PINNED_KEY)||'[]')}catch(e){return[]}}function savePinned(arr){localStorage.setItem(PINNED_KEY,JSON.stringify(arr))}function renderPinned(){const pinned=getPinned();if(!pinned.length){pinnedDiv.style.display='none';return;}pinnedDiv.style.display='block';let html='<span class="nav-section-title" style="color:#D97706;">📌 Pinned <span style="font-size:0.5rem;cursor:pointer;opacity:0.6;" onclick="clearAllPins()">(reset)</span></span>';document.querySelectorAll('.sidebar-nav .nav-item').forEach(a=>{a.classList.remove('pinned');if(pinned.includes(a.getAttribute('href'))){a.classList.add('pinned');html+=`<a href="${a.getAttribute('href')}" class="nav-item ${a.classList.contains('active')?'active':''}">${a.innerHTML}</a>`;}});pinnedDiv.innerHTML=html;}window.togglePin=function(el){const href=el.getAttribute('href');if(!href)return;let pinned=getPinned();if(pinned.includes(href)){pinned=pinned.filter(h=>h!==href);}else{if(pinned.length>=6){showToast&&showToast('error','Max 6 pinned items');return;}pinned.push(href);}savePinned(pinned);renderPinned();};window.clearAllPins=function(){savePinned([]);renderPinned();};searchInput.addEventListener('input',function(){const q=this.value.toLowerCase().trim();document.querySelectorAll('.sidebar-nav .nav-item').forEach(a=>{if(!q){a.classList.remove('search-hidden','search-match');return;}const label=(a.querySelector('span')||{}).textContent||'';const kw=a.getAttribute('data-keywords')||'';const match=label.toLowerCase().includes(q)||kw.toLowerCase().includes(q);a.classList.toggle('search-hidden',!match);a.classList.toggle('search-match',match);});document.querySelectorAll('.sidebar-nav .nav-section').forEach(sec=>{if(!q){sec.classList.remove('search-hidden');return;}const visible=sec.querySelectorAll('.nav-item:not(.search-hidden)');sec.classList.toggle('search-hidden',visible.length===0);});});document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();searchInput.focus();searchInput.select();}if(e.key==='Escape'&&document.activeElement===searchInput){searchInput.value='';searchInput.dispatchEvent(new Event('input'));searchInput.blur();}});renderPinned();})();
 </script>
 <script>
 function switchLang(lang){document.cookie='lang='+lang+';path=/;max-age=31536000';const langLabels={en:'EN',hi:'हि',ta:'த',te:'తె',mr:'म'};const el=document.getElementById('currentLangIcon');if(el)el.textContent=langLabels[lang]||lang.toUpperCase();document.getElementById('langDropdown').style.display='none';fetch('/api/user/set-language',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:lang})}).catch(()=>{});window.location.reload();}

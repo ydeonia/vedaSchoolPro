@@ -492,7 +492,7 @@ async def _send_email_smtp(host: str, port: int, username: str, password: str,
                 <p style="color:#334155;line-height:1.6;">{body}</p>
             </div>
             <p style="color:#94a3b8;font-size:12px;text-align:center;margin-top:16px;">
-                Powered by EduFlow School Management System
+                Powered by VedaSchoolPro School Management System
             </p>
         </div>
         """

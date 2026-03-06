@@ -359,7 +359,7 @@ class PaytmProvider(PaymentProvider):
                 "mid": self.merchant_id,
                 "linkType": "GENERIC",
                 "linkDescription": description,
-                "linkName": f"EduFlow-{uuid.uuid4().hex[:8]}",
+                "linkName": f"VedaSchoolPro-{uuid.uuid4().hex[:8]}",
                 "amount": f"{amount:.2f}",
                 "customerContact": {"customerPhone": customer.get("phone", "")},
                 "expiryInDays": max(1, expiry_hours // 24),

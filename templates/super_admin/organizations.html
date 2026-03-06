@@ -4,6 +4,12 @@
 {% block page_title %}Organizations{% endblock %}
 {% block page_subtitle %}Manage all school organizations on the platform{% endblock %}
 
+{% block extra_css %}
+<style>
+.data-table tbody tr{transition:background 0.15s;}
+.data-table tbody tr:hover{background:rgba(67,56,202,0.05) !important;}
+</style>
+{% endblock %}
 {% block content %}
 <div class="card">
     <div class="card-header">
@@ -29,7 +35,7 @@
                 </thead>
                 <tbody>
                     {% for org in organizations %}
-                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not org.is_active else '' }}">
+                    <tr style="{{ 'background:rgba(220,38,38,0.06);' if not org.is_active else '' }}cursor:pointer;" onclick="window.location='/super-admin/organizations/{{ org.id }}'" title="Click to view details">
                         <td>
                             <div style="display: flex; align-items: center; gap: 12px;">
                                 <div class="user-avatar" style="width: 38px; height: 38px; font-size: 0.75rem;">
@@ -45,7 +51,20 @@
                             <div class="text-sm">{{ org.city or '—' }}</div>
                             <div class="text-xs text-muted">{{ org.state or '' }}</div>
                         </td>
-                        <td><span class="badge badge-purple">{{ org.plan_type.value | title }}</span></td>
+                        <td>
+                            {% set info = org_plan_info.get(org.id | string, {}) %}
+                            {% set tier = info.get('tier', 'none') %}
+                            {% if tier == 'none' %}
+                            <span class="badge badge-gray">No Plan</span>
+                            {% elif tier == 'mixed' %}
+                            <span class="badge badge-purple" title="{{ info.get('summary','') }}">{{ info.get('summary','Mixed') }}</span>
+                            {% else %}
+                            <span class="badge badge-purple">{{ info.get('summary', 'No Plan') }}</span>
+                            {% endif %}
+                            {% if info.get('total_monthly', 0) > 0 %}
+                            <div class="text-xs text-muted" style="margin-top:2px;">₹{{ '{:,.0f}'.format(info.get('total_monthly', 0)) }}/mo</div>
+                            {% endif %}
+                        </td>
                         <td><strong>{{ org.branches | length }}</strong></td>
                         <td>
                             {% if org.is_active %}
@@ -55,7 +74,7 @@
                             {% endif %}
                         </td>
                         <td class="text-sm text-muted">{{ org.created_at.strftime('%d %b %Y') }}</td>
-                        <td>
+                        <td onclick="event.stopPropagation()">
                             <div style="display: flex; gap: 6px;">
                                 <a href="/super-admin/organizations/{{ org.id }}" class="btn btn-secondary btn-sm" title="View Details">
                                     <i class="fas fa-eye"></i>
@@ -108,10 +127,13 @@
                     <div class="form-group">
                         <label class="form-label">Plan</label>
                         <select name="plan_type" class="form-select">
-                            <option value="basic">Basic — ₹499/mo</option>
-                            <option value="standard">Standard — ₹999/mo</option>
-                            <option value="premium">Premium — ₹1,999/mo</option>
-                            <option value="enterprise">Enterprise — ₹4,999/mo</option>
+                            {% if plans %}
+                            {% for p in plans %}
+                            <option value="{{ p.tier.value }}">{{ p.name }} — {% if p.price_monthly > 0 %}₹{{ '{:,.0f}'.format(p.price_monthly) }}/mo{% elif p.tier.value in ('trial', 'free') %}Free{% else %}Custom{% endif %}</option>
+                            {% endfor %}
+                            {% else %}
+                            <option value="">No plans available — create plans first</option>
+                            {% endif %}
                         </select>
                     </div>
                 </div>

@@ -63,12 +63,51 @@ async def organizations_page(request: Request, db: AsyncSession = Depends(get_db
     )
     organizations = result.scalars().all()
 
+    # Fetch real plans for dropdown
+    from models.subscription import Plan, SchoolSubscription
+    plans_result = await db.execute(select(Plan).order_by(Plan.display_order))
+    plans = plans_result.scalars().all()
+
+    # Build plan lookup (id -> plan obj)
+    plan_map = {str(p.id): p for p in plans}
+
+    # Build org subscription summary: org_id -> {plan_summary, total_monthly}
+    org_plan_info = {}
+    for org in organizations:
+        branch_ids = [b.id for b in org.branches]
+        if branch_ids:
+            subs = (await db.execute(
+                select(SchoolSubscription).where(SchoolSubscription.branch_id.in_(branch_ids))
+            )).scalars().all()
+            plan_names = []
+            total_monthly = 0
+            for s in subs:
+                p = plan_map.get(str(s.plan_id))
+                if p:
+                    plan_names.append(p.name)
+                    total_monthly += float(p.price_monthly or 0)
+            if plan_names:
+                # Deduplicate and summarize: "Pro" or "Pro, Starter"
+                unique_plans = list(dict.fromkeys(plan_names))  # preserve order, dedupe
+                org_plan_info[str(org.id)] = {
+                    "summary": ", ".join(unique_plans),
+                    "count": len(plan_names),
+                    "total_monthly": total_monthly,
+                    "tier": unique_plans[0].lower() if len(unique_plans) == 1 else "mixed",
+                }
+            else:
+                org_plan_info[str(org.id)] = {"summary": "No Plan", "count": 0, "total_monthly": 0, "tier": "none"}
+        else:
+            org_plan_info[str(org.id)] = {"summary": "No Branches", "count": 0, "total_monthly": 0, "tier": "none"}
+
     return templates.TemplateResponse("super_admin/organizations.html", {
         "request": request,
         "user": user,
         "active_page": "organizations",
         "organizations": organizations,
         "action": action,
+        "plans": plans,
+        "org_plan_info": org_plan_info,
     })
 
 
@@ -88,12 +127,37 @@ async def branches_page(request: Request, db: AsyncSession = Depends(get_db)):
     orgs_result = await db.execute(select(Organization).where(Organization.is_active == True))
     organizations = orgs_result.scalars().all()
 
+    # Load subscription info per branch for plan column
+    from models.subscription import SchoolSubscription, Plan
+    branch_ids = [b.id for b in branches]
+    branch_subs = {}
+    if branch_ids:
+        subs = (await db.execute(
+            select(SchoolSubscription).where(SchoolSubscription.branch_id.in_(branch_ids))
+        )).scalars().all()
+        # Build plan lookup
+        plan_ids = list(set(str(s.plan_id) for s in subs if s.plan_id))
+        plans_map = {}
+        if plan_ids:
+            import uuid as _uuid
+            plans_res = (await db.execute(
+                select(Plan).where(Plan.id.in_([_uuid.UUID(pid) for pid in plan_ids]))
+            )).scalars().all()
+            plans_map = {str(p.id): p for p in plans_res}
+        for s in subs:
+            p = plans_map.get(str(s.plan_id))
+            branch_subs[str(s.branch_id)] = {
+                "plan_name": p.name if p else "Unknown",
+                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+            }
+
     return templates.TemplateResponse("super_admin/branches.html", {
         "request": request,
         "user": user,
         "active_page": "branches",
         "branches": branches,
         "organizations": organizations,
+        "branch_subs": branch_subs,
         "action": action,
     })
 
@@ -311,6 +375,15 @@ async def branch_detail(request: Request, branch_id: str, db: AsyncSession = Dep
         "branch": branch, "admins": admins, "all_staff": all_staff,
         "student_count": student_count, "teacher_count": teacher_count,
         "subscription": subscription,
+    })
+
+
+@router.get("/easy-setup")
+@require_role(UserRole.SUPER_ADMIN)
+async def easy_setup_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user = request.state.user
+    return templates.TemplateResponse("super_admin/easy_setup.html", {
+        "request": request, "user": user, "active_page": "easy_setup",
     })
 
 

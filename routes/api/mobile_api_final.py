@@ -1,6 +1,6 @@
 """
 VedaSchoolPro Mobile API — All endpoints for Android/iOS app
-Auto-matched to actual EduFlow model schema
+Auto-matched to actual VedaSchoolPro model schema
 ALL values from real database — zero hardcoded placeholders
 """
 from fastapi import APIRouter, Depends, HTTPException, Request, Query

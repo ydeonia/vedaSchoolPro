@@ -1,0 +1,1080 @@
+{% extends "base.html" %}
+{% block title %}Easy School Setup{% endblock %}
+{% block page_title %}Easy School Setup{% endblock %}
+{% block page_subtitle %}Bulk setup wizard — create an entire school in minutes{% endblock %}
+{% block extra_css %}
+<style>
+.ez-wrap{max-width:920px;margin:0 auto;}
+
+/* ── Step Indicator ── */
+.ez-steps{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;position:relative;padding:0 12px;}
+.ez-steps::before{content:'';position:absolute;top:20px;left:40px;right:40px;height:3px;background:var(--border-light,#e2e8f0);z-index:0;border-radius:2px;}
+.ez-step-item{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;flex:0 0 auto;min-width:72px;}
+.ez-step-circle{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.82rem;font-weight:800;border:3px solid var(--border-light,#e2e8f0);background:var(--bg-card,white);color:var(--text-light);transition:all 0.3s;cursor:pointer;}
+.ez-step-item.active .ez-step-circle{border-color:var(--primary);background:var(--primary);color:white;box-shadow:0 4px 16px rgba(79,70,229,0.35);}
+.ez-step-item.done .ez-step-circle{border-color:#059669;background:#059669;color:white;}
+.ez-step-label{font-size:0.58rem;font-weight:700;color:var(--text-light);margin-top:6px;text-align:center;max-width:72px;line-height:1.2;}
+.ez-step-item.active .ez-step-label{color:var(--primary);font-weight:800;}
+.ez-step-item.done .ez-step-label{color:#059669;}
+
+/* ── Cards ── */
+.ez-card{background:var(--bg-card,white);border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,0.06);padding:28px;margin-bottom:16px;display:none;}
+.ez-card.visible{display:block;}
+.ez-card h2{font-size:1.05rem;font-weight:900;margin:0 0 4px 0;display:flex;align-items:center;gap:8px;}
+.ez-card h2 i{color:var(--primary);font-size:0.95rem;}
+.ez-card .sub{font-size:0.72rem;color:var(--text-light);margin:0 0 18px 0;}
+
+/* ── Form Grid ── */
+.ez-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;}
+.ez-grid.col2{grid-template-columns:1fr 1fr;}
+.ez-grid.col4{grid-template-columns:repeat(4,1fr);}
+.ez-grp{display:flex;flex-direction:column;gap:3px;}
+.ez-grp label{font-size:0.60rem;font-weight:700;text-transform:uppercase;color:var(--text-light);letter-spacing:0.03em;}
+.ez-grp label .req{color:#dc2626;}
+.ez-grp input,.ez-grp select,.ez-grp textarea{padding:9px 12px;border-radius:10px;border:1.5px solid var(--border,#e2e8f0);font-size:0.84rem;transition:border 0.2s;background:var(--bg-card,white);color:var(--text,#333);width:100%;box-sizing:border-box;}
+.ez-grp input:focus,.ez-grp select:focus,.ez-grp textarea:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+.ez-grp .ez-help{font-size:0.56rem;color:var(--text-light);margin-top:1px;}
+
+/* ── Navigation Buttons ── */
+.ez-nav{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
+.btn-ez{padding:10px 26px;border-radius:12px;font-weight:700;font-size:0.84rem;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:7px;transition:all 0.2s;}
+.btn-ez:disabled{opacity:0.5;cursor:not-allowed;transform:none !important;}
+.btn-ez-next{background:var(--primary);color:white;box-shadow:0 4px 14px rgba(79,70,229,0.2);}
+.btn-ez-next:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(79,70,229,0.3);}
+.btn-ez-prev{background:var(--bg-secondary,#f8fafc);color:var(--text-primary);border:1.5px solid var(--border-light,#e2e8f0);}
+.btn-ez-prev:hover:not(:disabled){background:var(--border-light,#f1f5f9);}
+.btn-ez-success{background:#059669;color:white;box-shadow:0 4px 14px rgba(5,150,105,0.25);}
+.btn-ez-success:hover:not(:disabled){transform:translateY(-1px);background:#047857;}
+.btn-ez-danger{background:#dc2626;color:white;}
+
+/* ── File Upload Area ── */
+.ez-upload-zone{border:2px dashed var(--border,#e2e8f0);border-radius:12px;padding:28px 20px;text-align:center;background:var(--bg-secondary,#f8fafc);cursor:pointer;transition:all 0.2s;position:relative;}
+.ez-upload-zone:hover,.ez-upload-zone.dragover{border-color:var(--primary);background:rgba(79,70,229,0.04);}
+.ez-upload-zone i.upload-icon{font-size:2rem;color:var(--primary);margin-bottom:8px;display:block;}
+.ez-upload-zone .upload-title{font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-bottom:4px;}
+.ez-upload-zone .upload-hint{font-size:0.68rem;color:var(--text-light);}
+.ez-upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
+/* ── Download Template Button ── */
+.btn-template{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:700;cursor:pointer;border:1.5px solid var(--primary);color:var(--primary);background:transparent;transition:all 0.15s;margin-bottom:14px;}
+.btn-template:hover{background:var(--primary);color:white;}
+
+/* ── Preview Table ── */
+.ez-table-wrap{max-height:340px;overflow-y:auto;border-radius:10px;border:1.5px solid var(--border-light,#e2e8f0);margin-top:14px;}
+.ez-table{width:100%;border-collapse:collapse;font-size:0.76rem;}
+.ez-table thead{position:sticky;top:0;z-index:2;}
+.ez-table th{padding:9px 12px;text-align:left;font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;background:var(--bg-secondary,#f8fafc);color:var(--text-light);border-bottom:1.5px solid var(--border-light,#e2e8f0);}
+.ez-table td{padding:8px 12px;border-bottom:1px solid var(--border-light,#f1f5f9);color:var(--text-primary);}
+.ez-table tbody tr:nth-child(even){background:var(--bg-secondary,#f8fafc);}
+.ez-table tbody tr:hover{background:rgba(79,70,229,0.04);}
+.ez-table tbody tr.row-error{background:rgba(220,38,38,0.06);}
+.ez-table tbody tr.row-error:hover{background:rgba(220,38,38,0.1);}
+.status-ok{color:#059669;font-weight:700;}.status-err{color:#dc2626;font-weight:700;}
+
+/* ── Summary Cards ── */
+.ez-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.ez-sum-card{padding:18px;border-radius:12px;background:var(--bg-secondary,#f8fafc);border:1.5px solid var(--border-light,#e2e8f0);text-align:center;transition:all 0.2s;}
+.ez-sum-card .sum-icon{font-size:1.6rem;margin-bottom:6px;}
+.ez-sum-card .sum-icon.ic-admin{color:#7c3aed;}.ez-sum-card .sum-icon.ic-teacher{color:#2563eb;}.ez-sum-card .sum-icon.ic-student{color:#059669;}.ez-sum-card .sum-icon.ic-transport{color:#d97706;}
+.ez-sum-card .sum-count{font-size:1.8rem;font-weight:900;color:var(--text-primary);line-height:1;}
+.ez-sum-card .sum-label{font-size:0.64rem;font-weight:700;text-transform:uppercase;color:var(--text-light);margin-top:4px;letter-spacing:0.04em;}
+.ez-error-badge{display:inline-flex;align-items:center;gap:5px;padding:8px 16px;border-radius:10px;font-size:0.78rem;font-weight:700;margin-bottom:14px;}
+.ez-error-badge.has-errors{background:rgba(220,38,38,0.1);color:#dc2626;border:1px solid rgba(220,38,38,0.2);}
+.ez-error-badge.no-errors{background:rgba(5,150,105,0.1);color:#059669;border:1px solid rgba(5,150,105,0.2);}
+
+/* ── Review Detail List ── */
+.ez-review-section{background:var(--bg-card,white);border-radius:10px;border:1.5px solid var(--border-light,#e2e8f0);padding:16px;margin-bottom:12px;}
+.ez-review-section h4{font-size:0.72rem;font-weight:800;text-transform:uppercase;color:var(--text-light);margin:0 0 8px 0;display:flex;align-items:center;gap:6px;}
+.ez-review-row{display:flex;justify-content:space-between;font-size:0.78rem;padding:4px 0;border-bottom:1px solid var(--border-light,#f1f5f9);}
+.ez-review-row:last-child{border:none;}
+.ez-review-row .rl{color:var(--text-light);}.ez-review-row .rv{font-weight:700;}
+
+/* ── Success Screen ── */
+.ez-success{text-align:center;padding:30px 20px;}
+.ez-success .check-circle{width:80px;height:80px;border-radius:50%;background:rgba(5,150,105,0.12);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;border:3px solid #059669;}
+.ez-success .check-circle i{font-size:2.2rem;color:#059669;}
+.ez-success h2{font-size:1.3rem;font-weight:900;margin:0 0 6px 0;color:var(--text-primary);}
+.ez-success p{font-size:0.78rem;color:var(--text-light);margin:0 0 20px 0;}
+.ez-cred-table{width:100%;border-collapse:collapse;font-size:0.78rem;margin:16px 0;text-align:left;}
+.ez-cred-table th{padding:9px 12px;font-size:0.62rem;font-weight:800;text-transform:uppercase;background:var(--bg-secondary,#f8fafc);color:var(--text-light);border-bottom:1.5px solid var(--border-light);}
+.ez-cred-table td{padding:8px 12px;border-bottom:1px solid var(--border-light,#f1f5f9);}
+.ez-cred-table tbody tr:nth-child(even){background:var(--bg-secondary,#f8fafc);}
+.ez-cred-table .role-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.62rem;font-weight:700;}
+.role-admin{background:rgba(124,58,237,0.12);color:#7c3aed;}
+.role-teacher{background:rgba(37,99,235,0.12);color:#2563eb;}
+.role-student{background:rgba(5,150,105,0.12);color:#059669;}
+
+/* ── Optional Badge ── */
+.badge-optional{display:inline-block;padding:2px 8px;border-radius:6px;font-size:0.60rem;font-weight:700;background:rgba(217,119,6,0.12);color:#d97706;margin-left:6px;vertical-align:middle;}
+
+/* ── Info Banner ── */
+.ez-info{padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:0.74rem;display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
+.ez-info-blue{background:rgba(37,99,235,0.08);color:#1d4ed8;border:1px solid rgba(37,99,235,0.15);}
+.ez-info-green{background:rgba(5,150,105,0.08);color:#065f46;border:1px solid rgba(5,150,105,0.15);}
+
+/* ── Spinner overlay ── */
+.ez-loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9999;align-items:center;justify-content:center;}
+.ez-loading.show{display:flex;}
+.ez-loading-box{background:var(--bg-card,white);border-radius:14px;padding:32px 40px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.15);}
+.ez-loading-box i{font-size:2rem;color:var(--primary);margin-bottom:10px;display:block;}
+.ez-loading-box p{font-size:0.85rem;font-weight:700;color:var(--text-primary);margin:0;}
+
+@media(max-width:768px){
+    .ez-grid{grid-template-columns:1fr;}
+    .ez-grid.col2,.ez-grid.col4{grid-template-columns:1fr;}
+    .ez-summary-grid{grid-template-columns:1fr 1fr;}
+    .ez-steps{flex-wrap:wrap;gap:6px;justify-content:center;}
+    .ez-steps::before{display:none;}
+}
+</style>
+{% endblock %}
+{% block content %}
+<div class="ez-wrap">
+
+    <!-- Step Indicator -->
+    <div class="ez-steps" id="ezSteps"></div>
+
+    <!-- Step 1: Organization Details -->
+    <div class="ez-card" id="step1">
+        <h2><i class="fas fa-building"></i> Organization Details</h2>
+        <p class="sub">Enter the school organization information. Fields marked with * are required.</p>
+        <div class="ez-grid col2">
+            <div class="ez-grp"><label>Organization Name <span class="req">*</span></label><input id="orgName" placeholder="e.g. Delhi Public School Trust"></div>
+            <div class="ez-grp"><label>Email</label><input id="orgEmail" type="email" placeholder="info@school.edu.in"></div>
+        </div>
+        <div class="ez-grid col2">
+            <div class="ez-grp"><label>Phone</label><input id="orgPhone" type="tel" placeholder="+91 9876543210"></div>
+            <div class="ez-grp"><label>Address</label><input id="orgAddress" placeholder="123 School Road"></div>
+        </div>
+        <div class="ez-grid">
+            <div class="ez-grp"><label>City</label><input id="orgCity" placeholder="New Delhi"></div>
+            <div class="ez-grp"><label>State</label>
+                <select id="orgState">
+                    <option value="">Select State</option>
+                    <optgroup label="States">
+                        <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option>
+                    </optgroup>
+                    <optgroup label="Union Territories">
+                        <option>Andaman &amp; Nicobar</option><option>Chandigarh</option><option>Dadra &amp; Nagar Haveli</option><option>Daman &amp; Diu</option><option>Delhi</option><option>Jammu &amp; Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option>
+                    </optgroup>
+                </select>
+            </div>
+            <div class="ez-grp"><label>Pincode</label><input id="orgPincode" maxlength="6" inputmode="numeric" oninput="this.value=this.value.replace(/\D/g,'')" placeholder="110001"></div>
+        </div>
+    </div>
+
+    <!-- Step 2: Branch Details -->
+    <div class="ez-card" id="step2">
+        <h2><i class="fas fa-code-branch"></i> Branch Details</h2>
+        <p class="sub">Configure the primary school branch for this organization.</p>
+        <div class="ez-grid col2">
+            <div class="ez-grp"><label>Branch Name <span class="req">*</span></label><input id="branchName" placeholder="e.g. Main Campus"></div>
+            <div class="ez-grp"><label>Board Type</label>
+                <select id="branchBoard">
+                    <option value="">Select Board</option>
+                    <option value="CBSE">CBSE</option>
+                    <option value="ICSE">ICSE</option>
+                    <option value="STATE">State Board</option>
+                    <option value="IB">IB (International Baccalaureate)</option>
+                    <option value="IGCSE">IGCSE (Cambridge)</option>
+                    <option value="OTHER">Other</option>
+                </select>
+            </div>
+        </div>
+        <div class="ez-grid col2">
+            <div class="ez-grp"><label>City</label><input id="branchCity" placeholder="New Delhi"></div>
+            <div class="ez-grp"><label>State</label>
+                <select id="branchState">
+                    <option value="">Select State</option>
+                    <optgroup label="States">
+                        <option>Andhra Pradesh</option><option>Arunachal Pradesh</option><option>Assam</option><option>Bihar</option><option>Chhattisgarh</option><option>Goa</option><option>Gujarat</option><option>Haryana</option><option>Himachal Pradesh</option><option>Jharkhand</option><option>Karnataka</option><option>Kerala</option><option>Madhya Pradesh</option><option>Maharashtra</option><option>Manipur</option><option>Meghalaya</option><option>Mizoram</option><option>Nagaland</option><option>Odisha</option><option>Punjab</option><option>Rajasthan</option><option>Sikkim</option><option>Tamil Nadu</option><option>Telangana</option><option>Tripura</option><option>Uttar Pradesh</option><option>Uttarakhand</option><option>West Bengal</option>
+                    </optgroup>
+                    <optgroup label="Union Territories">
+                        <option>Andaman &amp; Nicobar</option><option>Chandigarh</option><option>Dadra &amp; Nagar Haveli</option><option>Daman &amp; Diu</option><option>Delhi</option><option>Jammu &amp; Kashmir</option><option>Ladakh</option><option>Lakshadweep</option><option>Puducherry</option>
+                    </optgroup>
+                </select>
+            </div>
+        </div>
+        <div class="ez-grid col2">
+            <div class="ez-grp"><label>Principal Name</label><input id="branchPrincipal" placeholder="Dr. Sharma"></div>
+            <div></div>
+        </div>
+    </div>
+
+    <!-- Step 3: Upload Admin/Principal Excel -->
+    <div class="ez-card" id="step3">
+        <h2><i class="fas fa-user-shield"></i> Upload Admins / Principals</h2>
+        <p class="sub">Upload an Excel file with admin and principal details. Download the template first.</p>
+        <button class="btn-template" onclick="downloadTemplate('admin')">
+            <i class="fas fa-download"></i> Download Admin Template (.xlsx)
+        </button>
+        <div class="ez-upload-zone" id="adminDropZone">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <div class="upload-title">Drop your Excel file here or click to browse</div>
+            <div class="upload-hint">Accepted formats: .xlsx, .xls — Max 5MB</div>
+            <input type="file" id="adminFileInput" accept=".xlsx,.xls" onchange="handleFileUpload('admin',this)">
+        </div>
+        <div id="adminPreview"></div>
+    </div>
+
+    <!-- Step 4: Upload Teachers Excel -->
+    <div class="ez-card" id="step4">
+        <h2><i class="fas fa-chalkboard-teacher"></i> Upload Teachers</h2>
+        <p class="sub">Upload an Excel file with teacher details. Download the template first.</p>
+        <button class="btn-template" onclick="downloadTemplate('teacher')">
+            <i class="fas fa-download"></i> Download Teacher Template (.xlsx)
+        </button>
+        <div class="ez-upload-zone" id="teacherDropZone">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <div class="upload-title">Drop your Excel file here or click to browse</div>
+            <div class="upload-hint">Accepted formats: .xlsx, .xls — Max 5MB</div>
+            <input type="file" id="teacherFileInput" accept=".xlsx,.xls" onchange="handleFileUpload('teacher',this)">
+        </div>
+        <div id="teacherPreview"></div>
+    </div>
+
+    <!-- Step 5: Upload Students Excel -->
+    <div class="ez-card" id="step5">
+        <h2><i class="fas fa-user-graduate"></i> Upload Students</h2>
+        <p class="sub">Upload an Excel file with student details. You can configure roll number generation below.</p>
+        <button class="btn-template" onclick="downloadTemplate('student')">
+            <i class="fas fa-download"></i> Download Student Template (.xlsx)
+        </button>
+        <div class="ez-info ez-info-blue">
+            <i class="fas fa-info-circle" style="margin-top:2px;"></i>
+            <div>
+                <strong>Roll Number Auto-Fill:</strong> Set a prefix and starting number below.
+                Each student row without a roll number will be auto-assigned sequentially (e.g. DPS-001, DPS-002...).
+            </div>
+        </div>
+        <div class="ez-grid col4" style="margin-bottom:16px;">
+            <div class="ez-grp"><label>Roll Number Prefix</label><input id="rollPrefix" placeholder="e.g. DPS"></div>
+            <div class="ez-grp"><label>Starting Number</label><input id="rollStart" type="number" min="1" value="1" placeholder="1"></div>
+            <div></div><div></div>
+        </div>
+        <div class="ez-upload-zone" id="studentDropZone">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <div class="upload-title">Drop your Excel file here or click to browse</div>
+            <div class="upload-hint">Accepted formats: .xlsx, .xls — Max 5MB</div>
+            <input type="file" id="studentFileInput" accept=".xlsx,.xls" onchange="handleFileUpload('student',this)">
+        </div>
+        <div id="studentPreview"></div>
+    </div>
+
+    <!-- Step 6: Upload Transport (Optional) -->
+    <div class="ez-card" id="step6">
+        <h2><i class="fas fa-bus"></i> Upload Transport <span class="badge-optional">Optional</span></h2>
+        <p class="sub">Upload transport routes and vehicle details. You can skip this step if transport is not needed yet.</p>
+        <button class="btn-template" onclick="downloadTemplate('transport')">
+            <i class="fas fa-download"></i> Download Transport Template (.xlsx)
+        </button>
+        <div class="ez-upload-zone" id="transportDropZone">
+            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+            <div class="upload-title">Drop your Excel file here or click to browse</div>
+            <div class="upload-hint">Accepted formats: .xlsx, .xls — Max 5MB — This step is optional</div>
+            <input type="file" id="transportFileInput" accept=".xlsx,.xls" onchange="handleFileUpload('transport',this)">
+        </div>
+        <div id="transportPreview"></div>
+    </div>
+
+    <!-- Step 7: Review All -->
+    <div class="ez-card" id="step7">
+        <h2><i class="fas fa-clipboard-check"></i> Review &amp; Confirm</h2>
+        <p class="sub">Verify all uploaded data before creating the school. Errors must be resolved before proceeding.</p>
+        <div id="reviewErrorBadge"></div>
+        <div class="ez-summary-grid" id="reviewSummary"></div>
+        <div id="reviewDetails"></div>
+    </div>
+
+    <!-- Step 8: Success -->
+    <div class="ez-card" id="step8">
+        <div class="ez-success">
+            <div class="check-circle"><i class="fas fa-check"></i></div>
+            <h2>School Setup Complete!</h2>
+            <p>The organization, branch, users, and data have been created successfully.</p>
+            <div id="credentialsSection"></div>
+            <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px;">
+                <button class="btn-ez btn-ez-success" onclick="sendCredentials()"><i class="fas fa-paper-plane"></i> Send All Credentials</button>
+                <button class="btn-ez btn-ez-prev" onclick="downloadCredentialsCSV()"><i class="fas fa-file-csv"></i> Download CSV</button>
+                <a href="/super-admin/branches" class="btn-ez btn-ez-next" style="text-decoration:none;"><i class="fas fa-arrow-right"></i> Go to Branches</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Buttons -->
+    <div class="ez-nav" id="ezNav">
+        <button class="btn-ez btn-ez-prev" id="btnPrev" onclick="prevStep()" style="display:none;">
+            <i class="fas fa-arrow-left"></i> Previous
+        </button>
+        <div style="flex:1;"></div>
+        <button class="btn-ez btn-ez-next" id="btnNext" onclick="nextStep()">
+            Next <i class="fas fa-arrow-right"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div class="ez-loading" id="ezLoading">
+    <div class="ez-loading-box">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p id="loadingText">Setting up school...</p>
+    </div>
+</div>
+
+{% endblock %}
+{% block extra_js %}
+<script>
+/* ════════════════════════════════════════════════════
+   Easy Setup Wizard — State & Constants
+   ════════════════════════════════════════════════════ */
+const TOTAL_STEPS = 8;
+let currentStep = 1;
+
+let setupData = {
+    org: {},
+    branch: {},
+    admins: [],
+    teachers: [],
+    students: [],
+    transport: []
+};
+
+/* Track parsed data and validation results per upload type */
+let parsedData = { admin: null, teacher: null, student: null, transport: null };
+let validationErrors = { admin: 0, teacher: 0, student: 0, transport: 0 };
+let credentials = [];
+
+const STEP_META = [
+    { id: 'step1', label: 'Organization', icon: 'fa-building' },
+    { id: 'step2', label: 'Branch',       icon: 'fa-code-branch' },
+    { id: 'step3', label: 'Admins',       icon: 'fa-user-shield' },
+    { id: 'step4', label: 'Teachers',     icon: 'fa-chalkboard-teacher' },
+    { id: 'step5', label: 'Students',     icon: 'fa-user-graduate' },
+    { id: 'step6', label: 'Transport',    icon: 'fa-bus' },
+    { id: 'step7', label: 'Review',       icon: 'fa-clipboard-check' },
+    { id: 'step8', label: 'Done',         icon: 'fa-check-circle' }
+];
+
+/* ════════════════════════════════════════════════════
+   Step Indicator Rendering
+   ════════════════════════════════════════════════════ */
+function renderStepIndicator() {
+    const container = document.getElementById('ezSteps');
+    container.innerHTML = STEP_META.map(function(s, i) {
+        var n = i + 1;
+        var cls = '';
+        if (n < currentStep) cls = 'done';
+        else if (n === currentStep) cls = 'active';
+        var circleContent = n < currentStep
+            ? '<i class="fas fa-check"></i>'
+            : String(n);
+        return '<div class="ez-step-item ' + cls + '" onclick="goToStep(' + n + ')">' +
+            '<div class="ez-step-circle">' + circleContent + '</div>' +
+            '<div class="ez-step-label">' + s.label + '</div>' +
+        '</div>';
+    }).join('');
+}
+
+/* ════════════════════════════════════════════════════
+   Show / Hide Steps
+   ════════════════════════════════════════════════════ */
+function showStep(n) {
+    for (var i = 1; i <= TOTAL_STEPS; i++) {
+        var el = document.getElementById('step' + i);
+        if (el) el.classList.toggle('visible', i === n);
+    }
+
+    /* Navigation buttons */
+    var btnPrev = document.getElementById('btnPrev');
+    var btnNext = document.getElementById('btnNext');
+    var nav = document.getElementById('ezNav');
+
+    if (n === TOTAL_STEPS) {
+        /* Success step — hide nav entirely */
+        nav.style.display = 'none';
+    } else {
+        nav.style.display = 'flex';
+        btnPrev.style.display = n > 1 ? 'inline-flex' : 'none';
+
+        if (n === 7) {
+            btnNext.innerHTML = '<i class="fas fa-rocket"></i> Setup School';
+            btnNext.className = 'btn-ez btn-ez-success';
+        } else {
+            btnNext.innerHTML = 'Next <i class="fas fa-arrow-right"></i>';
+            btnNext.className = 'btn-ez btn-ez-next';
+        }
+    }
+
+    currentStep = n;
+    renderStepIndicator();
+}
+
+function goToStep(n) {
+    if (n < currentStep) {
+        showStep(n);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Navigation: Next / Previous
+   ════════════════════════════════════════════════════ */
+function nextStep() {
+    if (!validateCurrentStep()) return;
+
+    if (currentStep === 7) {
+        executeSetup();
+        return;
+    }
+
+    /* Collect form data for steps 1 & 2 */
+    if (currentStep === 1) collectOrgData();
+    if (currentStep === 2) collectBranchData();
+
+    /* Steps 3-6: trigger server-side validation on Next */
+    if (currentStep >= 3 && currentStep <= 6) {
+        var typeMap = { 3: 'admin', 4: 'teacher', 5: 'student', 6: 'transport' };
+        var type = typeMap[currentStep];
+        if (parsedData[type] && parsedData[type].length > 0) {
+            validateUploadedData(type, function() {
+                showStep(currentStep + 1);
+                if (currentStep === 7) buildReview();
+            });
+            return;
+        }
+    }
+
+    showStep(currentStep + 1);
+    if (currentStep === 7) buildReview();
+}
+
+function prevStep() {
+    if (currentStep > 1) {
+        showStep(currentStep - 1);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Validation per Step
+   ════════════════════════════════════════════════════ */
+function validateCurrentStep() {
+    if (currentStep === 1) {
+        if (!gv('orgName')) {
+            showToast('error', 'Organization name is required');
+            document.getElementById('orgName').focus();
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 2) {
+        if (!gv('branchName')) {
+            showToast('error', 'Branch name is required');
+            document.getElementById('branchName').focus();
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 3) {
+        if (!parsedData.admin || parsedData.admin.length === 0) {
+            showToast('error', 'Please upload at least one admin/principal record');
+            return false;
+        }
+        if (validationErrors.admin > 0) {
+            showToast('error', 'Please fix ' + validationErrors.admin + ' error(s) in admin data before proceeding');
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 4) {
+        if (!parsedData.teacher || parsedData.teacher.length === 0) {
+            showToast('error', 'Please upload at least one teacher record');
+            return false;
+        }
+        if (validationErrors.teacher > 0) {
+            showToast('error', 'Please fix ' + validationErrors.teacher + ' error(s) in teacher data before proceeding');
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 5) {
+        if (!parsedData.student || parsedData.student.length === 0) {
+            showToast('error', 'Please upload at least one student record');
+            return false;
+        }
+        if (validationErrors.student > 0) {
+            showToast('error', 'Please fix ' + validationErrors.student + ' error(s) in student data before proceeding');
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 6) {
+        /* Transport is optional — allow skipping even with no data */
+        if (parsedData.transport && parsedData.transport.length > 0 && validationErrors.transport > 0) {
+            showToast('error', 'Please fix ' + validationErrors.transport + ' error(s) in transport data before proceeding');
+            return false;
+        }
+        return true;
+    }
+    if (currentStep === 7) {
+        var totalErrors = validationErrors.admin + validationErrors.teacher + validationErrors.student + validationErrors.transport;
+        if (totalErrors > 0) {
+            showToast('error', 'Cannot proceed — ' + totalErrors + ' validation error(s) remain. Go back and fix them.');
+            return false;
+        }
+        return true;
+    }
+    return true;
+}
+
+/* ════════════════════════════════════════════════════
+   Collect Form Data
+   ════════════════════════════════════════════════════ */
+function gv(id) {
+    var el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+}
+
+function collectOrgData() {
+    setupData.org = {
+        name: gv('orgName'),
+        email: gv('orgEmail'),
+        phone: gv('orgPhone'),
+        address: gv('orgAddress'),
+        city: gv('orgCity'),
+        state: gv('orgState'),
+        pincode: gv('orgPincode')
+    };
+}
+
+function collectBranchData() {
+    setupData.branch = {
+        name: gv('branchName'),
+        board_type: gv('branchBoard'),
+        city: gv('branchCity'),
+        state: gv('branchState'),
+        principal_name: gv('branchPrincipal')
+    };
+}
+
+/* ════════════════════════════════════════════════════
+   Download Template
+   ════════════════════════════════════════════════════ */
+async function downloadTemplate(type) {
+    try {
+        showToast('info', 'Downloading ' + type + ' template...');
+        var response = await fetch('/api/super-admin/easy-setup/template/' + type, {
+            method: 'GET',
+            credentials: 'same-origin'
+        });
+        if (!response.ok) {
+            showToast('error', 'Failed to download template');
+            return;
+        }
+        var blob = await response.blob();
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = type + '_template.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showToast('success', 'Template downloaded');
+    } catch (e) {
+        showToast('error', 'Download failed: ' + e.message);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   File Upload & Parse
+   ════════════════════════════════════════════════════ */
+async function handleFileUpload(type, input) {
+    var file = input.files[0];
+    if (!file) return;
+
+    /* Basic client-side checks */
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (ext !== 'xlsx' && ext !== 'xls') {
+        showToast('error', 'Only .xlsx or .xls files are accepted');
+        input.value = '';
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('error', 'File exceeds 5MB limit');
+        input.value = '';
+        return;
+    }
+
+    showToast('info', 'Uploading and parsing ' + type + ' file...');
+
+    var formData = new FormData();
+    formData.append('file', file);
+    formData.append('type', type);
+
+    /* For students, send roll number config */
+    if (type === 'student') {
+        formData.append('roll_prefix', gv('rollPrefix'));
+        formData.append('roll_start', gv('rollStart') || '1');
+    }
+
+    try {
+        var response = await fetch('/api/super-admin/easy-setup/parse', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        var data = await response.json();
+
+        if (data.error) {
+            showToast('error', data.error);
+            return;
+        }
+
+        parsedData[type] = data.rows || [];
+        validationErrors[type] = (data.errors || 0);
+
+        /* Store in setupData */
+        if (type === 'admin') setupData.admins = parsedData[type];
+        else if (type === 'teacher') setupData.teachers = parsedData[type];
+        else if (type === 'student') setupData.students = parsedData[type];
+        else if (type === 'transport') setupData.transport = parsedData[type];
+
+        renderPreviewTable(type, data.columns || [], parsedData[type]);
+        showToast('success', parsedData[type].length + ' rows parsed (' + validationErrors[type] + ' error' + (validationErrors[type] !== 1 ? 's' : '') + ')');
+    } catch (e) {
+        showToast('error', 'Upload failed: ' + e.message);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Preview Table
+   ════════════════════════════════════════════════════ */
+function renderPreviewTable(type, columns, rows) {
+    var container = document.getElementById(type + 'Preview');
+    if (!rows || rows.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    /* Build column headers dynamically; always prepend Status */
+    var cols = ['Status'].concat(columns.length > 0 ? columns : Object.keys(rows[0]).filter(function(k){ return k !== '_valid' && k !== '_errors'; }));
+
+    var html = '<div class="ez-table-wrap"><table class="ez-table"><thead><tr>';
+    for (var c = 0; c < cols.length; c++) {
+        html += '<th>' + escHtml(cols[c]) + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    for (var r = 0; r < rows.length; r++) {
+        var row = rows[r];
+        var isValid = row._valid !== false;
+        html += '<tr class="' + (isValid ? '' : 'row-error') + '">';
+        /* Status column */
+        if (isValid) {
+            html += '<td class="status-ok"><i class="fas fa-check-circle"></i></td>';
+        } else {
+            var errTitle = (row._errors || []).join('; ');
+            html += '<td class="status-err" title="' + escAttr(errTitle) + '"><i class="fas fa-times-circle"></i></td>';
+        }
+        /* Data columns */
+        for (var d = 1; d < cols.length; d++) {
+            var key = cols[d];
+            var val = row[key] !== undefined && row[key] !== null ? String(row[key]) : '';
+            html += '<td>' + escHtml(val) + '</td>';
+        }
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    html += '<div style="margin-top:8px;font-size:0.70rem;color:var(--text-light);">' +
+            '<i class="fas fa-table"></i> ' + rows.length + ' row(s) loaded' +
+            (validationErrors[type] > 0
+                ? ' &mdash; <span style="color:#dc2626;font-weight:700;">' + validationErrors[type] + ' error(s)</span>'
+                : ' &mdash; <span style="color:#059669;font-weight:700;">All valid</span>') +
+            '</div>';
+    container.innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════
+   Server-Side Validation (Steps 3-6 on Next)
+   ════════════════════════════════════════════════════ */
+async function validateUploadedData(type, onSuccess) {
+    try {
+        var payload = { type: type, rows: parsedData[type] || [] };
+        var result = await apiCall('/api/super-admin/easy-setup/validate', 'POST', payload);
+        if (result.error) {
+            showToast('error', result.error);
+            return;
+        }
+        /* Update rows with validation status from server */
+        if (result.rows) {
+            parsedData[type] = result.rows;
+            if (type === 'admin') setupData.admins = result.rows;
+            else if (type === 'teacher') setupData.teachers = result.rows;
+            else if (type === 'student') setupData.students = result.rows;
+            else if (type === 'transport') setupData.transport = result.rows;
+        }
+        validationErrors[type] = result.errors || 0;
+        renderPreviewTable(type, result.columns || [], parsedData[type]);
+
+        if (validationErrors[type] > 0) {
+            showToast('error', validationErrors[type] + ' validation error(s) found in ' + type + ' data');
+        } else {
+            if (onSuccess) onSuccess();
+        }
+    } catch (e) {
+        showToast('error', 'Validation failed: ' + e.message);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Validate All (for Review step)
+   ════════════════════════════════════════════════════ */
+async function validateAll() {
+    try {
+        var payload = {
+            org: setupData.org,
+            branch: setupData.branch,
+            admins: setupData.admins,
+            teachers: setupData.teachers,
+            students: setupData.students,
+            transport: setupData.transport
+        };
+        var result = await apiCall('/api/super-admin/easy-setup/validate-all', 'POST', payload);
+        return result;
+    } catch (e) {
+        return { error: e.message };
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Build Review (Step 7)
+   ════════════════════════════════════════════════════ */
+function buildReview() {
+    collectOrgData();
+    collectBranchData();
+
+    var totalErrors = validationErrors.admin + validationErrors.teacher + validationErrors.student + validationErrors.transport;
+
+    /* Error badge */
+    var badgeEl = document.getElementById('reviewErrorBadge');
+    if (totalErrors > 0) {
+        badgeEl.innerHTML = '<div class="ez-error-badge has-errors"><i class="fas fa-exclamation-triangle"></i> ' + totalErrors + ' error(s) found — go back and fix before proceeding</div>';
+    } else {
+        badgeEl.innerHTML = '<div class="ez-error-badge no-errors"><i class="fas fa-check-circle"></i> All data validated — ready to set up</div>';
+    }
+
+    /* Summary cards */
+    document.getElementById('reviewSummary').innerHTML =
+        sumCard('fa-user-shield', 'ic-admin', setupData.admins.length, 'Admins') +
+        sumCard('fa-chalkboard-teacher', 'ic-teacher', setupData.teachers.length, 'Teachers') +
+        sumCard('fa-user-graduate', 'ic-student', setupData.students.length, 'Students') +
+        sumCard('fa-bus', 'ic-transport', setupData.transport.length, 'Transport');
+
+    /* Detail sections */
+    var details = '';
+
+    /* Organization */
+    details += '<div class="ez-review-section"><h4><i class="fas fa-building"></i> Organization</h4>';
+    details += reviewRow('Name', setupData.org.name);
+    details += reviewRow('Email', setupData.org.email || '—');
+    details += reviewRow('Phone', setupData.org.phone || '—');
+    details += reviewRow('Location', [setupData.org.city, setupData.org.state, setupData.org.pincode].filter(Boolean).join(', ') || '—');
+    details += '</div>';
+
+    /* Branch */
+    details += '<div class="ez-review-section"><h4><i class="fas fa-code-branch"></i> Branch</h4>';
+    details += reviewRow('Name', setupData.branch.name);
+    details += reviewRow('Board', setupData.branch.board_type || '—');
+    details += reviewRow('Principal', setupData.branch.principal_name || '—');
+    details += reviewRow('Location', [setupData.branch.city, setupData.branch.state].filter(Boolean).join(', ') || '—');
+    details += '</div>';
+
+    /* Admins summary */
+    if (setupData.admins.length > 0) {
+        details += '<div class="ez-review-section"><h4><i class="fas fa-user-shield"></i> Admins (' + setupData.admins.length + ')</h4>';
+        for (var a = 0; a < Math.min(setupData.admins.length, 10); a++) {
+            var ad = setupData.admins[a];
+            details += reviewRow(
+                (ad.first_name || ad.name || '') + ' ' + (ad.last_name || ''),
+                ad.email || '—'
+            );
+        }
+        if (setupData.admins.length > 10) details += '<div style="font-size:0.70rem;color:var(--text-light);padding:4px 0;">...and ' + (setupData.admins.length - 10) + ' more</div>';
+        details += '</div>';
+    }
+
+    /* Teachers summary */
+    if (setupData.teachers.length > 0) {
+        details += '<div class="ez-review-section"><h4><i class="fas fa-chalkboard-teacher"></i> Teachers (' + setupData.teachers.length + ')</h4>';
+        for (var t = 0; t < Math.min(setupData.teachers.length, 10); t++) {
+            var tc = setupData.teachers[t];
+            details += reviewRow(
+                (tc.first_name || tc.name || '') + ' ' + (tc.last_name || ''),
+                tc.email || tc.subject || '—'
+            );
+        }
+        if (setupData.teachers.length > 10) details += '<div style="font-size:0.70rem;color:var(--text-light);padding:4px 0;">...and ' + (setupData.teachers.length - 10) + ' more</div>';
+        details += '</div>';
+    }
+
+    /* Students summary */
+    if (setupData.students.length > 0) {
+        details += '<div class="ez-review-section"><h4><i class="fas fa-user-graduate"></i> Students (' + setupData.students.length + ')</h4>';
+        for (var st = 0; st < Math.min(setupData.students.length, 10); st++) {
+            var sd = setupData.students[st];
+            details += reviewRow(
+                (sd.first_name || sd.name || '') + ' ' + (sd.last_name || ''),
+                (sd.class_name || sd['class'] || '') + (sd.section ? ' — ' + sd.section : '')
+            );
+        }
+        if (setupData.students.length > 10) details += '<div style="font-size:0.70rem;color:var(--text-light);padding:4px 0;">...and ' + (setupData.students.length - 10) + ' more</div>';
+        details += '</div>';
+    }
+
+    /* Transport summary */
+    if (setupData.transport.length > 0) {
+        details += '<div class="ez-review-section"><h4><i class="fas fa-bus"></i> Transport (' + setupData.transport.length + ')</h4>';
+        for (var tr = 0; tr < Math.min(setupData.transport.length, 10); tr++) {
+            var td = setupData.transport[tr];
+            details += reviewRow(
+                td.route_name || td.vehicle_number || ('Route ' + (tr + 1)),
+                td.driver_name || '—'
+            );
+        }
+        if (setupData.transport.length > 10) details += '<div style="font-size:0.70rem;color:var(--text-light);padding:4px 0;">...and ' + (setupData.transport.length - 10) + ' more</div>';
+        details += '</div>';
+    }
+
+    document.getElementById('reviewDetails').innerHTML = details;
+}
+
+function sumCard(icon, colorClass, count, label) {
+    return '<div class="ez-sum-card">' +
+        '<div class="sum-icon ' + colorClass + '"><i class="fas ' + icon + '"></i></div>' +
+        '<div class="sum-count">' + count + '</div>' +
+        '<div class="sum-label">' + label + '</div>' +
+    '</div>';
+}
+
+function reviewRow(label, value) {
+    return '<div class="ez-review-row"><span class="rl">' + escHtml(label) + '</span><span class="rv">' + escHtml(value) + '</span></div>';
+}
+
+/* ════════════════════════════════════════════════════
+   Execute Setup
+   ════════════════════════════════════════════════════ */
+async function executeSetup() {
+    var totalErrors = validationErrors.admin + validationErrors.teacher + validationErrors.student + validationErrors.transport;
+    if (totalErrors > 0) {
+        showToast('error', 'Cannot proceed with ' + totalErrors + ' error(s). Go back and fix them.');
+        return;
+    }
+
+    showLoading('Creating organization and branch...');
+
+    try {
+        var payload = {
+            org: setupData.org,
+            branch: setupData.branch,
+            admins: setupData.admins,
+            teachers: setupData.teachers,
+            students: setupData.students,
+            transport: setupData.transport,
+            roll_prefix: gv('rollPrefix'),
+            roll_start: parseInt(gv('rollStart')) || 1
+        };
+
+        var result = await apiCall('/api/super-admin/easy-setup/execute', 'POST', payload);
+        hideLoading();
+
+        if (result.error) {
+            showToast('error', result.error);
+            return;
+        }
+
+        credentials = result.credentials || [];
+        renderCredentials(credentials);
+        showStep(8);
+        showToast('success', 'School setup completed successfully!');
+    } catch (e) {
+        hideLoading();
+        showToast('error', 'Setup failed: ' + e.message);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Credentials Table (Step 8)
+   ════════════════════════════════════════════════════ */
+function renderCredentials(creds) {
+    var container = document.getElementById('credentialsSection');
+    if (!creds || creds.length === 0) {
+        container.innerHTML = '<p style="font-size:0.78rem;color:var(--text-light);">No credentials were generated.</p>';
+        return;
+    }
+
+    var html = '<div style="text-align:left;max-height:360px;overflow-y:auto;border-radius:10px;border:1.5px solid var(--border-light,#e2e8f0);margin:0 auto;max-width:700px;">';
+    html += '<table class="ez-cred-table"><thead><tr>';
+    html += '<th>Name</th><th>Email</th><th>Password</th><th>Role</th>';
+    html += '</tr></thead><tbody>';
+
+    for (var i = 0; i < creds.length; i++) {
+        var c = creds[i];
+        var roleClass = 'role-admin';
+        if (c.role === 'teacher') roleClass = 'role-teacher';
+        else if (c.role === 'student') roleClass = 'role-student';
+
+        html += '<tr>';
+        html += '<td>' + escHtml(c.name || '') + '</td>';
+        html += '<td>' + escHtml(c.email || '') + '</td>';
+        html += '<td><code style="font-size:0.76rem;background:var(--bg-secondary,#f8fafc);padding:2px 6px;border-radius:4px;">' + escHtml(c.password || '') + '</code></td>';
+        html += '<td><span class="role-badge ' + roleClass + '">' + escHtml(c.role || '') + '</span></td>';
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+/* ════════════════════════════════════════════════════
+   Send Credentials
+   ════════════════════════════════════════════════════ */
+async function sendCredentials() {
+    if (!credentials || credentials.length === 0) {
+        showToast('error', 'No credentials to send');
+        return;
+    }
+
+    showLoading('Sending credentials via email...');
+
+    try {
+        var result = await apiCall('/api/super-admin/easy-setup/send-credentials', 'POST', {
+            credentials: credentials
+        });
+        hideLoading();
+
+        if (result.error) {
+            showToast('error', result.error);
+            return;
+        }
+
+        showToast('success', 'Credentials sent to ' + (result.sent_count || credentials.length) + ' recipient(s)');
+    } catch (e) {
+        hideLoading();
+        showToast('error', 'Failed to send credentials: ' + e.message);
+    }
+}
+
+/* ════════════════════════════════════════════════════
+   Download Credentials CSV
+   ════════════════════════════════════════════════════ */
+function downloadCredentialsCSV() {
+    if (!credentials || credentials.length === 0) {
+        showToast('error', 'No credentials to download');
+        return;
+    }
+
+    var csvRows = ['Name,Email,Password,Role'];
+    for (var i = 0; i < credentials.length; i++) {
+        var c = credentials[i];
+        csvRows.push(
+            csvEscape(c.name || '') + ',' +
+            csvEscape(c.email || '') + ',' +
+            csvEscape(c.password || '') + ',' +
+            csvEscape(c.role || '')
+        );
+    }
+
+    var csvContent = csvRows.join('\n');
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'school_credentials_' + new Date().toISOString().split('T')[0] + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    showToast('success', 'CSV downloaded');
+}
+
+function csvEscape(val) {
+    val = String(val);
+    if (val.indexOf(',') !== -1 || val.indexOf('"') !== -1 || val.indexOf('\n') !== -1) {
+        return '"' + val.replace(/"/g, '""') + '"';
+    }
+    return val;
+}
+
+/* ════════════════════════════════════════════════════
+   Loading Overlay
+   ════════════════════════════════════════════════════ */
+function showLoading(text) {
+    document.getElementById('loadingText').textContent = text || 'Processing...';
+    document.getElementById('ezLoading').classList.add('show');
+}
+
+function hideLoading() {
+    document.getElementById('ezLoading').classList.remove('show');
+}
+
+/* ════════════════════════════════════════════════════
+   HTML/Attribute Escaping
+   ════════════════════════════════════════════════════ */
+function escHtml(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = String(str);
+    return d.innerHTML;
+}
+
+function escAttr(str) {
+    return escHtml(str).replace(/"/g, '&quot;');
+}
+
+/* ════════════════════════════════════════════════════
+   Drag & Drop Zones
+   ════════════════════════════════════════════════════ */
+function initDragDrop() {
+    var zones = ['adminDropZone', 'teacherDropZone', 'studentDropZone', 'transportDropZone'];
+    var types = ['admin', 'teacher', 'student', 'transport'];
+
+    zones.forEach(function(zoneId, idx) {
+        var zone = document.getElementById(zoneId);
+        if (!zone) return;
+
+        zone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+        zone.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+        });
+        zone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            var files = e.dataTransfer.files;
+            if (files.length > 0) {
+                var inputId = types[idx] + 'FileInput';
+                var input = document.getElementById(inputId);
+                /* Programmatic file assignment via DataTransfer */
+                var dt = new DataTransfer();
+                dt.items.add(files[0]);
+                input.files = dt.files;
+                handleFileUpload(types[idx], input);
+            }
+        });
+    });
+}
+
+/* ════════════════════════════════════════════════════
+   Initialization
+   ════════════════════════════════════════════════════ */
+function init() {
+    showStep(1);
+    initDragDrop();
+}
+
+init();
+</script>
+{% endblock %}
